@@ -1,0 +1,71 @@
+package xaeroplus.mixin.client;
+
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import xaero.map.MapProcessor;
+import xaero.map.cache.BlockStateShortShapeCache;
+import xaero.map.region.MapRegion;
+import xaero.map.region.MapTile;
+import xaero.map.region.MapTileChunk;
+import xaero.map.region.texture.LeafRegionTexture;
+import xaero.map.world.MapDimension;
+import xaero.map.world.MapWorld;
+import xaeroplus.feature.extensions.SeenChunksTrackingMapTileChunk;
+import xaeroplus.settings.Settings;
+
+@Mixin(
+   value = {MapTileChunk.class},
+   remap = false
+)
+public abstract class MixinMapTileChunk implements SeenChunksTrackingMapTileChunk {
+   @Unique
+   private final boolean[][] xaeroPlus$seenTiles = new boolean[4][4];
+   @Shadow
+   private LeafRegionTexture leafTexture;
+
+   @Shadow
+   public abstract MapRegion getInRegion();
+
+   public boolean[][] getSeenTiles() {
+      return this.xaeroPlus$seenTiles;
+   }
+
+   @Inject(
+      method = {"setTile"},
+      at = {@At("HEAD")}
+   )
+   public void setTile(final int x, final int z, final MapTile tile, final BlockStateShortShapeCache blockStateShortShapeCache, final MapProcessor mapProcessor, final CallbackInfo ci) {
+      this.xaeroPlus$seenTiles[x][z] = tile != null;
+   }
+
+   @Inject(
+      method = {"readCacheData"},
+      at = {@At("RETURN")}
+   )
+   public void readCacheData(final CallbackInfo ci) {
+      for(int i = 0; i < 4; ++i) {
+         for(int j = 0; j < 4; ++j) {
+            int height = this.leafTexture.getHeight(i << 4, j << 4);
+            this.xaeroPlus$seenTiles[i][j] = height != -1 && height != 32767;
+         }
+      }
+
+   }
+
+   @WrapOperation(
+      method = {"updateBuffers"},
+      at = {@At(
+   value = "INVOKE",
+   target = "Lxaero/map/world/MapWorld;getCurrentDimension()Lxaero/map/world/MapDimension;"
+)}
+   )
+   public MapDimension useRegionDimensionInsteadOfMapWorld(final MapWorld mapWorld, final Operation<MapDimension> original) {
+      return Settings.REGISTRY.writesWhileDimSwitched.get() && mapWorld.isMultiplayer() ? this.getInRegion().getDim() : (MapDimension)original.call(new Object[]{mapWorld});
+   }
+}

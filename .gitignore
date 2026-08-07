@@ -1,0 +1,14 @@
+.gradle/
+build/
+gradle-runtime/
+.gradle/
+map-integration/.gradle/
+map-integration/build/
+*.class
+*.jar
+!libs/*.jar
+.idea/
+*.iml
+local.properties
+run/
+out/

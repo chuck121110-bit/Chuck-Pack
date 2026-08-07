@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "aeropack",
+  "version": "${version}",
+  "name": "Aero Pack",
+  "description": "A Meteor Client addon by Aero.",
+  "authors": ["Aero"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/aeropack/icon.png",
+  "environment": "client",
+  "entrypoints": { "meteor": ["net.aero.aeropack.AeroPack"] },
+  "accessWidener": "aeropack.accesswidener",
+  "mixins": ["aeropack.mixins.json"],
+  "custom": { "meteor-client:color": "0,200,160" },
+  "depends": { "java": ">=21", "minecraft": ">=${mc_version}", "meteor-client": "*", "xaeroworldmap": "*" }
+}

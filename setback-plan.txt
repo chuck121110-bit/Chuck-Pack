@@ -1,0 +1,45 @@
+AUTOFLY SETBACK DETECTION PLAN
+================================
+
+PHASE 1 - RAMP UP (normal operation)
+- Speed increases slowly each tick (rampUpIncrement)
+- Setbacks start being detected and counted
+- Display: "Setback 1/10", "Setback 2/10", etc.
+- All timers are REAL LIFE milliseconds, not ticks
+
+PHASE 2 - THRESHOLD REACHED (10 setbacks first time, 5 after that)
+- Print "Setback detected" (no more "X/10" counting)
+- Decrease speed by rampUpIncrement
+- Enter COOLDOWN WATCH (5 real life seconds of no setbacks)
+
+PHASE 3a - COOLDOWN SUCCEEDS (no setbacks for 5 real life seconds)
+- Speed is safe for now, hold current speed
+- Enter QUIET WATCH (3 real life minutes of no setbacks)
+
+PHASE 4 - QUIET PERIOD SUCCEEDS (zero setbacks for 3 real life minutes)
+- Server is stable, start slowly ramping back up
+- Increase speed by rampUpIncrement / 3 per tick (1/3 normal ramp speed)
+- Keep watching for setbacks with 5 setback threshold
+- If setbacks detected during slow ramp, go back to PHASE 2
+
+PHASE 3b - COOLDOWN FAILS (setback happens within 5 real life seconds)
+- Server still pushing back, speed still too high
+- Decrease speed again immediately
+- Reset the 5 second cooldown timer
+- Keep doing this until we get 5 quiet seconds
+- After 5 quiet seconds, enter 3 minute quiet watch (PHASE 3a)
+
+PHASE 5 - SUBSEQUENT CYCLES
+- After the first full 10-setback cycle completes,
+  all future cycles use 5 setbacks as the threshold
+- Same pattern: 5 setbacks -> decrease -> 5s cooldown -> 3min quiet -> slow ramp
+
+SUMMARY
+- First cycle: 10 setbacks to trigger
+- Every cycle after: 5 setbacks to trigger
+- After every decrease: wait 5 real life seconds to hold speed
+- If setback during cooldown: decrease immediately, reset timer
+- After 5 quiet seconds: hold speed, start 3 minute quiet watch
+- After 3 quiet minutes: ramp up at 1/3 normal speed
+- If setback during slow ramp: back to decreasing with 5 threshold
+- All timings are real life milliseconds

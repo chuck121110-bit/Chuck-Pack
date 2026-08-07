@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.aero.mapintegration.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "GuiMapMixin",
+    "WaypointReaderMixin",
+    "ChatHudMixin",
+    "ChatHudClickMixin",
+    "MixinGuiWorldMapSettings",
+    "MixinGuiMinimapViewSettings"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

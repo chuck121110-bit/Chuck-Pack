@@ -1,0 +1,229 @@
+package xaeroplus.mixin.client;
+
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
+import com.llamalad7.mixinextras.sugar.Share;
+import com.llamalad7.mixinextras.sugar.ref.LocalIntRef;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import net.minecraft.class_12247;
+import net.minecraft.class_310;
+import net.minecraft.class_4587;
+import net.minecraft.class_4588;
+import org.joml.Matrix4f;
+import org.joml.Matrix4fStack;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
+import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.Slice;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import xaero.common.HudMod;
+import xaero.common.graphics.ImprovedFramebuffer;
+import xaero.common.graphics.renderer.multitexture.MultiTextureRenderTypeRenderer;
+import xaero.common.graphics.renderer.multitexture.MultiTextureRenderTypeRendererProvider;
+import xaero.common.minimap.render.MinimapFBORenderer;
+import xaero.common.minimap.render.MinimapRenderer;
+import xaero.common.minimap.render.MinimapRendererHelper;
+import xaero.common.mods.SupportXaeroWorldmap;
+import xaero.hud.minimap.BuiltInHudModules;
+import xaero.hud.minimap.Minimap;
+import xaero.hud.minimap.MinimapLogs;
+import xaero.hud.minimap.common.config.option.MinimapProfiledConfigOptions;
+import xaero.hud.minimap.compass.render.CompassRenderer;
+import xaero.hud.minimap.module.MinimapSession;
+import xaero.hud.minimap.waypoint.render.WaypointMapRenderer;
+import xaero.lib.client.graphics.XaeroBufferProvider;
+import xaeroplus.Globals;
+import xaeroplus.feature.extensions.CustomMinimapFBORenderer;
+import xaeroplus.feature.render.shaders.XaeroPlusShaders;
+
+@Mixin(
+   value = {MinimapFBORenderer.class},
+   remap = false
+)
+public abstract class MixinMinimapFBORenderer extends MinimapRenderer implements CustomMinimapFBORenderer {
+   @Shadow
+   private ImprovedFramebuffer scalingFramebuffer;
+   @Shadow
+   private ImprovedFramebuffer rotationFramebuffer;
+   @Shadow
+   private boolean loadedFBO;
+
+   public MixinMinimapFBORenderer(final HudMod modMain, final class_310 mc, final WaypointMapRenderer waypointMapRenderer, final Minimap minimap, final CompassRenderer compassRenderer, final class_4587 matrixStack) {
+      super(modMain, mc, waypointMapRenderer, minimap, compassRenderer, matrixStack);
+   }
+
+   @ModifyExpressionValue(
+      method = {"loadFrameBuffer"},
+      at = {@At(
+   value = "CONSTANT",
+   args = {"intValue=512"}
+)}
+   )
+   public int overrideFrameBufferSize(int size) {
+      return Globals.minimapScaleMultiplier * 512;
+   }
+
+   public void reloadMapFrameBuffers() {
+      if (!((MinimapSession)BuiltInHudModules.MINIMAP.getCurrentSession()).getProcessor().canUseFrameBuffer()) {
+         MinimapLogs.LOGGER.info("FBO mode not supported! Using minimap safe mode.");
+      } else {
+         if (this.scalingFramebuffer != null) {
+            this.scalingFramebuffer.method_1238();
+         }
+
+         if (this.rotationFramebuffer != null) {
+            this.rotationFramebuffer.method_1238();
+         }
+
+         int scaledSize = Globals.minimapScaleMultiplier * 512;
+         this.scalingFramebuffer = new ImprovedFramebuffer(scaledSize, scaledSize, true);
+         this.rotationFramebuffer = new ImprovedFramebuffer(scaledSize, scaledSize, true);
+         this.loadedFBO = this.scalingFramebuffer.method_30277() != null;
+      }
+
+   }
+
+   @ModifyArg(
+      method = {"renderChunks"},
+      at = @At(
+   value = "INVOKE",
+   target = "Lxaero/common/minimap/render/MinimapFBORenderer;renderChunksToFBO(Lxaero/hud/minimap/module/MinimapSession;Lnet/minecraft/class_4587;Lxaero/common/minimap/MinimapProcessor;Lnet/minecraft/class_243;Lnet/minecraft/class_5321;DIFIZZIDDZLxaero/lib/client/graphics/XaeroBufferProvider;)V"
+),
+      index = 6,
+      remap = true
+   )
+   public int modifyViewW(final int viewW) {
+      return viewW * Globals.minimapScaleMultiplier;
+   }
+
+   @Inject(
+      method = {"renderChunksToFBO"},
+      at = {@At("HEAD")},
+      remap = true
+   )
+   public void modifyScaledSize(final CallbackInfo ci, @Share("scaledSize") LocalIntRef scaledSize) {
+      int s = 256 * Globals.minimapScaleMultiplier * Globals.minimapSizeMultiplier;
+      if (Globals.minimapSizeMultiplier > 1) {
+         int f = (Globals.minimapSizeMultiplier - 1) * Globals.minimapScaleMultiplier;
+         s -= f * 6;
+         int scaledMinimapSize = (Integer)this.modMain.getHudConfigs().getClientConfigManager().getEffective(MinimapProfiledConfigOptions.SIZE);
+         int minimapNormalSize = scaledMinimapSize / Globals.minimapSizeMultiplier;
+         int minimapScaledSizeDiff = 250 - minimapNormalSize;
+         s -= minimapScaledSizeDiff * f;
+      }
+
+      scaledSize.set(s);
+   }
+
+   @Redirect(
+      method = {"renderChunksToFBO"},
+      at = @At(
+   value = "INVOKE",
+   target = "Lorg/joml/Matrix4fStack;translate(FFF)Lorg/joml/Matrix4f;",
+   ordinal = 0
+),
+      remap = true
+   )
+   public Matrix4f modifyShaderMatrixStackTranslate(final Matrix4fStack instance, final float x, final float y, final float z, @Share("scaledSize") LocalIntRef scaledSize) {
+      float translate = 256.0F * (float)Globals.minimapScaleMultiplier;
+      return instance.translate(translate, translate, -2000.0F);
+   }
+
+   @ModifyArg(
+      method = {"renderChunksToFBO"},
+      at = @At(
+   value = "INVOKE",
+   target = "Lxaero/common/minimap/render/MinimapRendererHelper;addColoredLineToExistingBuffer(Lnet/minecraft/class_4587$class_4665;Lnet/minecraft/class_4588;FFFFFFFFF)V"
+),
+      index = 10
+   )
+   public float modifyChunkGridLineWidth(final float lineWidth) {
+      return Math.max(1.0F, lineWidth * (float)Globals.minimapScaleMultiplier / (float)Globals.minimapSizeMultiplier);
+   }
+
+   @Redirect(
+      method = {"renderChunksToFBO"},
+      at = @At(
+   value = "INVOKE",
+   target = "Lorg/joml/Matrix4fStack;translate(FFF)Lorg/joml/Matrix4f;",
+   ordinal = 0
+),
+      slice = @Slice(
+   from = @At(
+   value = "INVOKE",
+   target = "Lxaero/common/graphics/ImprovedFramebuffer;getTas()Lnet/minecraft/class_12247$class_12337;"
+)
+),
+      remap = true
+   )
+   public Matrix4f correctPreRotationTranslationForSizeMult(final Matrix4fStack instance, final float x, final float y, final float z) {
+      return instance.translate(x / (float)Globals.minimapSizeMultiplier, y / (float)Globals.minimapSizeMultiplier, z);
+   }
+
+   @WrapOperation(
+      method = {"renderChunksToFBO"},
+      at = {@At(
+   value = "INVOKE",
+   target = "Lxaero/lib/client/graphics/util/ImmediateRenderUtil;texturedRect(Lnet/minecraft/class_4587;FFIIFFFFLcom/mojang/blaze3d/pipeline/RenderPipeline;Lnet/minecraft/class_12247$class_12337;)V",
+   ordinal = 0
+)},
+      slice = {@Slice(
+   from = @At(
+   value = "INVOKE",
+   target = "Lxaero/common/graphics/ImprovedFramebuffer;bindAsMainTarget(Z)V",
+   ordinal = 1
+)
+)}
+   )
+   public void correctScaledFBO(final class_4587 matrixStack, final float x, final float y, final int textureX, final int textureY, final float width, final float height, final float textureH, final float factor, final RenderPipeline renderPipeline, final class_12247.class_12337 texture, final Operation<Void> original) {
+      original.call(new Object[]{matrixStack, x * (float)Globals.minimapScaleMultiplier, y * (float)Globals.minimapScaleMultiplier, textureX, textureY, width * (float)Globals.minimapScaleMultiplier, height * (float)Globals.minimapScaleMultiplier, textureH * (float)Globals.minimapScaleMultiplier, factor * (float)Globals.minimapScaleMultiplier, renderPipeline, texture});
+   }
+
+   @WrapOperation(
+      method = {"renderChunksToFBO"},
+      at = {@At(
+   value = "INVOKE",
+   target = "Lxaero/common/mods/SupportXaeroWorldmap;drawMinimap(Lxaero/hud/minimap/module/MinimapSession;Lnet/minecraft/class_4587;Lxaero/common/minimap/render/MinimapRendererHelper;IIIIIIZDDLnet/minecraft/class_4588;Lxaero/common/graphics/renderer/multitexture/MultiTextureRenderTypeRendererProvider;)V"
+)},
+      remap = true
+   )
+   public void drawMinimapFeatures(final SupportXaeroWorldmap instance, final MinimapSession minimapSession, final class_4587 matrixStack, final MinimapRendererHelper helper, final int xFloored, final int zFloored, final int minViewX, final int minViewZ, final int maxViewX, final int maxViewZ, final boolean zooming, final double zoom, final double mapDimensionScale, final class_4588 overlayBufferBuilder, final MultiTextureRenderTypeRendererProvider multiTextureRenderTypeRenderers, final Operation<Void> original, @Local(name = {"renderTypeBuffers"}) XaeroBufferProvider renderTypeBuffers) {
+      original.call(new Object[]{instance, minimapSession, matrixStack, helper, xFloored, zFloored, minViewX, minViewZ, maxViewX, maxViewZ, zooming, zoom, mapDimensionScale, overlayBufferBuilder, multiTextureRenderTypeRenderers});
+      int mapX = xFloored >> 4;
+      int mapZ = zFloored >> 4;
+      int chunkX = mapX >> 2;
+      int chunkZ = mapZ >> 2;
+      int tileX = mapX & 3;
+      int tileZ = mapZ & 3;
+      int insideX = xFloored & 15;
+      int insideZ = zFloored & 15;
+      XaeroPlusShaders.setFrameSize((float)this.scalingFramebuffer.field_1482, (float)this.scalingFramebuffer.field_1481);
+      Globals.drawManager.drawMinimapFeatures(chunkX, chunkZ, tileX, tileZ, insideX, insideZ, zoom, matrixStack, renderTypeBuffers);
+   }
+
+   @WrapOperation(
+      method = {"renderChunksToFBO"},
+      at = {@At(
+   value = "INVOKE",
+   target = "Lxaero/common/graphics/renderer/multitexture/MultiTextureRenderTypeRendererProvider;draw(Lxaero/common/graphics/renderer/multitexture/MultiTextureRenderTypeRenderer;)V"
+)}
+   )
+   public void drawMinimapFeaturesCaveMode(final MultiTextureRenderTypeRendererProvider instance, final MultiTextureRenderTypeRenderer renderer, final Operation<Void> original, @Local(name = {"xFloored"}) int xFloored, @Local(name = {"zFloored"}) int zFloored, @Local(name = {"matrixStack"}) class_4587 matrixStack, @Local(name = {"renderTypeBuffers"}) XaeroBufferProvider renderTypeBuffers) {
+      original.call(new Object[]{instance, renderer});
+      XaeroPlusShaders.setFrameSize((float)this.scalingFramebuffer.field_1482, (float)this.scalingFramebuffer.field_1481);
+      int mapX = xFloored >> 4;
+      int mapZ = zFloored >> 4;
+      int chunkX = mapX >> 2;
+      int chunkZ = mapZ >> 2;
+      int tileX = mapX & 3;
+      int tileZ = mapZ & 3;
+      int insideX = xFloored & 15;
+      int insideZ = zFloored & 15;
+      Globals.drawManager.drawMinimapFeatures(chunkX, chunkZ, tileX, tileZ, insideX, insideZ, this.zoom, matrixStack, renderTypeBuffers);
+   }
+}

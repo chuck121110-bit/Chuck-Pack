@@ -1,0 +1,1572 @@
+package net.aero.aeropack.modules.movement;
+
+import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
+
+import meteordevelopment.meteorclient.events.render.Render3DEvent;
+import meteordevelopment.meteorclient.events.world.TickEvent;
+import meteordevelopment.meteorclient.events.game.OpenScreenEvent;
+import meteordevelopment.meteorclient.events.packets.PacketEvent;
+import meteordevelopment.meteorclient.gui.GuiTheme;
+import meteordevelopment.meteorclient.gui.widgets.WWidget;
+import meteordevelopment.meteorclient.gui.widgets.containers.WVerticalList;
+import meteordevelopment.meteorclient.settings.*;
+import meteordevelopment.meteorclient.systems.modules.Categories;
+import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.meteorclient.systems.modules.Modules;
+import meteordevelopment.meteorclient.systems.modules.movement.Flight;
+import meteordevelopment.meteorclient.utils.render.color.Color;
+import meteordevelopment.meteorclient.utils.render.color.SettingColor;
+import meteordevelopment.orbit.EventHandler;
+import net.aero.aeropack.autoflypath.PathFlightConfig;
+import net.aero.aeropack.autoflypath.PathFlightRuntime;
+import net.aero.aeropack.autoflypath.flight.BetterBlockPos;
+import net.aero.aeropack.autoflypath.flight.FlightController;
+import net.aero.aeropack.modules.misc.AntiSocial;
+import net.minecraft.client.gui.screen.DisconnectedScreen;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.projectile.AbstractFireballEntity;
+import net.minecraft.entity.projectile.PersistentProjectileEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
+import net.minecraft.network.packet.s2c.play.PlayerRespawnS2CPacket;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
+import net.aero.aeropack.mixin.ClientPlayerEntityAccessor;
+import net.aero.aeropack.mixin.PlayerMoveC2SPacketAccessor;
+
+public final class AutoFly extends Module
+{
+	private final SettingGroup sgGeneral = settings.getDefaultGroup();
+	private final SettingGroup sgSpeed = settings.createGroup("Speed");
+	private final SettingGroup sgDanger = settings.createGroup("Danger Avoidance");
+	private final SettingGroup sgAutomation = settings.createGroup("Automation");
+	private final SettingGroup sgRender = settings.createGroup("Render");
+	private final SettingGroup sgDebug = settings.createGroup("Debug");
+
+	private final Setting<Double> startSpeed = sgSpeed.add(new DoubleSetting.Builder()
+		.name("start-speed")
+		.description("How fast the fly starts (blocks per tick).")
+		.defaultValue(0.05)
+		.min(0.01)
+		.sliderMax(1.0)
+		.build()
+	);
+
+	private final Setting<Double> rampUpIncrement = sgSpeed.add(new DoubleSetting.Builder()
+		.name("ramp-up-increment")
+		.description("How much speed increases per tick when not being set back.")
+		.defaultValue(0.01)
+		.min(0.005)
+		.sliderMax(0.1)
+		.build()
+	);
+
+	private final Setting<Double> rampUpLimit = sgSpeed.add(new DoubleSetting.Builder()
+		.name("ramp-up-limit")
+		.description("Maximum flight speed. It will ramp up to this speed.")
+		.defaultValue(0.1)
+		.min(0.05)
+		.sliderMax(2.0)
+		.build()
+	);
+
+	private final Setting<Double> arrivalRadius = sgGeneral.add(new DoubleSetting.Builder()
+		.name("arrival-radius")
+		.description("Distance at which the target is considered reached.")
+		.defaultValue(5.0)
+		.min(1.0)
+		.sliderMax(32.0)
+		.build()
+	);
+
+	private final Setting<Boolean> autoDisconnectOnArrival = sgGeneral.add(new BoolSetting.Builder()
+		.name("auto-disconnect-on-arrival")
+		.description("Automatically disconnect when AutoFly reaches the destination.")
+		.defaultValue(false)
+		.build()
+	);
+
+	private final Setting<Double> disconnectRadius = sgGeneral.add(new DoubleSetting.Builder()
+		.name("disconnect-radius")
+		.description("Disconnect when within this distance of the target (0 = use arrival radius).")
+		.defaultValue(0.0)
+		.min(0.0)
+		.sliderMax(64.0)
+		.visible(autoDisconnectOnArrival::get)
+		.build()
+	);
+
+	private final Setting<Boolean> jumpDisengage = sgGeneral.add(new BoolSetting.Builder()
+		.name("jump-disengage")
+		.description("Only jump key disables AutoFly. Requires double-jump. All other movement keys are ignored.")
+		.defaultValue(false)
+		.build()
+	);
+
+	private final Setting<Boolean> waitChunksOverworld = sgGeneral.add(new BoolSetting.Builder()
+		.name("wait-chunks-overworld")
+		.description("Wait for chunks to load in the Overworld before continuing through them.")
+		.defaultValue(true)
+		.build()
+	);
+
+	private final Setting<Boolean> waitChunksNether = sgGeneral.add(new BoolSetting.Builder()
+		.name("wait-chunks-nether")
+		.description("Wait for chunks to load in the Nether before continuing through them.")
+		.defaultValue(true)
+		.build()
+	);
+
+	private final Setting<Boolean> waitChunksEnd = sgGeneral.add(new BoolSetting.Builder()
+		.name("wait-chunks-end")
+		.description("Wait for chunks to load in the End before continuing through them.")
+		.defaultValue(true)
+		.build()
+	);
+
+	private final Setting<Boolean> dodgeGhastFireballs = sgDanger.add(new BoolSetting.Builder()
+		.name("dodge-ghast-fireballs")
+		.description("Automatically teleport away from ghast fireballs.")
+		.defaultValue(true)
+		.build()
+	);
+
+	private final Setting<Double> ghastTeleportDistance = sgDanger.add(new DoubleSetting.Builder()
+		.name("ghast-teleport-distance")
+		.description("How many blocks to teleport away from ghast fireballs.")
+		.defaultValue(20.0)
+		.min(5.0)
+		.sliderMax(100.0)
+		.visible(dodgeGhastFireballs::get)
+		.build()
+	);
+
+	private final Setting<Double> ghastScanRange = sgDanger.add(new DoubleSetting.Builder()
+		.name("ghast-scan-range")
+		.description("How far to scan for ghast fireballs.")
+		.defaultValue(50.0)
+		.min(10.0)
+		.sliderMax(200.0)
+		.visible(dodgeGhastFireballs::get)
+		.build()
+	);
+
+	private final Setting<Boolean> dodgeArrows = sgDanger.add(new BoolSetting.Builder()
+		.name("dodge-arrows")
+		.description("Automatically teleport away from incoming arrows.")
+		.defaultValue(true)
+		.build()
+	);
+
+	private final Setting<Double> arrowTeleportDistance = sgDanger.add(new DoubleSetting.Builder()
+		.name("arrow-teleport-distance")
+		.description("How many blocks to teleport away from arrows.")
+		.defaultValue(15.0)
+		.min(5.0)
+		.sliderMax(100.0)
+		.visible(dodgeArrows::get)
+		.build()
+	);
+
+	private final Setting<Double> arrowScanRange = sgDanger.add(new DoubleSetting.Builder()
+		.name("arrow-scan-range")
+		.description("How far to scan for arrows.")
+		.defaultValue(40.0)
+		.min(10.0)
+		.sliderMax(200.0)
+		.visible(dodgeArrows::get)
+		.build()
+	);
+
+	private final Setting<Boolean> dodgeLavaAndFire = sgDanger.add(new BoolSetting.Builder()
+		.name("dodge-lava-and-fire")
+		.description("Automatically teleport away from nearby lava and fire blocks.")
+		.defaultValue(true)
+		.build()
+	);
+
+	private final Setting<Double> lavaTeleportDistance = sgDanger.add(new DoubleSetting.Builder()
+		.name("lava-teleport-distance")
+		.description("How many blocks to teleport away from lava and fire.")
+		.defaultValue(8.0)
+		.min(3.0)
+		.sliderMax(32.0)
+		.visible(dodgeLavaAndFire::get)
+		.build()
+	);
+
+	private final Setting<Double> lavaScanRange = sgDanger.add(new DoubleSetting.Builder()
+		.name("lava-scan-range")
+		.description("How far to scan for lava and fire blocks.")
+		.defaultValue(6.0)
+		.min(2.0)
+		.sliderMax(16.0)
+		.visible(dodgeLavaAndFire::get)
+		.build()
+	);
+
+	private final Setting<Boolean> autoEat = sgAutomation.add(new BoolSetting.Builder()
+		.name("auto-eat")
+		.description("Automatically enable the AutoEat module when AutoFly is active.")
+		.defaultValue(false)
+		.build()
+	);
+
+	private final Setting<Boolean> autoAntiSocial = sgAutomation.add(new BoolSetting.Builder()
+		.name("auto-anti-social")
+		.description("Automatically enable the AntiSocial module when AutoFly is active.")
+		.defaultValue(false)
+		.build()
+	);
+
+	private final Setting<Boolean> autoLogOnDamage = sgAutomation.add(new BoolSetting.Builder()
+		.name("auto-log-on-damage")
+		.description("Automatically disconnect when health drops below a threshold.")
+		.defaultValue(false)
+		.build()
+	);
+
+	private final Setting<Integer> autoLogThreshold = sgAutomation.add(new IntSetting.Builder()
+		.name("auto-log-threshold")
+		.description("Health threshold in HP to trigger auto-log (20 HP = 10 hearts). Default 8 HP = 4 hearts.")
+		.defaultValue(8)
+		.min(1)
+		.max(20)
+		.visible(autoLogOnDamage::get)
+		.build()
+	);
+
+	private final Setting<Boolean> autoLogOnUnreachable = sgAutomation.add(new BoolSetting.Builder()
+		.name("auto-log-on-unreachable")
+		.description("Automatically disconnect when destination appears unreachable.")
+		.defaultValue(false)
+		.build()
+	);
+
+	private final Setting<Boolean> pathDebug = sgDebug.add(new BoolSetting.Builder()
+		.name("path-debug")
+		.description("Show path debug messages (stuck, rerouting, etc).")
+		.defaultValue(false)
+		.build()
+	);
+
+	private final Setting<Boolean> speedDebug = sgDebug.add(new BoolSetting.Builder()
+		.name("speed-debug")
+		.description("Show speed debug messages (setbacks, ramp changes).")
+		.defaultValue(false)
+		.build()
+	);
+
+	private final Setting<Boolean> verboseDebug = sgDebug.add(new BoolSetting.Builder()
+		.name("verbose")
+		.description("Log every tick's full state to chat AND game logs for real-time diagnostics.")
+		.defaultValue(false)
+		.build()
+	);
+
+	private final Setting<AntiKickMode> antiKickMode = sgAutomation.add(new EnumSetting.Builder<AntiKickMode>()
+		.name("anti-kick-mode")
+		.description("Anti-kick method: None (standard), Normal (minetick), Packet (packet edit).")
+		.defaultValue(AntiKickMode.None)
+		.build()
+	);
+
+	private final Setting<Boolean> autoAntiKick = sgAutomation.add(new BoolSetting.Builder()
+		.name("auto-anti-kick")
+		.description("Every 20 ticks, move down 0.035 blocks to prevent anti-cheat kicks.")
+		.defaultValue(false)
+		.build()
+	);
+
+	private final Setting<Integer> antiKickDelay = sgAutomation.add(new IntSetting.Builder()
+		.name("delay")
+		.description("The amount of delay, in ticks, between flying down a bit and return to original position.")
+		.defaultValue(20)
+		.min(1)
+		.sliderMax(200)
+		.visible(() -> antiKickMode.get() != AntiKickMode.None)
+		.build()
+	);
+
+	private final Setting<Integer> antiKickOffTime = sgAutomation.add(new IntSetting.Builder()
+		.name("off-time")
+		.description("The amount of delay, in ticks, to fly down a bit to reset floating ticks.")
+		.defaultValue(1)
+		.min(1)
+		.sliderRange(1, 20)
+		.visible(() -> antiKickMode.get() != AntiKickMode.None)
+		.build()
+	);
+
+	private final Setting<Boolean> showPath = sgRender.add(new BoolSetting.Builder()
+		.name("show-path")
+		.description("Render FlyTo's calculated route in the world.")
+		.defaultValue(true)
+		.build()
+	);
+
+	private final Setting<SettingColor> pathColor = sgRender.add(new ColorSetting.Builder()
+		.name("path-color")
+		.description("Color of the flight path trail.")
+		.defaultValue(new SettingColor(90, 97, 255, 200))
+		.visible(showPath::get)
+		.build()
+	);
+
+	private final PathFlightConfig pathFlightConfig = new PathFlightConfig();
+	private final FlightController pathFlightController;
+	private boolean flightWasEnabled;
+
+	private double currentSpeed;
+	private long lastSetbackMs = 0;
+	private long suppressSetbackUntilMs = 0;
+	private boolean speedFrozen = false;
+	private int ticksSinceSetback = -1;
+	private boolean speedLocked = false;
+
+	private BlockPos lastTarget;
+	private boolean arrived;
+	private boolean autoEnabledEat;
+	private boolean autoEnabledAntiSocial;
+	private BlockPos mapClickTarget;
+	private boolean mapClickYKnown;
+	private Object autoFlyWaypoint;
+	private Object existingWaypointOriginal;
+	private String originalWaypointSymbol;
+
+	private long lastDangerAvoidMs = 0;
+	private int unreachableTicks = 0;
+	private boolean wasPathing = false;
+	private int antiKickDelayLeft;
+	private int antiKickOffLeft;
+	private boolean antiKickFlip;
+	private float antiKickLastYaw;
+	private double antiKickLastPacketY;
+	private final java.util.ArrayList<Long> recentSetbacks = new java.util.ArrayList<>();
+	private static final int INITIAL_SETBACK_THRESHOLD = 10;
+	private static final int ONGOING_SETBACK_THRESHOLD = 5;
+	private static final long SETBACK_WINDOW_MS = 10000;
+	private int currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
+	private int setbackPhase = 0;
+	private long cooldownStartMs = 0;
+	private static final long COOLDOWN_MS = 5000;
+	private long lastRampUpMs = 0;
+	public int setbackDisplayTicks = 0;
+	private boolean jumpWasPressed = false;
+	private long lastJumpPressMs = 0;
+	private static final long DOUBLE_JUMP_WINDOW_MS = 400;
+
+    public AutoFly()
+    {
+        super(Categories.Movement, "auto-fly", "Flies you to a destination using terrain-aware pathfinding. Right-click Xaero\u2019s map to set a target.");
+        PathFlightRuntime.initialize(pathFlightConfig);
+        pathFlightController = PathFlightRuntime.controller();
+    }
+
+	@Override
+	public void onActivate()
+	{
+		if(mc.player == null || mc.world == null)
+		{
+			error("Join a world before enabling AutoFly.");
+			toggle();
+			return;
+		}
+
+		cleanStaleAutoFlyWaypoints();
+
+		pathFlightController.stop();
+		currentSpeed = startSpeed.get();
+		lastRampUpMs = 0;
+		suppressSetbackUntilMs = System.currentTimeMillis() + 3000;
+		speedFrozen = false;
+		ticksSinceSetback = -1;
+		speedLocked = false;
+		recentSetbacks.clear();
+		currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
+		lastTarget = null;
+		arrived = false;
+		lastDangerAvoidMs = 0;
+		unreachableTicks = 0;
+		wasPathing = false;
+		antiKickDelayLeft = antiKickDelay.get();
+		antiKickOffLeft = antiKickOffTime.get();
+		antiKickFlip = false;
+		antiKickLastYaw = 0;
+		antiKickLastPacketY = Double.MAX_VALUE;
+		jumpWasPressed = false;
+		lastJumpPressMs = 0;
+
+		flightWasEnabled = Modules.get().isActive(Flight.class);
+		suspendFlight();
+
+		syncConfig();
+	}
+
+	@Override
+	public void onDeactivate()
+	{
+		pathFlightController.stop();
+		lastTarget = null;
+		mapClickTarget = null;
+		removeAutoFlyWaypoint();
+		restoreExistingWaypointSymbol();
+		arrived = false;
+		setbackDisplayTicks = 0;
+		if(mc.player != null) restoreFlight();
+		stopAutoEnabledModules();
+	}
+
+	@EventHandler
+	private void onScreenOpen(OpenScreenEvent event)
+	{
+		if(event.screen instanceof DisconnectedScreen && isActive())
+		{
+			toggle();
+		}
+	}
+
+	private void stopAutoEnabledModules()
+	{
+		if(mc.player == null) return;
+		try
+		{
+			if(autoEnabledEat)
+			{
+				var eat = Modules.get().get("auto-eat");
+				if(eat != null && eat.isActive()) eat.toggle();
+				autoEnabledEat = false;
+			}
+
+			if(autoEnabledAntiSocial)
+			{
+				var social = Modules.get().get(AntiSocial.class);
+				if(social != null && social.isActive()) social.toggle();
+				autoEnabledAntiSocial = false;
+			}
+		}catch(Exception ignored) {}
+	}
+
+	@EventHandler
+	private void onTick(TickEvent.Pre event)
+	{
+		if(mc.player == null || mc.world == null) return;
+
+		if(setbackDisplayTicks > 0) setbackDisplayTicks--;
+
+		if(Modules.get().isActive(Flight.class))
+		{
+			info("Flight enabled — disabling AutoFly.");
+			toggle();
+			return;
+		}
+
+		if(pathFlightController.isActive())
+		{
+			boolean input;
+			if(jumpDisengage.get())
+			{
+				boolean jumpNow = mc.options.jumpKey.isPressed();
+				long now = System.currentTimeMillis();
+				if(jumpNow && !jumpWasPressed)
+				{
+					if(now - lastJumpPressMs <= DOUBLE_JUMP_WINDOW_MS)
+					{
+						input = true;
+					}
+					else
+					{
+						lastJumpPressMs = now;
+						input = false;
+					}
+				}
+				else
+				{
+					input = false;
+				}
+				jumpWasPressed = jumpNow;
+			}
+			else
+			{
+				input = mc.options.forwardKey.isPressed()
+					|| mc.options.backKey.isPressed()
+					|| mc.options.leftKey.isPressed()
+					|| mc.options.rightKey.isPressed()
+					|| mc.options.jumpKey.isPressed()
+					|| mc.options.sneakKey.isPressed();
+			}
+			if(input)
+			{
+				info("Input detected — disabling.");
+				toggle();
+				return;
+			}
+		}
+
+		pathFlightController.clientTick();
+
+		boolean reachedGoal = pathFlightController.hasReachedGoal();
+
+		boolean isPathingNow = pathFlightController.isActive();
+		if(wasPathing && !isPathingNow && !arrived)
+		{
+			arrived = true;
+			pathFlightController.stop();
+			stopAutoEnabledModules();
+			if(reachedGoal)
+			{
+				removeAutoFlyWaypoint();
+				restoreExistingWaypointSymbol();
+				info("Destination reached! Disabling AutoFly.");
+				if(autoDisconnectOnArrival.get())
+				{
+					info("Arrived! Disconnecting...");
+					net.aero.aeropack.modules.render.CoordinateLogout.hardDisconnect("AutoFly: Target reached");
+				}
+				else
+				{
+					toggle();
+					return;
+				}
+			}
+			else if(autoDisconnectOnArrival.get())
+			{
+				info("Flight interrupted. Disconnecting...");
+				net.aero.aeropack.modules.render.CoordinateLogout.hardDisconnect("AutoFly: Flight interrupted");
+				return;
+			}
+			else
+			{
+				info("Flight interrupted.");
+				toggle();
+				return;
+			}
+		}
+		wasPathing = isPathingNow;
+
+		if(arrived || !pathFlightController.isActive()) return;
+
+		if(autoLogOnDamage.get())
+		{
+			autoLogTick();
+		}
+
+		if(dodgeGhastFireballs.get() || dodgeArrows.get() || dodgeLavaAndFire.get())
+		{
+			dangerAvoidTick();
+		}
+
+		if(autoLogOnUnreachable.get())
+		{
+			if(pathFlightController.isDestinationUnreachable())
+			{
+				unreachableTicks++;
+				if(pathDebug.get() && unreachableTicks % 20 == 0)
+				{
+					info("[PathDebug] Destination unreachable, logging out in " + (60 - unreachableTicks) + " ticks...");
+				}
+				if(unreachableTicks >= 60)
+				{
+					net.aero.aeropack.modules.render.CoordinateLogout.hardDisconnect("AutoFly Auto-Log: Destination unreachable");
+					return;
+				}
+			}
+			else
+			{
+				unreachableTicks = 0;
+			}
+		}
+
+		if(autoDisconnectOnArrival.get())
+		{
+			double discRadius = disconnectRadius.get();
+			if(discRadius > 0 && mc.player != null && lastTarget != null)
+			{
+				double dist = mc.player.getEntityPos().distanceTo(Vec3d.ofCenter(lastTarget));
+				if(dist <= discRadius)
+				{
+					info("Near target! Disconnecting...");
+					pathFlightController.stop();
+					arrived = true;
+					stopAutoEnabledModules();
+					mc.player.setVelocity(Vec3d.ZERO);
+					net.aero.aeropack.modules.render.CoordinateLogout.hardDisconnect("AutoFly: Within disconnect radius");
+					return;
+				}
+			}
+		}
+
+		adaptiveSpeedTick();
+
+		// Anti-kick post-tick (Meteor-style)
+		if(antiKickMode.get() != AntiKickMode.None && pathFlightController.isActive() && mc.player != null)
+		{
+			if(antiKickDelayLeft > 0) antiKickDelayLeft--;
+
+			if(antiKickOffLeft <= 0 && antiKickDelayLeft <= 0)
+			{
+				antiKickDelayLeft = antiKickDelay.get();
+				antiKickOffLeft = antiKickOffTime.get();
+				if(antiKickMode.get() == AntiKickMode.Packet)
+				{
+					((ClientPlayerEntityAccessor) mc.player).aeropack$setTicksSinceLastPositionPacketSent(20);
+				}
+			}
+			else if(antiKickDelayLeft <= 0)
+			{
+				if(antiKickMode.get() == AntiKickMode.Packet && antiKickOffLeft == antiKickOffTime.get())
+				{
+					((ClientPlayerEntityAccessor) mc.player).aeropack$setTicksSinceLastPositionPacketSent(20);
+				}
+				antiKickOffLeft--;
+			}
+		}
+
+		syncConfig();
+	}
+
+	private void dangerAvoidTick()
+	{
+		if(mc.player == null || mc.world == null) return;
+
+		long now = System.currentTimeMillis();
+		if(now - lastDangerAvoidMs < 1000) return;
+
+		Vec3d safe = findSafePosition();
+		if(safe != null)
+		{
+			mc.player.setPosition(safe);
+			mc.player.setVelocity(Vec3d.ZERO);
+			lastDangerAvoidMs = now;
+			info("Teleported to safety!");
+		}
+	}
+
+	private Vec3d findSafePosition()
+	{
+		if(mc.player == null || mc.world == null) return null;
+
+		Vec3d playerPos = mc.player.getEntityPos();
+		BlockPos playerBlock = mc.player.getBlockPos();
+
+		if(dodgeGhastFireballs.get())
+		{
+			Box scanBox = new Box(playerPos.x - ghastScanRange.get(), playerPos.y - ghastScanRange.get(), playerPos.z - ghastScanRange.get(),
+				playerPos.x + ghastScanRange.get(), playerPos.y + ghastScanRange.get(), playerPos.z + ghastScanRange.get());
+
+			List<Entity> fireballs = new ArrayList<>();
+			for(Entity e : mc.world.getEntities())
+			{
+				if(e instanceof AbstractFireballEntity && scanBox.intersects(e.getBoundingBox()))
+				{
+					fireballs.add(e);
+				}
+			}
+			for(Entity entity : fireballs)
+			{
+				if(entity.squaredDistanceTo(mc.player) > ghastScanRange.get() * ghastScanRange.get()) continue;
+
+				if(entity instanceof AbstractFireballEntity fb && fb.getVelocity().lengthSquared() > 0.01)
+				{
+					Vec3d toPlayer = playerPos.subtract(fb.getEntityPos()).normalize();
+					double dot = fb.getVelocity().normalize().dotProduct(toPlayer);
+
+					if(dot > 0.1)
+					{
+						return sphereTeleport(playerPos, fb.getEntityPos(), ghastTeleportDistance.get());
+					}
+				}
+			}
+		}
+
+		if(dodgeArrows.get())
+		{
+			Box scanBox = new Box(playerPos.x - arrowScanRange.get(), playerPos.y - arrowScanRange.get(), playerPos.z - arrowScanRange.get(),
+				playerPos.x + arrowScanRange.get(), playerPos.y + arrowScanRange.get(), playerPos.z + arrowScanRange.get());
+
+			List<Entity> allProjectiles = new ArrayList<>();
+			for(Entity e : mc.world.getEntities())
+			{
+				if(e instanceof PersistentProjectileEntity && scanBox.intersects(e.getBoundingBox()))
+				{
+					allProjectiles.add(e);
+				}
+			}
+
+			for(Entity entity : allProjectiles)
+			{
+				if(entity.squaredDistanceTo(mc.player) > arrowScanRange.get() * arrowScanRange.get()) continue;
+
+				if(entity instanceof PersistentProjectileEntity proj && proj.getVelocity().lengthSquared() > 0.01)
+				{
+					Vec3d toPlayer = playerPos.subtract(entity.getEntityPos()).normalize();
+					double dot = proj.getVelocity().normalize().dotProduct(toPlayer);
+
+					if(dot > 0.1)
+					{
+						return sphereTeleport(playerPos, entity.getEntityPos(), arrowTeleportDistance.get());
+					}
+				}
+			}
+		}
+
+		if(dodgeLavaAndFire.get())
+		{
+			int scanRange = (int) Math.ceil(lavaScanRange.get());
+			BlockPos nearestDanger = null;
+			double nearestDangerDistSq = Double.MAX_VALUE;
+
+			for(int x = -scanRange; x <= scanRange; x++)
+			{
+				for(int y = -scanRange; y <= scanRange; y++)
+				{
+					for(int z = -scanRange; z <= scanRange; z++)
+					{
+						BlockPos check = playerBlock.add(x, y, z);
+						var state = mc.world.getBlockState(check);
+						if(state.getBlock() == net.minecraft.block.Blocks.LAVA
+							|| state.getBlock() == net.minecraft.block.Blocks.FIRE
+							|| state.getBlock() == net.minecraft.block.Blocks.SOUL_FIRE)
+						{
+							double distSq = playerPos.squaredDistanceTo(Vec3d.ofCenter(check));
+							if(distSq < nearestDangerDistSq)
+							{
+								nearestDangerDistSq = distSq;
+								nearestDanger = check;
+							}
+						}
+					}
+				}
+			}
+
+			if(nearestDanger != null && nearestDangerDistSq <= lavaScanRange.get() * lavaScanRange.get())
+			{
+				Vec3d dangerCenter = Vec3d.ofCenter(nearestDanger);
+				double playerDistFromDanger = Math.sqrt(nearestDangerDistSq);
+				Vec3d awayDir = playerPos.subtract(dangerCenter).normalize();
+
+				if(awayDir.lengthSquared() < 0.01)
+				{
+					awayDir = new Vec3d(0, 1, 0);
+				}
+
+				double radius = lavaTeleportDistance.get();
+				double radiusSq = radius * radius;
+				BlockPos bestCandidate = null;
+				double bestDistFromDanger = playerDistFromDanger;
+
+				for(int x = (int) Math.floor(-radius); x <= (int) Math.ceil(radius); x++)
+				{
+					for(int y = (int) Math.floor(-radius); y <= (int) Math.ceil(radius); y++)
+					{
+						for(int z = (int) Math.floor(-radius); z <= (int) Math.ceil(radius); z++)
+						{
+							double distSq = x * x + y * y + z * z;
+							if(distSq > radiusSq || distSq < 1) continue;
+
+							BlockPos candidate = playerBlock.add(x, y, z);
+
+							if(!isAirBlock(candidate)) continue;
+							if(!isAirBlock(candidate.up())) continue;
+							if(!isAirBlock(candidate.up(2))) continue;
+
+							if(isDangerousAt(candidate)) continue;
+
+							Vec3d candidatePos = Vec3d.ofCenter(candidate);
+							double candidateDistFromDanger = candidatePos.distanceTo(dangerCenter);
+
+							if(candidateDistFromDanger > bestDistFromDanger + 0.5)
+							{
+								bestDistFromDanger = candidateDistFromDanger;
+								bestCandidate = candidate;
+							}
+						}
+					}
+				}
+
+				if(bestCandidate != null)
+				{
+					return Vec3d.ofCenter(bestCandidate);
+				}
+			}
+		}
+
+		return null;
+	}
+
+	private boolean isDangerousAt(BlockPos pos)
+	{
+		if(mc.world == null) return true;
+
+		for(int dx = -1; dx <= 1; dx++)
+		{
+			for(int dy = -3; dy <= 1; dy++)
+			{
+				for(int dz = -1; dz <= 1; dz++)
+				{
+					var state = mc.world.getBlockState(pos.add(dx, dy, dz));
+					if(state.getBlock() == net.minecraft.block.Blocks.LAVA
+						|| state.getBlock() == net.minecraft.block.Blocks.FIRE
+						|| state.getBlock() == net.minecraft.block.Blocks.SOUL_FIRE)
+					{
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	private boolean isAirBlock(BlockPos pos)
+	{
+		if(mc.world == null) return false;
+		var state = mc.world.getBlockState(pos);
+		return state.isAir();
+	}
+
+	private Vec3d teleportPosition(Vec3d from, Vec3d direction, double distance)
+	{
+		double targetX = from.x + direction.x * distance;
+		double targetY = from.y + direction.y * distance;
+		double targetZ = from.z + direction.z * distance;
+
+		targetX = MathHelper.clamp(targetX, -29999999, 29999999);
+		targetZ = MathHelper.clamp(targetZ, -29999999, 29999999);
+
+		return new Vec3d(targetX, targetY, targetZ);
+	}
+
+	private Vec3d sphereTeleport(Vec3d playerPos, Vec3d dangerPos, double radius)
+	{
+		BlockPos playerBlock = mc.player.getBlockPos();
+		double radiusSq = radius * radius;
+		double playerDistFromDanger = playerPos.distanceTo(dangerPos);
+		BlockPos bestCandidate = null;
+		double bestDistFromDanger = playerDistFromDanger;
+
+		for(int x = (int) Math.floor(-radius); x <= (int) Math.ceil(radius); x++)
+		{
+			for(int y = (int) Math.floor(-radius); y <= (int) Math.ceil(radius); y++)
+			{
+				for(int z = (int) Math.floor(-radius); z <= (int) Math.ceil(radius); z++)
+				{
+					double distSq = x * x + y * y + z * z;
+					if(distSq > radiusSq || distSq < 1) continue;
+
+					BlockPos candidate = playerBlock.add(x, y, z);
+
+					if(!isAirBlock(candidate)) continue;
+					if(!isAirBlock(candidate.up())) continue;
+					if(!isAirBlock(candidate.up(2))) continue;
+
+					if(isDangerousAt(candidate)) continue;
+
+					Vec3d candidatePos = Vec3d.ofCenter(candidate);
+					double candidateDistFromDanger = candidatePos.distanceTo(dangerPos);
+
+					if(candidateDistFromDanger > bestDistFromDanger + 0.5)
+					{
+						bestDistFromDanger = candidateDistFromDanger;
+						bestCandidate = candidate;
+					}
+				}
+			}
+		}
+
+		if(bestCandidate != null)
+		{
+			return Vec3d.ofCenter(bestCandidate);
+		}
+
+		Vec3d awayDir = playerPos.subtract(dangerPos).normalize();
+		if(awayDir.lengthSquared() < 0.01) awayDir = new Vec3d(0, 1, 0);
+		return teleportPosition(playerPos, awayDir, radius);
+	}
+
+	private void autoLogTick()
+	{
+		if(mc.player == null) return;
+
+		float currentHealth = mc.player.getHealth();
+
+		if((int) currentHealth <= autoLogThreshold.get())
+		{
+			info("Auto-log: Health too low (" + (int) currentHealth + " HP)! Disconnecting...");
+			net.aero.aeropack.modules.render.CoordinateLogout.hardDisconnect("AutoFly Auto-Log: Low health (" + (int) currentHealth + " HP)");
+		}
+	}
+
+	private void adaptiveSpeedTick()
+	{
+		if(mc.player == null || !pathFlightController.isActive()) return;
+
+		long now = System.currentTimeMillis();
+
+		if(setbackPhase == 0)
+		{
+			if(now - lastRampUpMs >= 250)
+			{
+				currentSpeed = Math.min(rampUpLimit.get(), currentSpeed + rampUpIncrement.get());
+				lastRampUpMs = now;
+				pathFlightConfig.flightHorizontalSpeed = currentSpeed * 10.0;
+				pathFlightConfig.flightVerticalSpeed = currentSpeed * 10.0 * 0.667;
+				if(speedDebug.get())
+				{
+					info("[SpeedDebug] Ramping up: " + String.format(Locale.ROOT, "%.3f", currentSpeed));
+				}
+			}
+		}
+		else if(setbackPhase == 1)
+		{
+			if(now - cooldownStartMs >= COOLDOWN_MS)
+			{
+				setbackPhase = 2;
+				recentSetbacks.clear();
+				if(speedDebug.get())
+				{
+					info("[SpeedDebug] Quiet period over, watching for setbacks...");
+				}
+			}
+		}
+		else if(setbackPhase == 3)
+		{
+			if(now - cooldownStartMs >= COOLDOWN_MS)
+			{
+				setbackPhase = 2;
+				recentSetbacks.clear();
+				if(speedDebug.get())
+				{
+					info("[SpeedDebug] Quiet period over, watching for setbacks...");
+				}
+			}
+		}
+	}
+
+	@EventHandler
+	private void onSendPacket(PacketEvent.Send event)
+	{
+		if(antiKickMode.get() != AntiKickMode.Packet) return;
+		if(!isActive() || mc.player == null) return;
+
+		if(event.packet instanceof PlayerMoveC2SPacket packet)
+		{
+			double currentY;
+			if(packet instanceof PlayerMoveC2SPacket.PositionAndOnGround posPacket)
+			{
+				currentY = posPacket.getY(0);
+			}
+			else if(packet instanceof PlayerMoveC2SPacket.Full fullPacket2)
+			{
+				currentY = fullPacket2.getY(0);
+			}
+			else
+			{
+				currentY = Double.MAX_VALUE;
+			}
+
+			if(currentY != Double.MAX_VALUE)
+			{
+				antiKickPacket(packet, currentY);
+			}
+			else
+			{
+				PlayerMoveC2SPacket.Full fullPacket = new PlayerMoveC2SPacket.Full(
+					mc.player.getX(), mc.player.getY(), mc.player.getZ(),
+					packet.getYaw(0), packet.getPitch(0),
+					packet.isOnGround(), mc.player.horizontalCollision
+				);
+				event.cancel();
+				antiKickPacket(fullPacket, mc.player.getY());
+				mc.getNetworkHandler().sendPacket(fullPacket);
+			}
+		}
+	}
+
+	private void antiKickPacket(PlayerMoveC2SPacket packet, double currentY)
+	{
+		if(antiKickDelayLeft <= 0 && antiKickLastPacketY != Double.MAX_VALUE
+			&& shouldFlyDown(currentY, antiKickLastPacketY) && !mc.player.isOnGround())
+		{
+			((PlayerMoveC2SPacketAccessor) packet).aeropack$setY(antiKickLastPacketY - 0.0313);
+		}
+		else
+		{
+			antiKickLastPacketY = currentY;
+		}
+	}
+
+	private boolean shouldFlyDown(double currentY, double lastY)
+	{
+		if(currentY >= lastY) return true;
+		return lastY - currentY < 0.0313;
+	}
+
+	@EventHandler
+	private void onReceivePacket(PacketEvent.Receive event)
+	{
+		if(event.packet instanceof PlayerRespawnS2CPacket)
+		{
+			suppressSetbackUntilMs = System.currentTimeMillis() + 3000;
+		}
+	}
+
+	public boolean isSpeedIncreasing()
+	{
+		return isActive() && setbackPhase == 0 && currentSpeed < rampUpLimit.get();
+	}
+
+	public void onGlobalSetback(long now)
+	{
+		if(!isActive() || mc.player == null) return;
+		if(now < suppressSetbackUntilMs) return;
+
+		lastSetbackMs = now;
+		setbackDisplayTicks = 40;
+
+		if(setbackPhase == 1)
+		{
+			currentSpeed = Math.max(startSpeed.get(), currentSpeed - rampUpIncrement.get());
+			cooldownStartMs = now;
+			recentSetbacks.clear();
+			syncConfig();
+			if(speedDebug.get())
+			{
+				info("[SpeedDebug] Setback during cooldown, speed: " + String.format(Locale.ROOT, "%.3f", currentSpeed) + " (reset timer)");
+			}
+			return;
+		}
+
+		if(setbackPhase == 3)
+		{
+			currentSpeed = Math.max(startSpeed.get(), currentSpeed - rampUpIncrement.get());
+			cooldownStartMs = now;
+			syncConfig();
+			if(speedDebug.get())
+			{
+				info("[SpeedDebug] Setback during continuous, speed: " + String.format(Locale.ROOT, "%.3f", currentSpeed) + " (reset timer)");
+			}
+			return;
+		}
+
+		if(setbackPhase == 2)
+		{
+			recentSetbacks.add(now);
+			recentSetbacks.removeIf(t -> now - t > SETBACK_WINDOW_MS);
+
+			if(recentSetbacks.size() < currentSetbackThreshold)
+			{
+				if(speedDebug.get())
+				{
+					info("[SpeedDebug] Setback " + recentSetbacks.size() + "/" + currentSetbackThreshold);
+				}
+				return;
+			}
+
+			currentSpeed = Math.max(startSpeed.get(), currentSpeed - rampUpIncrement.get());
+			cooldownStartMs = now;
+			recentSetbacks.clear();
+			setbackPhase = 3;
+			currentSetbackThreshold = ONGOING_SETBACK_THRESHOLD;
+			syncConfig();
+			if(speedDebug.get())
+			{
+				info("[SpeedDebug] 5 setbacks reached! Speed: " + String.format(Locale.ROOT, "%.3f", currentSpeed) + " → continuous mode");
+			}
+			return;
+		}
+
+		if(setbackPhase == 0)
+		{
+			recentSetbacks.add(now);
+			recentSetbacks.removeIf(t -> now - t > SETBACK_WINDOW_MS);
+
+			if(recentSetbacks.size() < currentSetbackThreshold)
+			{
+				if(speedDebug.get())
+				{
+					info("[SpeedDebug] Setback " + recentSetbacks.size() + "/" + currentSetbackThreshold);
+				}
+				return;
+			}
+
+			currentSpeed = Math.max(startSpeed.get(), currentSpeed - rampUpIncrement.get());
+			cooldownStartMs = now;
+			recentSetbacks.clear();
+			setbackPhase = 1;
+			currentSetbackThreshold = ONGOING_SETBACK_THRESHOLD;
+			syncConfig();
+			if(speedDebug.get())
+			{
+				info("[SpeedDebug] 10 setbacks reached! Speed: " + String.format(Locale.ROOT, "%.3f", currentSpeed) + " → cooldown");
+			}
+		}
+	}
+
+	public void setTargetFromMap(int x, int y, int z)
+	{
+		setTargetFromMap(x, y, z, false);
+	}
+
+	public void setTargetFromMap(int x, int y, int z, boolean yKnown, boolean skipWaypoint)
+	{
+		mapClickYKnown = yKnown;
+		setTargetFromMapInternal(x, y, z);
+		if(!skipWaypoint) createAutoFlyWaypoint();
+		else { removeAutoFlyWaypoint(); mapClickTarget = null; }
+	}
+
+	private void setTargetFromMap(int x, int y, int z, boolean yKnown)
+	{
+		mapClickYKnown = yKnown;
+		setTargetFromMapInternal(x, y, z);
+		createAutoFlyWaypoint();
+	}
+
+	public BlockPos getDestination()
+	{
+		if(pathFlightController != null && pathFlightController.isActive())
+		{
+			return pathFlightController.currentDestination();
+		}
+		return lastTarget;
+	}
+
+	public BlockPos getFinalTarget()
+	{
+		return lastTarget;
+	}
+
+	private void setTargetFromMapInternal(int x, int y, int z)
+	{
+		if(mc.player == null || mc.world == null) return;
+
+		int minY = mc.world.getBottomY();
+		y = Math.max(minY, Math.min(319, y));
+
+		removeAutoFlyWaypoint();
+		restoreExistingWaypointSymbol();
+
+		arrived = false;
+		currentSpeed = startSpeed.get();
+		lastRampUpMs = 0;
+		suppressSetbackUntilMs = System.currentTimeMillis() + 3000;
+		speedFrozen = false;
+		ticksSinceSetback = -1;
+		speedLocked = false;
+		recentSetbacks.clear();
+		currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
+		setbackPhase = 0;
+		cooldownStartMs = 0;
+		setbackDisplayTicks = 0;
+
+		if(autoEat.get())
+		{
+			var eat = Modules.get().get("auto-eat");
+			if(eat != null && !eat.isActive())
+			{
+				eat.toggle();
+				autoEnabledEat = true;
+			}
+		}
+
+		if(autoAntiSocial.get())
+		{
+			var social = Modules.get().get(AntiSocial.class);
+			if(social != null && !social.isActive())
+			{
+				social.toggle();
+				autoEnabledAntiSocial = true;
+			}
+		}
+
+		syncConfig();
+
+		mc.player.setPosition(mc.player.getX(), mc.player.getY() + 2, mc.player.getZ());
+
+		mapClickTarget = new BlockPos(x, y, z);
+		if(mapClickYKnown)
+		{
+			pathFlightController.flyTo(x, y, z);
+		}
+		else
+		{
+			pathFlightController.flyTo(x, z);
+		}
+		lastTarget = new BlockPos(x, y, z);
+	}
+
+	public void setTargetFromExistingWaypoint(int x, int y, int z, String originalSymbol)
+	{
+		removeAutoFlyWaypoint();
+		restoreExistingWaypointSymbol();
+
+		existingWaypointOriginal = null;
+		originalWaypointSymbol = null;
+
+		arrived = false;
+		currentSpeed = startSpeed.get();
+		lastRampUpMs = 0;
+		suppressSetbackUntilMs = System.currentTimeMillis() + 3000;
+		speedFrozen = false;
+		ticksSinceSetback = -1;
+		speedLocked = false;
+		recentSetbacks.clear();
+		currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
+		setbackPhase = 0;
+		cooldownStartMs = 0;
+		setbackDisplayTicks = 0;
+
+		if(autoEat.get())
+		{
+			var eat = Modules.get().get("auto-eat");
+			if(eat != null && !eat.isActive())
+			{
+				eat.toggle();
+				autoEnabledEat = true;
+			}
+		}
+
+		if(autoAntiSocial.get())
+		{
+			var social = Modules.get().get(AntiSocial.class);
+			if(social != null && !social.isActive())
+			{
+				social.toggle();
+				autoEnabledAntiSocial = true;
+			}
+		}
+
+		syncConfig();
+
+		mapClickTarget = new BlockPos(x, y, z);
+		mapClickYKnown = true;
+		pathFlightController.flyTo(x, y, z);
+		lastTarget = new BlockPos(x, y, z);
+
+		try
+		{
+			Object builtInMinimap = Class.forName("xaero.hud.minimap.BuiltInHudModules")
+				.getField("MINIMAP").get(null);
+			Object session = builtInMinimap.getClass().getMethod("getCurrentSession").invoke(builtInMinimap);
+			if(session == null) return;
+
+			Object worldManager = session.getClass().getMethod("getWorldManager").invoke(session);
+			Object currentWorld = worldManager.getClass().getMethod("getCurrentWorld").invoke(worldManager);
+			if(currentWorld == null) return;
+
+			Object currentSet = currentWorld.getClass().getMethod("getCurrentWaypointSet").invoke(currentWorld);
+			if(currentSet == null) return;
+
+			Class<?> wpClass = Class.forName("xaero.common.minimap.waypoints.Waypoint");
+			Iterable<?> existingWaypoints = (Iterable<?>) currentSet.getClass().getMethod("getWaypoints").invoke(currentSet);
+			for(Object wp : existingWaypoints)
+			{
+				int exX = (int) wpClass.getMethod("getX").invoke(wp);
+				int exZ = (int) wpClass.getMethod("getZ").invoke(wp);
+				int exY = (int) wpClass.getMethod("getY").invoke(wp);
+				if(exX == x && exZ == z && exY == y)
+				{
+					existingWaypointOriginal = wp;
+					originalWaypointSymbol = originalSymbol;
+					wpClass.getMethod("setSymbol", String.class).invoke(wp, "Ad");
+					try {
+						Object worldManagerIO = session.getClass().getMethod("getWorldManagerIO").invoke(session);
+						for(java.lang.reflect.Method m : worldManagerIO.getClass().getMethods()) {
+							if(m.getName().equals("saveWorld")) {
+								m.invoke(worldManagerIO, currentWorld);
+								break;
+							}
+						}
+					} catch(Throwable ignored) {}
+					try {
+						Object supportMods = Class.forName("xaero.map.mods.SupportMods").getField("xaeroMinimap").get(null);
+						if(supportMods != null) {
+							java.lang.reflect.Field f = supportMods.getClass().getDeclaredField("refreshWaypoints");
+							f.setAccessible(true);
+							f.setBoolean(supportMods, true);
+						}
+					} catch(Throwable ignored) {}
+					break;
+				}
+			}
+		}catch(Throwable ignored) {}
+	}
+
+	private void restoreExistingWaypointSymbol()
+	{
+		if(existingWaypointOriginal == null || originalWaypointSymbol == null) return;
+		try
+		{
+			Class<?> wpClass = Class.forName("xaero.common.minimap.waypoints.Waypoint");
+			wpClass.getMethod("setSymbol", String.class).invoke(existingWaypointOriginal, originalWaypointSymbol);
+
+			Object builtInMinimap = Class.forName("xaero.hud.minimap.BuiltInHudModules")
+				.getField("MINIMAP").get(null);
+			Object session = builtInMinimap.getClass().getMethod("getCurrentSession").invoke(builtInMinimap);
+			if(session != null)
+			{
+				Object worldManager = session.getClass().getMethod("getWorldManager").invoke(session);
+				Object currentWorld = worldManager.getClass().getMethod("getCurrentWorld").invoke(worldManager);
+				if(currentWorld != null)
+				{
+					try {
+						Object worldManagerIO = session.getClass().getMethod("getWorldManagerIO").invoke(session);
+						for(java.lang.reflect.Method m : worldManagerIO.getClass().getMethods()) {
+							if(m.getName().equals("saveWorld")) {
+								m.invoke(worldManagerIO, currentWorld);
+								break;
+							}
+						}
+					} catch(Throwable ignored) {}
+					try {
+						Object supportMods = Class.forName("xaero.map.mods.SupportMods").getField("xaeroMinimap").get(null);
+						if(supportMods != null) {
+							java.lang.reflect.Field f = supportMods.getClass().getDeclaredField("refreshWaypoints");
+							f.setAccessible(true);
+							f.setBoolean(supportMods, true);
+						}
+					} catch(Throwable ignored) {}
+				}
+			}
+		}catch(Throwable ignored) {}
+		existingWaypointOriginal = null;
+		originalWaypointSymbol = null;
+	}
+
+	private void syncConfig()
+	{
+		pathFlightConfig.flightProcess = isActive();
+		pathFlightConfig.assumeFlightHack = true;
+		pathFlightConfig.flightHorizontalSpeed = currentSpeed * 10.0;
+		pathFlightConfig.flightVerticalSpeed = currentSpeed * 10.0 * 0.667;
+		pathFlightConfig.flightArrivalRadius = arrivalRadius.get();
+		pathFlightConfig.flightAntiHunger = false;
+		pathFlightConfig.flightFaceTravel = false;
+		pathFlightConfig.flightRenderPath = false;
+		pathFlightConfig.flightDebug = pathDebug.get();
+		pathFlightConfig.flightVerbose = verboseDebug.get();
+		pathFlightConfig.flightCruiseHeight = 120;
+		pathFlightConfig.flightPredictTerrain = !pathFlightConfig.waitChunks;
+
+		if(mc.world != null && mc.world.getRegistryKey() != null)
+		{
+			String dim = mc.world.getRegistryKey().getValue().toString();
+			if(dim.equals("minecraft:the_nether"))
+			{
+				pathFlightConfig.waitChunks = waitChunksNether.get();
+			}
+			else if(dim.equals("minecraft:the_end"))
+			{
+				pathFlightConfig.waitChunks = waitChunksEnd.get();
+			}
+			else
+			{
+				pathFlightConfig.waitChunks = waitChunksOverworld.get();
+			}
+		}
+		net.aero.aeropack.util.config.Seeds.Seed storedSeed = net.aero.aeropack.util.config.Seeds.get().getSeed();
+		pathFlightConfig.flightSeed = storedSeed != null ? storedSeed.seed : 0L;
+	}
+
+	private void suspendFlight()
+	{
+		var flight = Modules.get().get(Flight.class);
+		if(flight != null && flight.isActive()) flight.toggle();
+	}
+
+	private void restoreFlight()
+	{
+		var flight = Modules.get().get(Flight.class);
+		if(flight != null && flightWasEnabled && !flight.isActive()) flight.toggle();
+		flightWasEnabled = false;
+	}
+
+	private void createAutoFlyWaypoint()
+	{
+		if(mapClickTarget == null || mc.player == null) return;
+		try
+		{
+			int wx = mapClickTarget.getX();
+			int wz = mapClickTarget.getZ();
+			int wy = mapClickTarget.getY();
+			boolean yKnown = mapClickYKnown;
+
+			Object builtInMinimap = Class.forName("xaero.hud.minimap.BuiltInHudModules")
+				.getField("MINIMAP").get(null);
+			Object session = builtInMinimap.getClass().getMethod("getCurrentSession").invoke(builtInMinimap);
+			if(session == null) { mapClickTarget = null; return; }
+
+			Object worldManager = session.getClass().getMethod("getWorldManager").invoke(session);
+			Object currentWorld = worldManager.getClass().getMethod("getCurrentWorld").invoke(worldManager);
+			if(currentWorld == null) { mapClickTarget = null; return; }
+
+			Object currentSet = currentWorld.getClass().getMethod("getCurrentWaypointSet").invoke(currentWorld);
+			if(currentSet == null) { mapClickTarget = null; return; }
+
+			Class<?> wpClass = Class.forName("xaero.common.minimap.waypoints.Waypoint");
+			Class<?> colorClass = Class.forName("xaero.hud.minimap.waypoint.WaypointColor");
+			Class<?> purposeClass = Class.forName("xaero.hud.minimap.waypoint.WaypointPurpose");
+			Object color = colorClass.getField("AQUA").get(null);
+			Object purpose = purposeClass.getField("NORMAL").get(null);
+
+			Iterable<?> existingWaypoints = (Iterable<?>) currentSet.getClass().getMethod("getWaypoints").invoke(currentSet);
+			for(Object wp : existingWaypoints)
+			{
+				int exX = (int) wpClass.getMethod("getX").invoke(wp);
+				int exZ = (int) wpClass.getMethod("getZ").invoke(wp);
+				if(exX == wx && exZ == wz)
+				{
+					mapClickTarget = null;
+					return;
+				}
+			}
+
+			Object waypoint = wpClass.getConstructor(int.class, int.class, int.class, String.class, String.class, colorClass, purposeClass, boolean.class, boolean.class)
+				.newInstance(wx, wy, wz, "Auto Fly Destination", "Ad", color, purpose, false, yKnown);
+
+			wpClass.getMethod("setTemporary", boolean.class).invoke(waypoint, true);
+
+			currentSet.getClass().getMethod("add", wpClass).invoke(currentSet, waypoint);
+
+			try {
+				Object worldManagerIO = session.getClass().getMethod("getWorldManagerIO").invoke(session);
+				for(java.lang.reflect.Method m : worldManagerIO.getClass().getMethods()) {
+					if(m.getName().equals("saveWorld")) {
+						m.invoke(worldManagerIO, currentWorld);
+						break;
+					}
+				}
+			} catch(Throwable ignored) {}
+
+			try {
+				Object supportMods = Class.forName("xaero.map.mods.SupportMods").getField("xaeroMinimap").get(null);
+				if(supportMods != null) {
+					java.lang.reflect.Field f = supportMods.getClass().getDeclaredField("refreshWaypoints");
+					f.setAccessible(true);
+					f.setBoolean(supportMods, true);
+				}
+			} catch(Throwable ignored) {}
+
+			autoFlyWaypoint = waypoint;
+			mapClickTarget = null;
+		}catch(Throwable ignored)
+		{
+			mapClickTarget = null;
+		}
+	}
+
+	private void removeAutoFlyWaypoint()
+	{
+		if(autoFlyWaypoint == null) return;
+		try
+		{
+			Object builtInMinimap = Class.forName("xaero.hud.minimap.BuiltInHudModules")
+				.getField("MINIMAP").get(null);
+			Object session = builtInMinimap.getClass().getMethod("getCurrentSession").invoke(builtInMinimap);
+			if(session != null)
+			{
+				Object worldManager = session.getClass().getMethod("getWorldManager").invoke(session);
+				Object currentWorld = worldManager.getClass().getMethod("getCurrentWorld").invoke(worldManager);
+				if(currentWorld != null)
+				{
+					Object currentSet = currentWorld.getClass().getMethod("getCurrentWaypointSet").invoke(currentWorld);
+					if(currentSet != null)
+					{
+						Class<?> wpClass = Class.forName("xaero.common.minimap.waypoints.Waypoint");
+						currentSet.getClass().getMethod("remove", wpClass).invoke(currentSet, autoFlyWaypoint);
+					}
+				}
+			}
+		}catch(Throwable ignored) {}
+		autoFlyWaypoint = null;
+	}
+
+	private void cleanStaleAutoFlyWaypoints()
+	{
+		try
+		{
+			Object builtInMinimap = Class.forName("xaero.hud.minimap.BuiltInHudModules")
+				.getField("MINIMAP").get(null);
+			Object session = builtInMinimap.getClass().getMethod("getCurrentSession").invoke(builtInMinimap);
+			if(session == null) return;
+
+			Object worldManager = session.getClass().getMethod("getWorldManager").invoke(session);
+			Object currentWorld = worldManager.getClass().getMethod("getCurrentWorld").invoke(worldManager);
+			if(currentWorld == null) return;
+
+			Object currentSet = currentWorld.getClass().getMethod("getCurrentWaypointSet").invoke(currentWorld);
+			if(currentSet == null) return;
+
+			Class<?> wpClass = Class.forName("xaero.common.minimap.waypoints.Waypoint");
+			Iterable<?> existingWaypoints = (Iterable<?>) currentSet.getClass().getMethod("getWaypoints").invoke(currentSet);
+
+			List<Object> toRemove = new ArrayList<>();
+			for(Object wp : existingWaypoints)
+			{
+				String name = (String) wpClass.getMethod("getName").invoke(wp);
+				if("Auto Fly Destination".equals(name))
+				{
+					toRemove.add(wp);
+				}
+			}
+
+			for(Object wp : toRemove)
+			{
+				currentSet.getClass().getMethod("remove", wpClass).invoke(currentSet, wp);
+			}
+
+			if(!toRemove.isEmpty())
+			{
+				try {
+					Object worldManagerIO = session.getClass().getMethod("getWorldManagerIO").invoke(session);
+					for(java.lang.reflect.Method m : worldManagerIO.getClass().getMethods()) {
+						if(m.getName().equals("saveWorld")) {
+							m.invoke(worldManagerIO, currentWorld);
+							break;
+						}
+					}
+				} catch(Throwable ignored) {}
+
+				try {
+					Object supportMods = Class.forName("xaero.map.mods.SupportMods").getField("xaeroMinimap").get(null);
+					if(supportMods != null) {
+						java.lang.reflect.Field f = supportMods.getClass().getDeclaredField("refreshWaypoints");
+						f.setAccessible(true);
+						f.setBoolean(supportMods, true);
+					}
+				} catch(Throwable ignored) {}
+			}
+		}catch(Throwable ignored) {}
+	}
+
+	@EventHandler
+	private void onRender3D(Render3DEvent event)
+	{
+		if(!showPath.get() || mc.player == null) return;
+		if(!pathFlightController.isActive()) return;
+
+		List<BetterBlockPos> path = pathFlightController.getVisiblePath();
+		if(path.isEmpty()) return;
+
+		Color color = pathColor.get();
+
+		Vec3d prev = mc.player.getEntityPos();
+		for(BetterBlockPos pos : path)
+		{
+			Vec3d center = Vec3d.ofCenter(pos);
+			event.renderer.line(prev.x, prev.y, prev.z, center.x, center.y, center.z, color);
+			prev = center;
+		}
+	}
+
+	public enum AntiKickMode {
+		Normal,
+		Packet,
+		None;
+	}
+}

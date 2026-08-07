@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "mapintegration",
+  "version": "${version}",
+  "name": "Map Integration",
+  "description": "Enhances Xaero's Map with waypoint utilities, chat coordinates, and right-click menu improvements.",
+  "authors": ["Aero"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["net.aero.mapintegration.MapIntegrationMod"]
+  },
+  "mixins": ["mapintegration.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.13.0",
+    "minecraft": "${mc_version}",
+    "java": ">=21"
+  },
+  "suggests": {
+    "xaeroworldmap": "*",
+    "xaerominimap": "*"
+  }
+}

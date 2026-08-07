@@ -1,0 +1,404 @@
+buildscript {
+	dependencies {
+		classpath "org.kohsuke:github-api:1.330"
+	}
+}
+
+plugins {
+	id "net.fabricmc.fabric-loom" version "${loom_version}"
+	id "com.diffplug.spotless" version "8.8.0"
+	id "net.wimods.github-compile-summary" version "0.1.1"
+}
+
+def ENV = System.getenv()
+
+def niceWurstRaw =
+	(project.findProperty("nicewurst") ?: ENV.NICEWURST ?: "0").toString()
+def niceWurstEnabled = !["0", "false", "off", "no", ""]
+	.contains(niceWurstRaw.toLowerCase(Locale.ROOT))
+
+def forkReleaseVersion =
+	(project.findProperty("fork_release_version") ?: "0.0").toString()
+def effectiveVersion = project.mod_version
+def effectiveArchiveName =
+	niceWurstEnabled ? "NiceWurst" : project.archives_base_name
+def modId = niceWurstEnabled ? "nicewurst" : "wurst"
+def modName = niceWurstEnabled ? "NiceWurst 7"
+	: "Wurst Client - Modified by CevAPI"
+def modDescription = niceWurstEnabled
+	? "NiceWurst is a curated, cheat-free build of the Wurst7-CevAPI, a fork of the original Wurst client."
+	: "A fork of the original Wurst client, with many new features and improvements. This fork is maintained by CevAPI."
+def homepageUrl = niceWurstEnabled ? "https://github.com/cev-api/NiceWurst"
+	: "https://github.com/cev-api/Wurst7-CevAPI/"
+def sourcesUrl = homepageUrl
+def issuesUrl =
+	homepageUrl + (homepageUrl.endsWith("/") ? "issues" : "/issues")
+
+version = effectiveVersion
+group = project.maven_group
+
+def mainModId = niceWurstEnabled ? "nicewurst" : "wurst"
+
+base {
+	archivesName = effectiveArchiveName
+}
+
+repositories {
+	mavenCentral()
+	
+	// Add repositories to retrieve artifacts from in here.
+	// You should only use this when depending on other mods because
+	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
+	// See https://docs.gradle.org/current/userguide/declaring_repositories.html
+	// for more information about repositories.
+	exclusiveContent {
+		forRepository {
+			maven {
+				name = "Modrinth"
+				url = "https://api.modrinth.com/maven"
+			}
+		}
+		filter {
+			includeGroup "maven.modrinth"
+		}
+	}
+}
+
+dependencies {
+	// To change the versions see the gradle.properties file
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	
+	// Fabric API. This is technically optional, but you probably want it anyway.
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	
+	// net.wurstclient.ai.PathPos extends net.minecraft.util.math.BlockPos,
+	// which uses javax.annotation.concurrent.Immutable, which is part of
+	// the JSR305 library.
+	//
+	// In other words, Wurst won't compile without this library,
+	// even though it's Minecraft that actually uses it.
+	implementation "com.google.code.findbugs:jsr305:3.0.2"
+
+	// Minecraft ships Netty without SOCKS support. Bundle the matching modules
+	// so multiplayer connections can use SOCKS5 proxies at runtime.
+	implementation include("io.netty:netty-handler-proxy:4.2.15.Final")
+	implementation include("io.netty:netty-codec-socks:4.2.15.Final")
+	
+}
+
+fabricApi.configureTests {
+	createSourceSet = true
+	enableGameTests = false
+	enableClientGameTests = true
+	modId = "wurst_testmod"
+	username = "Wurst-Bot"
+}
+
+loom {
+	accessWidenerPath = file("src/main/resources/wurst.accesswidener")
+	mods {
+		wurst {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.gametest
+		}
+	}
+	
+	runs {
+		clientGameTest {
+			jvmArguments.add("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
+		}
+		
+		clientWithMods {
+			environment = "client"
+			inherit client
+		}
+		
+		clientGameTestWithMods {
+			environment = "client"
+			inherit client
+			runDir = "build/run/clientGameTestWithMods"
+			jvmArguments.add("-Dfabric.client.gametest")
+			jvmArguments.add("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
+			programArguments.add("--username=Wurst-Bot")
+		}
+	}
+}
+
+configurations {
+	testMods {
+		transitive = false
+	}
+}
+
+def optionalCompatMods = [
+	sodium: [artifact: "sodium", property: "sodium_version"],
+	better_block_entities: [
+		artifact: "better-block-entities",
+		property: "better_block_entities_version"
+	],
+	badoptimizations: [
+		artifact: "badoptimizations",
+		property: "badoptimizations_version"
+	]
+]
+
+def compatModVersions = optionalCompatMods.collectEntries { id, mod ->
+	[(id): providers.gradleProperty(mod.property).orElse("")]
+}
+
+dependencies {
+	optionalCompatMods.each { id, mod ->
+		def version = compatModVersions[id].get().trim()
+		if(!version.isEmpty())
+			testMods "maven.modrinth:${mod.artifact}:${version}"
+	}
+}
+
+def hasCompatMods = providers.provider {
+	compatModVersions.values().any { !it.get().trim().isEmpty() }
+}
+
+def cleanClientWithMods = tasks.register("cleanClientWithMods", Delete) {
+	delete "run/mods"
+}
+
+def prepareClientWithMods = tasks.register("prepareClientWithMods", Sync) {
+	from configurations.testMods
+	into "run/mods"
+}
+
+tasks.named("runClientWithMods") {
+	onlyIf { hasCompatMods.get() }
+	dependsOn prepareClientWithMods
+	finalizedBy cleanClientWithMods
+}
+
+def cleanClientGameTestWithMods = tasks.register("cleanClientGameTestWithMods", Delete) {
+	delete layout.buildDirectory.dir("run/clientGameTestWithMods")
+}
+
+def prepareClientGameTestWithMods = tasks.register("prepareClientGameTestWithMods", Sync) {
+	dependsOn cleanClientGameTestWithMods
+	from configurations.testMods
+	into layout.buildDirectory.dir("run/clientGameTestWithMods/mods")
+}
+
+tasks.named("runClientGameTestWithMods") {
+	onlyIf { hasCompatMods.get() }
+	dependsOn prepareClientGameTestWithMods
+}
+
+processResources {
+	def rawVersion = project.version.toString()
+	def modVersion = niceWurstEnabled ? forkReleaseVersion
+		: (rawVersion.startsWith("v") ? rawVersion.substring(1) : rawVersion)
+	inputs.property("version", modVersion)
+	inputs.property("modName", modName)
+	inputs.property("modDescription", modDescription)
+	inputs.property("homepageUrl", homepageUrl)
+	inputs.property("sourcesUrl", sourcesUrl)
+	inputs.property("issuesUrl", issuesUrl)
+	inputs.property("modId", modId)
+	def modrinthProjectId = niceWurstEnabled ? "V5aiZX0p" : ""
+	inputs.property("modrinthProjectId", modrinthProjectId)
+	
+	filesMatching("fabric.mod.json") {
+		expand([
+			modId: mainModId,
+			version: modVersion,
+			modName: modName,
+			modDescription: modDescription,
+			homepage: homepageUrl,
+			sources: sourcesUrl,
+			issues: issuesUrl,
+			modrinthProjectId: modrinthProjectId
+		])
+	}
+}
+
+def buildConfigOutput =
+	layout.buildDirectory.dir("generated/sources/buildConfig/java")
+
+tasks.register("generateBuildConfig") {
+	def template =
+		file("src/main/templates/net/wurstclient/config/BuildConfig.java.in")
+	def modVersionValue = project.mod_version
+	def ghRepoId = project.gh_repo_id.toString()
+	def ghRepoUrl = "https://github.com/${ghRepoId}"
+	def buildDate = java.time.Instant.now().toString()
+	
+	inputs.file(template)
+	inputs.property("niceWurstEnabled", niceWurstEnabled)
+	inputs.property("forkReleaseVersion", forkReleaseVersion)
+	inputs.property("ghRepoId", ghRepoId)
+	inputs.property("ghRepoUrl", ghRepoUrl)
+	inputs.property("buildDate", buildDate)
+	outputs.dir(buildConfigOutput)
+	
+	doLast {
+		def targetDir =
+			buildConfigOutput.get().dir("net/wurstclient/config").asFile
+		if(!targetDir.exists())
+			targetDir.mkdirs()
+		
+		def content = template.getText("UTF-8")
+			.replace('${NICE_WURST}', String.valueOf(niceWurstEnabled))
+			.replace('${MOD_VERSION}', modVersionValue)
+			.replace('${FORK_RELEASE_VERSION}', forkReleaseVersion)
+			.replace('${BUILD_DATE}', buildDate)
+			.replace('${GH_REPO_ID}', ghRepoId)
+			.replace('${GH_REPO_URL}', ghRepoUrl)
+		
+		def targetFile = new File(targetDir, "BuildConfig.java")
+		targetFile.setText(content, "UTF-8")
+	}
+}
+
+sourceSets.main.java.srcDir(buildConfigOutput)
+
+tasks.named("compileJava").configure {
+	dependsOn(tasks.named("generateBuildConfig"))
+}
+
+tasks.configureEach {
+	if(name == "sourcesJar" || name == "spotlessJava")
+		dependsOn(tasks.named("generateBuildConfig"))
+}
+
+tasks.withType(JavaCompile).configureEach {
+	// Minecraft 26.1 (26.1-snapshot-1) upwards uses Java 25.
+	it.options.release = 25
+}
+
+java {
+	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
+	// if it is present.
+	// If you remove this line, sources will not be generated.
+	withSourcesJar()
+	
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+	def archivesName = project.base.archivesName
+	inputs.property("archivesName", archivesName)
+	archiveVersion = "${project.version}_v${forkReleaseVersion}"
+	
+	from("LICENSE.txt") {
+		rename { "LICENSE-${archivesName.get()}.txt" }
+	}
+	
+	exclude("intentionally_untranslated.json")
+}
+
+tasks.configureEach {
+	if(name == "remapJar")
+		archiveVersion = "${project.version}_v${forkReleaseVersion}"
+}
+
+import com.diffplug.spotless.generic.LicenseHeaderStep
+spotless {
+	lineEndings = "WINDOWS"
+	java {
+		targetExclude("build/generated/sources/buildConfig/java/**/*.java")
+		removeUnusedImports()
+		leadingSpacesToTabs()
+		trimTrailingWhitespace()
+		eclipse().configFile(file("codestyle/formatter.xml"))
+	}
+	format("licenseHeader") {
+		target("src/*/java/**/*.java")
+		def header_file = file("codestyle/license_header.txt")
+		def delimiter = LicenseHeaderStep.DEFAULT_JAVA_HEADER_DELIMITER
+		licenseHeaderFile(header_file, delimiter).updateYearWithLatest(true)
+	}
+	json {
+		target("src/**/*.json", "src/**/*.mcmeta")
+		gson().indentWithSpaces(2).version("2.11.0")
+	}
+}
+
+def getGhVersion() {
+	return version.substring(0, version.indexOf("-MC"))
+}
+
+def getChangelogLink(String platform, String from) {
+	def versionSlug = getGhVersion().substring(1).replace(".", "-")
+	def shortURL = "https://www.wurstclient.net/updates/wurst-${versionSlug}/"
+	def query = []
+	if (platform != "GitHub")
+		query.add("mc=${project.minecraft_version}")
+	query.add("utm_source=${platform}")
+	query.add("utm_medium=" + project.archives_base_name.replace("-", "+"))
+	def fullURL = shortURL + (query.isEmpty() ? "" : "?" + query.join("&"))
+	def encodedURL = java.net.URLEncoder.encode(fullURL, "UTF-8")
+	return "[${shortURL}](https://go.wimods.net/from/${from}?to=${encodedURL})"
+}
+
+def getChangelogImage(String from) {
+	return "![](https://img.wimods.net/${from})"
+}
+
+def getChangelog(String platform, String from) {
+	def prefix = platform == "GitHub" ? "" : "A changelog can be found at: "
+	def imgQuery = platform == "GitHub" ? "" : "?mc_version=${project.minecraft_version}&mod_loader=${project.mod_loader}"
+	return prefix + getChangelogLink(platform, from) + getChangelogImage(from + imgQuery)
+}
+
+import org.kohsuke.github.GHReleaseBuilder
+import org.kohsuke.github.GitHub
+
+task github(dependsOn: build) {
+	onlyIf {
+		ENV.GITHUB_TOKEN
+	}
+	
+	doLast {
+		def github = GitHub.connectUsingOAuth(ENV.GITHUB_TOKEN as String)
+		def repoId = project.mcx_repo_id
+		def repository = github.getRepository(repoId)
+		def ghVersion = getGhVersion()
+		
+		def ghRelease = repository.getReleaseByTagName(ghVersion as String)
+		if(ghRelease == null) {
+			def releaseBuilder = new GHReleaseBuilder(repository, ghVersion as String)
+			releaseBuilder.body(getChangelogImage("github.com/${repoId}/releases/tag/${ghVersion}"))
+			releaseBuilder.prerelease(ghVersion.contains("pre"))
+			ghRelease = releaseBuilder.create()
+		}
+		
+		ghRelease.uploadAsset(jar.archiveFile.get().getAsFile(), "application/java-archive")
+		ghRelease.uploadAsset(sourcesJar.archiveFile.get().getAsFile(), "application/java-archive")
+	}
+}
+
+import org.kohsuke.github.GHIssueState
+import org.kohsuke.github.GHMilestoneState
+import java.time.Instant
+
+task closeMilestone {
+	onlyIf {
+		ENV.GITHUB_TOKEN
+	}
+	
+	doLast {
+		def github = GitHub.connectUsingOAuth(ENV.GITHUB_TOKEN as String)
+		def repoId = project.gh_repo_id
+		def repository = github.getRepository(repoId)
+		def ghVersion = getGhVersion()
+		
+		// Weird API design: listMilestones() requires GHIssueState while everything else uses GHMilestoneState.
+		def milestone = repository.listMilestones(GHIssueState.ALL).find { it.title == ghVersion }
+		if (milestone == null) {
+			milestone = repository.createMilestone(ghVersion, "")
+		}
+		
+		if (milestone.getState() != GHMilestoneState.CLOSED) {
+			milestone.setDueOn(Date.from(Instant.now()))
+			milestone.setDescription(getChangelog("GitHub", "github.com/${repoId}/milestone/${ghVersion}"))
+			milestone.close()
+		}
+	}
+}

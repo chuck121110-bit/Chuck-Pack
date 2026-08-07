@@ -1,0 +1,157 @@
+package xaero.hud.minimap.radar.icon.definition;
+
+import com.google.gson.annotations.Expose;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import net.minecraft.class_1297;
+import net.minecraft.class_2960;
+import net.minecraft.class_897;
+import xaero.hud.minimap.MinimapLogs;
+import xaero.hud.minimap.radar.icon.definition.form.RadarIconBasicForms;
+import xaero.hud.minimap.radar.icon.definition.form.RadarIconForm;
+import xaero.hud.minimap.radar.icon.definition.form.model.config.RadarIconModelConfig;
+import xaero.hud.minimap.radar.icon.definition.form.type.RadarIconFormType;
+import xaero.hud.minimap.radar.icon.definition.form.type.RadarIconFormTypes;
+
+public class RadarIconDefinition {
+   private class_2960 entityId;
+   @Expose
+   private HashMap<String, String> variants;
+   @Expose
+   private ArrayList<RadarIconModelConfig> modelConfigs;
+   private HashMap<String, RadarIconForm> variantForms;
+   @Expose
+   private String variantMethod;
+   private Method variantMethodReflect;
+   @Expose
+   private String variantIdMethod;
+   private Method variantIdMethodReflect;
+   @Expose
+   private String variantIdBuilderMethod;
+   private Method variantIdBuilderMethodReflect;
+
+   public RadarIconForm getVariantForm(String variantId) {
+      return (RadarIconForm)(this.variantForms == null ? RadarIconBasicForms.DEFAULT_MODEL : (RadarIconForm)this.variantForms.get(variantId));
+   }
+
+   public void construct(class_2960 entityId) {
+      this.entityId = entityId;
+      if (this.variantMethod != null) {
+         this.variantMethodReflect = this.convertStringToMethod(this.variantMethod, entityId.toString(), "variant", (Class)null, class_2960.class, class_897.class, class_1297.class);
+      }
+
+      if (this.variantIdBuilderMethod != null) {
+         this.variantIdBuilderMethodReflect = this.convertStringToMethod(this.variantIdBuilderMethod, entityId.toString(), "variant ID builder", Void.TYPE, StringBuilder.class, class_897.class, class_1297.class);
+      }
+
+      if (this.variantIdMethod != null) {
+         this.variantIdMethodReflect = this.convertStringToMethod(this.variantIdMethod, entityId.toString(), "variant ID", String.class, class_897.class, class_1297.class);
+      }
+
+      if (this.variants != null) {
+         for(Map.Entry<String, String> entry : this.variants.entrySet()) {
+            String value = (String)entry.getValue();
+            RadarIconForm form = this.constructForm(value);
+            if (form == null) {
+               MinimapLogs.LOGGER.info("Skipping invalid icon form: " + value + " for " + String.valueOf(entityId));
+            } else {
+               if (this.variantForms == null) {
+                  this.variantForms = new HashMap();
+               }
+
+               this.variantForms.put((String)entry.getKey(), form);
+            }
+         }
+
+         if (this.variantForms != null) {
+            if (!this.variantForms.containsKey("default")) {
+               this.variantForms.put("default", RadarIconBasicForms.DEFAULT_MODEL);
+            }
+         }
+      }
+   }
+
+   private RadarIconForm constructForm(String value) {
+      String[] valueSplit = value.split(":");
+      RadarIconFormType formType = RadarIconFormTypes.readType(valueSplit[0]);
+      return formType == null ? null : formType.readForm(this, valueSplit);
+   }
+
+   public String getVariantMethodString() {
+      return this.variantMethod;
+   }
+
+   public Method getVariantMethod() {
+      return this.variantMethodReflect;
+   }
+
+   public void setVariantMethod(Method variantMethod) {
+      this.variantMethodReflect = variantMethod;
+   }
+
+   public String getVariantIdBuilderMethodString() {
+      return this.variantIdBuilderMethod;
+   }
+
+   public Method getVariantIdBuilderMethod() {
+      return this.variantIdBuilderMethodReflect;
+   }
+
+   public void setVariantIdBuilderMethod(Method variantIdBuilderMethodReflect) {
+      this.variantIdBuilderMethodReflect = variantIdBuilderMethodReflect;
+   }
+
+   private Method convertStringToMethod(String methodPath, String entityId, String methodDisplayName, Class<?> returnType, Class<?>... parameterTypes) {
+      if (methodPath == null) {
+         return null;
+      } else {
+         Method result = null;
+         int lastDot = methodPath.lastIndexOf(46);
+         String classPath = methodPath.substring(0, lastDot);
+         String methodName = methodPath.substring(lastDot + 1);
+
+         try {
+            Class<?> c = Class.forName(classPath);
+            result = c.getDeclaredMethod(methodName, parameterTypes);
+            if (returnType == null) {
+               return result;
+            }
+
+            if (result.getReturnType() != returnType) {
+               MinimapLogs.LOGGER.info(String.format("The return type of the %s method for %s is not %s. Can't use it.", methodDisplayName, entityId, returnType));
+               return null;
+            }
+         } catch (Exception e) {
+            MinimapLogs.LOGGER.error(String.format("Could not find %s method %s defined for %s", methodDisplayName, methodPath, entityId), e);
+         }
+
+         return result;
+      }
+   }
+
+   public String getOldVariantIdMethodString() {
+      return this.variantIdMethod;
+   }
+
+   public Method getOldVariantIdMethod() {
+      return this.variantIdMethodReflect;
+   }
+
+   public void setOldVariantIdMethod(Method variantIdMethodReflect) {
+      this.variantIdMethodReflect = variantIdMethodReflect;
+   }
+
+   public RadarIconModelConfig getModelConfig(int index) {
+      if (this.modelConfigs == null) {
+         return null;
+      } else {
+         return index >= 0 && index < this.modelConfigs.size() ? (RadarIconModelConfig)this.modelConfigs.get(index) : null;
+      }
+   }
+
+   public class_2960 getEntityId() {
+      return this.entityId;
+   }
+}

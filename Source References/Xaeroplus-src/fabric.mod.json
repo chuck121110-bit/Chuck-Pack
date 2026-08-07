@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "xaeroplus",
+  "version": "2.35.1",
+  "name": "XaeroPlus",
+  "description": "Xaero\u0027s WorldMap and MiniMap Extra Features",
+  "authors": [
+    "rfresh2"
+  ],
+  "contact": {
+    "homepage": "https://github.com/rfresh2/XaeroPlus",
+    "sources": "https://github.com/rfresh2/XaeroPlus"
+  },
+  "license": "MIT",
+  "icon": "assets/xaeroplus/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "xaeroplus.fabric.XaeroPlusFabric"
+    ],
+    "modmenu": [
+      "xaeroplus.fabric.XaeroPlusModMenu"
+    ],
+    "sodium:config_api_user": [
+      "xaeroplus.fabric.XaeroPlusSodiumConfigBuilder"
+    ]
+  },
+  "mixins": [
+    "xaeroplus.mixins.json",
+    "xaeroplus-fabric.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": "\u003e\u003d0.18.4",
+    "minecraft": "1.21.11",
+    "xaeroworldmap": "1.44.2"
+  },
+  "custom": {
+    "minimap_version": "26.4.2",
+    "lithium:options": {
+      "mixin.chunk.palette": false
+    }
+  },
+  "accessWidener": "xaeroplus.accesswidener"
+}

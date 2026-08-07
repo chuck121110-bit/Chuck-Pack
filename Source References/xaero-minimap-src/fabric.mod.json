@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "xaerominimap",
+  "version": "26.4.2",
+  "name": "Xaero\u0027s Minimap",
+  "description": "The most vanilla-looking minimap for Minecraft.",
+  "authors": [
+    "xaero96"
+  ],
+  "contact": {
+    "homepage": "https://www.curseforge.com/minecraft/mc-mods/xaeros-minimap",
+    "issues": "https://www.curseforge.com/minecraft/mc-mods/xaeros-minimap/issues"
+  },
+  "license": "All Rights Reserved",
+  "icon": "assets/xaerominimap/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "xaero.minimap.XaeroMinimapFabric"
+    ],
+    "server": [
+      "xaero.minimap.XaeroMinimapFabric"
+    ],
+    "modmenu": [
+      "xaero.common.XaeroHudModMenu"
+    ]
+  },
+  "mixins": [
+    "xaerohud.mixins.json",
+    "xaerohud.fabric.mixins.json",
+    "xaerominimap.mixins.json",
+    "xaerominimap.fabric.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": "\u003e\u003d0.13.0",
+    "fabric-api": "\u003e\u003d0.43.1",
+    "minecraft": "\u003e1.21.10 \u003c26.1.0",
+    "xaerolib": "\u003e\u003d1.0"
+  },
+  "suggests": {},
+  "breaks": {
+    "openpartiesandclaims": "\u003c0.27.0",
+    "xaeroworldmap": "\u003c1.44.0"
+  },
+  "jars": [
+    {
+      "file": "META-INF/jars/xaerolib-fabric-1.21.11-1.7.1.jar"
+    }
+  ]
+}

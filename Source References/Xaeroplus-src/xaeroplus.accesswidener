@@ -1,0 +1,10 @@
+accessWidener	v2	intermediary
+accessible	class	net/minecraft/class_2841$class_6561
+accessible	field	net/minecraft/class_2841	field_34560	Lnet/minecraft/class_2841$class_6561;
+accessible	field	net/minecraft/class_315	field_34784	I
+accessible	field	net/minecraft/class_761	field_4112	Lnet/minecraft/class_769;
+transitive-accessible	field	net/minecraft/class_10799	field_60125	Lcom/mojang/blaze3d/pipeline/RenderPipeline$Snippet;
+transitive-accessible	field	net/minecraft/class_310	field_1689	Lnet/minecraft/class_276;
+transitive-mutable	field	net/minecraft/class_310	field_1689	Lnet/minecraft/class_276;
+accessible	field	net/minecraft/class_638	field_27734	Lnet/minecraft/class_5582;
+accessible	field	net/minecraft/class_2580	field_11803	I

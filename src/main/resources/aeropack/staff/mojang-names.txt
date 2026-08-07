@@ -1,0 +1,3 @@
+# Mojang staff usernames, one per line.
+# Used by Staff Monitor when the "Mojang Staff" setting is enabled.
+# Lines starting with # are ignored. Names are case-insensitive.

@@ -1,0 +1,23 @@
+accessWidener	v2	intermediary
+accessible	class	net/minecraft/class_1071$class_8687
+accessible	class	net/minecraft/class_677$class_680
+accessible	class	net/minecraft/class_2824$class_5907
+accessible	class	net/minecraft/class_2824$class_5910
+accessible	class	net/minecraft/class_2824$class_5906
+accessible	class	net/minecraft/class_631$class_3681
+accessible	class	net/minecraft/class_10093$class_331
+accessible	field	net/minecraft/class_10093$class_331	field_2048	Lnet/minecraft/class_1043;
+accessible	class	net/minecraft/class_466$class_469
+accessible	class	net/minecraft/class_466$class_468
+accessible	class	net/minecraft/class_466$class_467
+accessible	class	net/minecraft/class_6360$class_6363
+accessible	class	com/mojang/blaze3d/opengl/GlStateManager$class_1018
+accessible	method	com/mojang/blaze3d/pipeline/RenderPipeline$Builder	<init>	()V
+accessible	method	com/mojang/blaze3d/pipeline/RenderPipeline$Builder	withSnippet	(Lcom/mojang/blaze3d/pipeline/RenderPipeline$Snippet;)V
+accessible	field	net/minecraft/class_11661	field_62244	Lit/unimi/dsi/fastutil/ints/Int2ObjectAVLTreeMap;
+accessible	class	net/minecraft/class_1536$class_1537
+accessible	field	net/minecraft/class_1536	field_7175	Lnet/minecraft/class_1536$class_1537;
+accessible	method	net/minecraft/class_636	method_41931	(Lnet/minecraft/class_638;Lnet/minecraft/class_7204;)V
+accessible	class	net/minecraft/class_332$class_8214
+accessible	field	net/minecraft/class_12247	field_63989	Lnet/minecraft/class_12246;
+accessible	method	net/minecraft/class_1676	method_62823	()Z

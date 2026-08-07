@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "plugin" : "xaero.lib.mixin.plugin.MixinPlugin",
+  "minVersion": "0.8",
+  "package": "xaero.minimap.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+  ],
+  "client": [
+  ],
+  "server": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

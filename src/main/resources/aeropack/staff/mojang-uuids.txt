@@ -1,0 +1,3 @@
+# Mojang staff UUIDs, one per line.
+# Used by Staff Monitor when the "Mojang Staff" setting is enabled.
+# Lines starting with # are ignored. Malformed UUIDs are ignored.
