@@ -12,3 +12,4 @@ map-integration/build/
 local.properties
 run/
 out/
+*.bat
