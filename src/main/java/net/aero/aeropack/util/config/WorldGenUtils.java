@@ -92,9 +92,9 @@ public class WorldGenUtils {
         }
 
         if (mc.player != null) {
-            ItemStack stack = mc.player.getStackInHand(InteractionHand.MAIN_HAND);
+            ItemStack stack = mc.player.getItemInHand(InteractionHand.MAIN_HAND);
             if (stack.isEmpty()) {
-                stack = mc.player.getStackInHand(InteractionHand.OFF_HAND);
+                stack = mc.player.getItemInHand(InteractionHand.OFF_HAND);
             }
             if (!stack.isEmpty()) {
                 try {
@@ -156,7 +156,7 @@ public class WorldGenUtils {
     }
 
     private static boolean isInDimension(meteordevelopment.meteorclient.utils.world.Dimension dimension) {
-        return PlayerUtils.dimensionType() == dimension;
+        return PlayerUtils.getDimension() == dimension;
     }
 
     private static meteordevelopment.meteorclient.utils.world.Dimension getDimension(Feature feature) {
@@ -169,7 +169,7 @@ public class WorldGenUtils {
 
     private static boolean isValidMap(Feature feature, ItemStack stack) {
         if (stack.isEmpty()) return false;
-        if (!stack.getComponents().contains(DataComponents.MAP_DECORATIONS)) return false;
+        if (!stack.getComponents().has(DataComponents.MAP_DECORATIONS)) return false;
         MapDecorations component = stack.get(DataComponents.MAP_DECORATIONS);
         if (component == null || component.decorations().isEmpty()) return false;
         String name = component.toString();
@@ -183,10 +183,10 @@ public class WorldGenUtils {
     }
 
     private static BlockPos getMapMarker(ItemStack stack) {
-        if (!stack.getComponents().contains(DataComponents.MAP_DECORATIONS)) return null;
+        if (!stack.getComponents().has(DataComponents.MAP_DECORATIONS)) return null;
         MapDecorations component = stack.get(DataComponents.MAP_DECORATIONS);
         if (component == null || component.decorations().isEmpty()) return null;
-        MapDecorations.Decoration decoration = component.decorations().get(0);
+        MapDecorations.Entry decoration = component.decorations().values().iterator().next();
         return new BlockPos((int) decoration.x(), 0, (int) decoration.z());
     }
 }

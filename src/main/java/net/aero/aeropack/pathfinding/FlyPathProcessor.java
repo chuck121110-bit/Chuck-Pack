@@ -102,7 +102,7 @@ public class FlyPathProcessor extends PathProcessor
 		if(horizontal)
 		{
 			Flight flight = Modules.get().get(Flight.class);
-			double horizontalSpeed = flight != null ? flight.horizontalSpeed.get() : 1.0;
+			double horizontalSpeed = flight != null ? (double) flight.getFlyingSpeed() : 1.0;
 			if(!creativeFlying && MC.player.position().distanceTo(vecInPos) <= horizontalSpeed)
 			{
 				MC.player.setPos(vecInPos.x, vecInPos.y, vecInPos.z);
@@ -119,7 +119,7 @@ public class FlyPathProcessor extends PathProcessor
 		}else if(y)
 		{
 			Flight flight = Modules.get().get(Flight.class);
-			double verticalSpeed = flight != null ? flight.verticalSpeed.get() : 0.5;
+			double verticalSpeed = flight != null ? (double) flight.getFlyingSpeed() : 0.5;
 			if(!creativeFlying && MC.player.position().distanceTo(vecInPos) <= verticalSpeed)
 			{
 				MC.player.setPos(vecInPos.x, vecInPos.y, vecInPos.z);

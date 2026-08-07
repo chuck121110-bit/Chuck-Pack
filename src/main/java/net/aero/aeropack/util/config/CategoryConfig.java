@@ -10,7 +10,7 @@ public class CategoryConfig {
 
     public static void load() {
         CompoundTag data = AeroConfig.load(FOLDER, FILE);
-        separateCategory = data.getBoolean("separateCategory", false);
+        separateCategory = data.getBooleanOr("separateCategory", false);
     }
 
     public static void save() {

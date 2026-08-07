@@ -295,23 +295,23 @@ public class AutoFarming extends Module {
         if (block instanceof SweetBerryBushBlock) {
             if (rotate.get()) {
                 Rotations.rotate(Rotations.getYaw(pos), Rotations.getPitch(pos), -100, () -> {
-                    mc.gameMode.interactBlock(mc.player, InteractionHand.MAIN_HAND,
+                    mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND,
                         new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
                     if (swingHand.get()) mc.player.swing(InteractionHand.MAIN_HAND);
                 });
             } else {
-                mc.gameMode.interactBlock(mc.player, InteractionHand.MAIN_HAND,
+                mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND,
                     new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
                 if (swingHand.get()) mc.player.swing(InteractionHand.MAIN_HAND);
             }
         } else {
             if (rotate.get()) {
                 Rotations.rotate(Rotations.getYaw(pos), Rotations.getPitch(pos), -100, () -> {
-                    mc.gameMode.updateBlockBreakingProgress(pos, Direction.UP);
+                    mc.gameMode.continueDestroyBlock(pos, Direction.UP);
                     if (swingHand.get()) mc.player.swing(InteractionHand.MAIN_HAND);
                 });
             } else {
-                mc.gameMode.updateBlockBreakingProgress(pos, Direction.UP);
+                mc.gameMode.continueDestroyBlock(pos, Direction.UP);
                 if (swingHand.get()) mc.player.swing(InteractionHand.MAIN_HAND);
             }
         }
@@ -331,11 +331,11 @@ public class AutoFarming extends Module {
 
         if (rotate.get()) {
             Rotations.rotate(Rotations.getYaw(pos), Rotations.getPitch(pos), -100, () -> {
-                mc.gameMode.updateBlockBreakingProgress(pos, Direction.UP);
+                mc.gameMode.continueDestroyBlock(pos, Direction.UP);
                 if (tallCropSwingHand.get()) mc.player.swing(InteractionHand.MAIN_HAND);
             });
         } else {
-            mc.gameMode.updateBlockBreakingProgress(pos, Direction.UP);
+            mc.gameMode.continueDestroyBlock(pos, Direction.UP);
             if (tallCropSwingHand.get()) mc.player.swing(InteractionHand.MAIN_HAND);
         }
         actions++;
@@ -453,7 +453,7 @@ public class AutoFarming extends Module {
             boolean wasSneaking = mc.player.isShiftKeyDown();
             mc.player.setShiftKeyDown(false);
             InvUtils.swap(item.slot(), true);
-            mc.gameMode.interactBlock(mc.player, InteractionHand.MAIN_HAND,
+            mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND,
                 new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
             if (swingHand.get()) mc.player.swing(InteractionHand.MAIN_HAND);
             InvUtils.swapBack();
@@ -476,8 +476,8 @@ public class AutoFarming extends Module {
     }
 
     private boolean isWaterNearby(LevelReader Level, BlockPos pos) {
-        for (BlockPos blockPos : BlockPos.iterate(pos.offset(-4, 0, -4), pos.offset(4, 1, 4))) {
-            if (world.getFluidState(blockPos).is(FluidTags.WATER)) return true;
+        for (BlockPos blockPos : BlockPos.betweenClosed(pos.offset(-4, 0, -4), pos.offset(4, 1, 4))) {
+            if (Level.getFluidState(blockPos).is(FluidTags.WATER)) return true;
         }
         return false;
     }
@@ -499,12 +499,12 @@ public class AutoFarming extends Module {
     private boolean isMature(BlockState state, Block block) {
         if (state.is(BlockTags.CROPS)) {
             if (block instanceof CropBlock cropBlock) {
-                return cropBlock.isMature(state);
+                return cropBlock.isMaxAge(state);
             }
         }
 
         if (block instanceof CropBlock cropBlock) {
-            return cropBlock.isMature(state);
+            return cropBlock.isMaxAge(state);
         } else if (block instanceof CocoaBlock) {
             return state.getValue(CocoaBlock.AGE) >= 2;
         } else if (block instanceof StemBlock) {
@@ -536,7 +536,7 @@ public class AutoFarming extends Module {
         if (block instanceof CropBlock) return true;
         if (block instanceof StemBlock) return true;
         if (block instanceof SaplingBlock) return true;
-        if (block instanceof MushroomPlantBlock) return true;
+        if (block instanceof MushroomBlock) return true;
         if (block instanceof AzaleaBlock) return true;
 
         return block == Blocks.COCOA ||

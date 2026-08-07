@@ -176,7 +176,7 @@ public class PearlChecker extends Module {
             Renderer2D.COLOR.quad(x - 1, y - 1, w + 2, mc.font.lineHeight + 2, BACKGROUND);
             Renderer2D.COLOR.render();
 
-            event.graphics.drawString(mc.font, label, (int) x, (int) y, new Color(textColor.get()).hashCode());
+            event.graphics.text(mc.font, label, (int) x, (int) y, new Color(textColor.get()).hashCode());
 
             NametagUtils.end();
         }
