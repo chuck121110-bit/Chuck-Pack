@@ -1,9 +1,9 @@
 package net.aero.aeropack.mixin;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.util.math.Box;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.phys.AABB;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -20,15 +20,15 @@ public abstract class ESPMixin {
         Entity camera = mc.getCameraEntity();
         if (camera == null) return;
 
-        Box box = entity.getBoundingBox();
+        AABB AABB = entity.getBoundingBox();
 
         double camX = camera.getX();
         double camY = camera.getY();
         double camZ = camera.getZ();
 
-        double nearestX = Math.max(box.minX, Math.min(camX, box.maxX));
-        double nearestY = Math.max(box.minY, Math.min(camY, box.maxY));
-        double nearestZ = Math.max(box.minZ, Math.min(camZ, box.maxZ));
+        double nearestX = Math.max(AABB.minX, Math.min(camX, AABB.maxX));
+        double nearestY = Math.max(AABB.minY, Math.min(camY, AABB.maxY));
+        double nearestZ = Math.max(AABB.minZ, Math.min(camZ, AABB.maxZ));
 
         double dx = nearestX - camX;
         double dy = nearestY - camY;

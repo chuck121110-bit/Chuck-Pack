@@ -5,23 +5,24 @@ import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import net.aero.aeropack.modules.misc.OppStats;
 import net.aero.aeropack.modules.misc.OppStats.OppRecord;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.EntryListWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.client.util.DefaultSkinHelper;
-import net.minecraft.entity.player.SkinTextures;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.AbstractSelectionList;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.resources.DefaultPlayerSkin;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.world.entity.player.PlayerSkin;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -41,11 +42,11 @@ public final class OppStatsScreen extends Screen {
     private final Screen previous;
     private final OppStats module;
     private OppList list;
-    private TextFieldWidget searchBox;
-    private ButtonWidget onlineButton;
-    private ButtonWidget historicalButton;
-    private ButtonWidget copyButton;
-    private ButtonWidget copyEventsButton;
+    private EditBox searchBox;
+    private Button onlineButton;
+    private Button historicalButton;
+    private Button copyButton;
+    private Button copyEventsButton;
     private boolean showOnline = true;
     private String searchQuery = "";
     private long nextReloadAt;
@@ -57,7 +58,7 @@ public final class OppStatsScreen extends Screen {
     private int infoPanelH;
 
     public OppStatsScreen(Screen previous, OppStats module) {
-        super(Text.empty());
+        super(Component.empty());
         this.previous = previous;
         this.module = module;
     }
@@ -71,37 +72,37 @@ public final class OppStatsScreen extends Screen {
         int leftPanelW = Math.min(440, Math.max(220, width / 2 - 36));
         list = new OppList(Minecraft.getInstance(), width / 2 - 20, listHeight,
             top, 24, module, showOnline, searchQuery);
-        addDrawableChild(list);
+        addRenderableWidget(list);
 
-        addDrawableChild(onlineButton = ButtonWidget.builder(Text.literal("Online"), b -> {
+        addRenderableWidget(onlineButton = Button.builder(Component.literal("Online"), b -> {
             showOnline = true;
             list.reload(showOnline, searchQuery);
             updateModeButtonLabels();
-        }).dimensions(16, 12, 100, 20).build());
+        }).bounds(16, 12, 100, 20).build());
 
-        addDrawableChild(historicalButton = ButtonWidget.builder(Text.literal("Historical"), b -> {
+        addRenderableWidget(historicalButton = Button.builder(Component.literal("Historical"), b -> {
             showOnline = false;
             list.reload(showOnline, searchQuery);
             updateModeButtonLabels();
-        }).dimensions(122, 12, 110, 20).build());
+        }).bounds(122, 12, 110, 20).build());
 
-        searchBox = new TextFieldWidget(textRenderer, leftPanelX, 36, leftPanelW, 18,
-            Text.literal("Search"));
-        searchBox.setPlaceholder(Text.literal("Search players..."));
-        searchBox.setText(searchQuery);
-        searchBox.setChangedListener(value -> {
+        searchBox = new EditBox(font, leftPanelX, 36, leftPanelW, 18,
+            Component.literal("Search"));
+        searchBox.setHint(Component.literal("Search players..."));
+        searchBox.setValue(searchQuery);
+        searchBox.setResponder(value -> {
             searchQuery = value == null ? "" : value.trim();
             if (list != null)
                 list.reload(showOnline, searchQuery);
         });
-        addDrawableChild(searchBox);
+        addRenderableWidget(searchBox);
 
-        copyButton = addDrawableChild(ButtonWidget.builder(Text.literal("Copy Profile"), b -> copySelected())
-            .dimensions(width - 360, height - 32, 110, 20).build());
-        copyEventsButton = addDrawableChild(ButtonWidget.builder(Text.literal("Copy Events"), b -> copyEvents())
-            .dimensions(width - 242, height - 32, 110, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Close"), b -> close())
-            .dimensions(width - 120, height - 32, 100, 20).build());
+        copyButton = addRenderableWidget(Button.builder(Component.literal("Copy Profile"), b -> copySelected())
+            .bounds(width - 360, height - 32, 110, 20).build());
+        copyEventsButton = addRenderableWidget(Button.builder(Component.literal("Copy Events"), b -> copyEvents())
+            .bounds(width - 242, height - 32, 110, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Close"), b -> onClose())
+            .bounds(width - 120, height - 32, 100, 20).build());
         updateModeButtonLabels();
     }
 
@@ -120,39 +121,39 @@ public final class OppStatsScreen extends Screen {
 
     private void updateModeButtonLabels() {
         if (onlineButton != null)
-            onlineButton.setMessage(Text.literal("Online (" + module.getOnlineRecords().size() + ")"));
+            onlineButton.setMessage(Component.literal("Online (" + module.getOnlineRecords().size() + ")"));
         if (historicalButton != null)
-            historicalButton.setMessage(Text.literal("Historical (" + module.getHistoricalRecords().size() + ")"));
+            historicalButton.setMessage(Component.literal("Historical (" + module.getHistoricalRecords().size() + ")"));
     }
 
     private void copySelected() {
         OppRecord rec = list.getSelectedRecord();
         if (rec == null)
             return;
-        client.keyboard.setClipboard(module.formatForClipboard(rec));
-        ChatUtils.sendMsg(Text.literal("Copied OppStats profile for " + rec.name + "."));
+        net.minecraft.client.Minecraft.getInstance().keyboardHandler.setClipboard(module.formatForClipboard(rec));
+        ChatUtils.sendMsg(Component.literal("Copied OppStats profile for " + rec.name + "."));
     }
 
     private void copyEvents() {
         OppRecord rec = list.getSelectedRecord();
         if (rec == null)
             return;
-        client.keyboard.setClipboard(String.join("\n", rec.events));
-        ChatUtils.sendMsg(Text.literal("Copied event log for " + rec.name + "."));
+        net.minecraft.client.Minecraft.getInstance().keyboardHandler.setClipboard(String.join("\n", rec.events));
+        ChatUtils.sendMsg(Component.literal("Copied event log for " + rec.name + "."));
     }
 
     @Override
-    public void close() {
-        client.setScreen(previous);
+    public void onClose() {
+        Minecraft.getInstance().setScreen(previous);
     }
 
     @Override
-    public boolean shouldPause() {
-        return false;
+    public boolean shouldCloseOnEsc() {
+        return true;
     }
 
     @Override
-    public boolean keyPressed(KeyInput key) {
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent key) {
         if (searchBox == null || !searchBox.isFocused()) {
             if (key.key() == GLFW.GLFW_KEY_UP)
                 return list != null && list.moveSelection(-1);
@@ -179,9 +180,9 @@ public final class OppStatsScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
-        context.drawCenteredTextWithShadow(textRenderer, "OppStats", width / 2, 12, 0xFFFFFFFF);
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        super.extractRenderState(context, mouseX, mouseY, delta);
+        context.centeredText(font, "OppStats", width / 2, 12, 0xFFFFFFFF);
 
         OppRecord selected = list.getSelectedRecord();
         if (selected == null)
@@ -197,10 +198,10 @@ public final class OppStatsScreen extends Screen {
         drawInfoPanel(context, selected, panelX, infoY, panelW);
     }
 
-    private void drawModelPanel(DrawContext context, OppRecord selected, int x, int y) {
+    private void drawModelPanel(GuiGraphicsExtractor context, OppRecord selected, int x, int y) {
         Identifier skin = resolveSkin(selected.uuid);
         context.fill(x, y, x + 86, y + 120, 0x55000000);
-        context.drawStrokedRectangle(x, y, 86, 120, 0x88808080);
+        context.outline(x, y, x + 86, y + 120, 0x88808080);
 
         blit(context, skin, x + 28, y + 7, 8, 8, 30, 30, 8, 8, 64, 64);
         blit(context, skin, x + 28, y + 7, 40, 8, 30, 30, 8, 8, 64, 64);
@@ -211,17 +212,17 @@ public final class OppStatsScreen extends Screen {
         blit(context, skin, x + 43, y + 73, 4, 20, 12, 20, 4, 12, 64, 64);
     }
 
-    private void blit(DrawContext context, Identifier skin, int x, int y, int u, int v,
+    private void blit(GuiGraphicsExtractor context, Identifier skin, int x, int y, int u, int v,
         int w, int h, int texW, int texH, int textureWidth, int textureHeight) {
-        context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, skin,
+        context.blit(RenderPipelines.GUI_TEXTURED, skin,
             x, y, u, v, w, h, texW, texH, textureWidth, textureHeight, 0xFFFFFFFF);
     }
 
-    private int drawEquipmentPanel(DrawContext context, OppRecord selected, int x, int y,
+    private int drawEquipmentPanel(GuiGraphicsExtractor context, OppRecord selected, int x, int y,
         int w, int mouseX, int mouseY) {
         int panelH = 254;
         context.fill(x, y, x + w, y + panelH, 0x55000000);
-        context.drawStrokedRectangle(x, y, w, panelH, 0x88808080);
+        context.outline(x, y, x + w, y + panelH, 0x88808080);
 
         SlotView[] slots = new SlotView[] {
             new SlotView("Head", selected.helmet),
@@ -237,12 +238,12 @@ public final class OppStatsScreen extends Screen {
             int rowY = y + 8 + i * rowH;
             int iconX = x + 40;
             int labelX = x + 8;
-            context.drawText(textRenderer, Text.literal(slots[i].label), labelX, rowY + 11,
+            context.text(font, Component.literal(slots[i].label), labelX, rowY + 11,
                 0xFFD0E0FF, false);
             ItemStack stack = parseStackIdToDisplay(slots[i].raw);
             if (!stack.isEmpty()) {
-                context.drawItem(stack, iconX, rowY + 6);
-                context.drawStackOverlay(textRenderer, stack, iconX, rowY + 6);
+                context.item(stack, iconX, rowY + 6);
+                context.itemDecorations(font, stack, iconX, rowY + 6);
             }
             String name = extractItemName(slots[i].raw);
             String durability = durabilityOnly(slots[i].raw);
@@ -267,30 +268,30 @@ public final class OppStatsScreen extends Screen {
         return panelH;
     }
 
-    private void showSlotTooltip(DrawContext context, SlotView slot, int mouseX, int mouseY) {
-        ArrayList<Text> lines = new ArrayList<>();
+    private void showSlotTooltip(GuiGraphicsExtractor context, SlotView slot, int mouseX, int mouseY) {
+        ArrayList<Component> lines = new ArrayList<>();
         String name = extractItemName(slot.raw);
-        lines.add(Text.literal(slot.label + ": " + name));
+        lines.add(Component.literal(slot.label + ": " + name));
         String dur = durabilityOnly(slot.raw);
         if (!dur.isBlank())
-            lines.add(Text.literal(dur));
+            lines.add(Component.literal(dur));
         String ench = enchantsOnly(slot.raw);
         if (ench.equals("N/A") || ench.equals("none") || ench.isBlank())
-            lines.add(Text.literal("No enchantments"));
+            lines.add(Component.literal("No enchantments"));
         else
             for (String part : ench.split("\\s*,\\s*"))
                 if (!part.isBlank())
-                    lines.add(Text.literal(part.trim()));
-        context.drawTooltip(textRenderer, lines, mouseX, mouseY);
+                    lines.add(Component.literal(part.trim()));
+        context.setComponentTooltipForNextFrame(font, lines, mouseX, mouseY);
     }
 
-    private void drawInfoPanel(DrawContext context, OppRecord selected, int x, int y, int w) {
+    private void drawInfoPanel(GuiGraphicsExtractor context, OppRecord selected, int x, int y, int w) {
         infoPanelX = x;
         infoPanelY = y;
         infoPanelW = w;
         infoPanelH = height - 44 - y;
         context.fill(x, y, x + w, y + infoPanelH, 0x44000000);
-        context.drawStrokedRectangle(x, y, w, infoPanelH, 0x66808080);
+        context.outline(x, y, x + w, y + infoPanelH, 0x66808080);
 
         ArrayList<InfoLine> lines = new ArrayList<>();
         lines.add(new InfoLine("Identity", true));
@@ -308,7 +309,7 @@ public final class OppStatsScreen extends Screen {
         lines.add(new InfoLine("HP: " + fmt(selected.health) + "  Abs: "
             + fmt(selected.absorption) + "  Armor: " + na(selected.armorValue)
             + "  Ping: " + na(getLivePing(selected)), false));
-        lines.add(new InfoLine("Gamemode: " + na(selected.gamemode), false));
+        lines.add(new InfoLine("GameType: " + na(selected.GameType), false));
         lines.add(new InfoLine("", false));
         lines.add(new InfoLine("Stats", true));
         lines.add(new InfoLine("Joins: " + selected.joinCount, false));
@@ -335,45 +336,45 @@ public final class OppStatsScreen extends Screen {
         for (InfoLine line : lines) {
             if (lineY > y - lineHeight && lineY < y + infoPanelH - 2) {
                 if (line.title)
-                    drawSectionTitle(context, line.text, x + 6, lineY);
-                else if (!line.text.isBlank())
-                    drawLine(context, line.text, x + 6, lineY, w - 12);
+                    drawSectionTitle(context, line.Component, x + 6, lineY);
+                else if (!line.Component.isBlank())
+                    drawLine(context, line.Component, x + 6, lineY, w - 12);
             }
             lineY += lineHeight;
         }
         context.disableScissor();
     }
 
-    private void drawLine(DrawContext context, String text, int x, int y, int maxWidth) {
-        if (textRenderer.getWidth(text) <= maxWidth) {
-            context.drawText(textRenderer, Text.literal(text), x, y, 0xFFE0E0E0, false);
+    private void drawLine(GuiGraphicsExtractor context, String text, int x, int y, int maxWidth) {
+        if (font.width(text) <= maxWidth) {
+            context.text(font, Component.literal(text), x, y, 0xFFE0E0E0, false);
             return;
         }
-        drawScaledText(context, textRenderer, text, x, y, 0xFFE0E0E0, false, 0.82f);
+        drawScaledText(context, font, text, x, y, 0xFFE0E0E0, false, 0.82f);
     }
 
-    private void drawScaledText(DrawContext context, TextRenderer font, String text, int x,
+    private void drawScaledText(GuiGraphicsExtractor context, Font font, String text, int x,
         int y, int color, boolean shadow, float scale) {
-        context.getMatrices().pushMatrix();
-        context.getMatrices().scale(scale, scale);
-        context.drawText(font, Text.literal(text), Math.round(x / scale),
+        context.pose().pushMatrix();
+        context.pose().scale(scale, scale);
+        context.text(font, Component.literal(text), Math.round(x / scale),
             Math.round(y / scale), color, shadow);
-        context.getMatrices().popMatrix();
+        context.pose().popMatrix();
     }
 
-    private void drawTrimmed(DrawContext context, String text, int x, int y, int maxW,
+    private void drawTrimmed(GuiGraphicsExtractor context, String text, int x, int y, int maxW,
         int color) {
         if (text == null || text.isBlank() || text.equals("N/A") || text.equals("none"))
             return;
         String t = text;
-        while (textRenderer.getWidth(t) > maxW && t.length() > 3)
+        while (font.width(t) > maxW && t.length() > 3)
             t = t.substring(0, t.length() - 1);
         if (!t.equals(text))
             t = t.substring(0, Math.max(1, t.length() - 1)) + "\u2026";
-        context.drawText(textRenderer, Text.literal(t), x, y, color, false);
+        context.text(font, Component.literal(t), x, y, color, false);
     }
 
-    private void drawEnchantLines(DrawContext context, String enchants, int x, int y,
+    private void drawEnchantLines(GuiGraphicsExtractor context, String enchants, int x, int y,
         int maxW, int maxLines) {
         enchants = normalizeEnchantText(enchants);
         if (enchants == null || enchants.isBlank() || enchants.equals("N/A")
@@ -395,24 +396,24 @@ public final class OppStatsScreen extends Screen {
         }
     }
 
-    private void drawSectionTitle(DrawContext context, String title, int x, int y) {
-        context.drawText(textRenderer, Text.literal(title), x, y, 0xFFD0E0FF, false);
+    private void drawSectionTitle(GuiGraphicsExtractor context, String title, int x, int y) {
+        context.text(font, Component.literal(title), x, y, 0xFFD0E0FF, false);
     }
 
-    private ItemStack parseStackIdToDisplay(String text) {
-        if (text == null || text.equals("N/A"))
+    private ItemStack parseStackIdToDisplay(String Component) {
+        if (Component == null || Component.equals("N/A"))
             return ItemStack.EMPTY;
-        int idStart = text.indexOf("id=");
+        int idStart = Component.indexOf("id=");
         if (idStart < 0)
             return ItemStack.EMPTY;
-        int idEnd = text.indexOf(',', idStart);
-        String id = idEnd < 0 ? text.substring(idStart + 3)
-            : text.substring(idStart + 3, idEnd);
+        int idEnd = Component.indexOf(',', idStart);
+        String id = idEnd < 0 ? Component.substring(idStart + 3)
+            : Component.substring(idStart + 3, idEnd);
         Identifier identifier = Identifier.tryParse(id.trim());
         if (identifier == null)
             return ItemStack.EMPTY;
         try {
-            Item item = Registries.ITEM.get(identifier);
+            Item item = BuiltInRegistries.ITEM.getValue(identifier);
             return item == null || item == Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
         } catch (Exception e) {
             return ItemStack.EMPTY;
@@ -435,11 +436,11 @@ public final class OppStatsScreen extends Screen {
         return normalizeEnchantText(stackText.substring(i + "enchants=".length()).trim());
     }
 
-    private String normalizeEnchantText(String text) {
-        if (text == null)
+    private String normalizeEnchantText(String Component) {
+        if (Component == null)
             return null;
 
-        String normalized = text.trim();
+        String normalized = Component.trim();
         while (normalized.endsWith("]"))
             normalized = normalized.substring(0, normalized.length() - 1).trim();
         return normalized;
@@ -490,7 +491,7 @@ public final class OppStatsScreen extends Screen {
         if (rec == null || rec.uuid == null || mc.getConnection() == null)
             return rec == null ? -1 : rec.ping;
 
-        PlayerListEntry info = mc.getConnection().getPlayerListEntry(rec.uuid);
+        PlayerInfo info = mc.getConnection().getPlayerInfo(rec.uuid);
         if (info != null)
             return info.getLatency();
 
@@ -505,12 +506,12 @@ public final class OppStatsScreen extends Screen {
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.getConnection() != null) {
-            PlayerListEntry info = mc.getConnection().getPlayerListEntry(uuid);
+            PlayerInfo info = mc.getConnection().getPlayerInfo(uuid);
             if (info != null)
-                return info.getSkinTextures().body().texturePath();
+                return DefaultPlayerSkin.getDefaultTexture();
         }
 
-        return DefaultSkinHelper.getSkinTextures(uuid).body().texturePath();
+        return DefaultPlayerSkin.getDefaultTexture();
     }
 
     private static void requestMojangSkin(UUID uuid) {
@@ -526,8 +527,8 @@ public final class OppStatsScreen extends Screen {
             }
         }).thenCompose(profile -> {
             if (profile == null)
-                return CompletableFuture.completedFuture(Optional.<SkinTextures>empty());
-            return mc.getSkinProvider().fetchSkinTextures(profile);
+                return CompletableFuture.completedFuture(Optional.<PlayerSkin>empty());
+            return mc.getSkinManager().get(profile);
         }).thenAccept(optSkin -> {
             optSkin.ifPresent(skin -> mojangSkins.put(uuid, skin.body().texturePath()));
             loadingMojangSkins.remove(uuid);
@@ -539,9 +540,9 @@ public final class OppStatsScreen extends Screen {
 
     private record SlotView(String label, String raw) {}
 
-    private record InfoLine(String text, boolean title) {}
+    private record InfoLine(String Component, boolean title) {}
 
-    private static final class OppList extends EntryListWidget<OppList.Entry> {
+    private static final class OppList extends AbstractSelectionList<OppList.Entry> {
         private final OppStats module;
         private boolean showOnline;
 
@@ -571,7 +572,7 @@ public final class OppStatsScreen extends Screen {
         }
 
         OppRecord getSelectedRecord() {
-            Entry selected = getSelectedOrNull();
+            Entry selected = getSelected();
             return selected == null ? null : selected.record;
         }
 
@@ -583,7 +584,7 @@ public final class OppStatsScreen extends Screen {
             if (entries.isEmpty())
                 return false;
 
-            Entry selected = getSelectedOrNull();
+            Entry selected = getSelected();
             int index = entries.indexOf(selected);
             if (index < 0)
                 index = delta > 0 ? -1 : entries.size();
@@ -594,7 +595,7 @@ public final class OppStatsScreen extends Screen {
 
             Entry entry = entries.get(next);
             setSelected(entry);
-            scrollTo(entry);
+            centerScrollOn(entry);
             return true;
         }
 
@@ -604,12 +605,12 @@ public final class OppStatsScreen extends Screen {
         }
 
         @Override
-        protected void appendClickableNarrations(NarrationMessageBuilder builder) {
-            appendNarrations(builder, getSelectedOrNull());
+        protected void updateWidgetNarration(NarrationElementOutput builder) {
+            this.defaultButtonNarrationText(builder);
         }
 
         private String captureSelection() {
-            Entry selected = getSelectedOrNull();
+            Entry selected = getSelected();
             return selected == null ? null : selected.record.uuid.toString();
         }
 
@@ -627,7 +628,7 @@ public final class OppStatsScreen extends Screen {
 
         private void ensureSelection() {
             List<Entry> entries = children();
-            if (!entries.isEmpty() && getSelectedOrNull() == null)
+            if (!entries.isEmpty() && getSelected() == null)
                 setSelected(entries.get(0));
         }
 
@@ -644,7 +645,7 @@ public final class OppStatsScreen extends Screen {
             return uuid.contains(query);
         }
 
-        private static final class Entry extends EntryListWidget.Entry<Entry> {
+        private static final class Entry extends AbstractSelectionList.Entry<Entry> {
             private final OppRecord record;
 
             public Entry(OppList parent, OppRecord record) {
@@ -653,18 +654,18 @@ public final class OppStatsScreen extends Screen {
             }
 
             @Override
-            public void render(DrawContext context, int x, int y, boolean hovered,
+            public void extractContent(GuiGraphicsExtractor context, int x, int y, boolean hovered,
                 float delta) {
                 Identifier skin = resolveSkin(record.uuid);
-                context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED,
+                context.blit(RenderPipelines.GUI_TEXTURED,
                     skin, x + 2, y + 2, 8, 8, 16, 16, 8, 8, 64, 64, 0xFFFFFFFF);
                 Minecraft mc = Minecraft.getInstance();
-                context.drawText(mc.font, Text.literal(record.name), x + 24, y + 2,
+                context.text(mc.font, Component.literal(record.name), x + 24, y + 2,
                     0xFFFFFFFF, false);
                 String pingText = record.online
                     ? "ping: " + na(getLivePing(record)) + " ms"
                     : "offline";
-                context.drawText(mc.font, Text.literal(pingText), x + 24, y + 12,
+                context.text(mc.font, Component.literal(pingText), x + 24, y + 12,
                     record.online ? 0xFF55FF55 : 0xFFFF7777, false);
             }
         }

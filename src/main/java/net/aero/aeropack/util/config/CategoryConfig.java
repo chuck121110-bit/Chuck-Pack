@@ -1,6 +1,6 @@
 package net.aero.aeropack.util.config;
 
-import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.CompoundTag;
 
 public class CategoryConfig {
     private static final String FOLDER = "config";
@@ -9,12 +9,12 @@ public class CategoryConfig {
     private static boolean separateCategory = false;
 
     public static void load() {
-        NbtCompound data = AeroConfig.load(FOLDER, FILE);
+        CompoundTag data = AeroConfig.load(FOLDER, FILE);
         separateCategory = data.getBoolean("separateCategory", false);
     }
 
     public static void save() {
-        NbtCompound data = new NbtCompound();
+        CompoundTag data = new CompoundTag();
         data.putBoolean("separateCategory", separateCategory);
         AeroConfig.save(FOLDER, FILE, data);
     }

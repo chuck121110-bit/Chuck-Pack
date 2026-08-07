@@ -8,10 +8,10 @@ import meteordevelopment.meteorclient.pathing.PathManagers;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
-import net.minecraft.block.Block;
-import net.minecraft.command.CommandSource;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.commands.CommandSource;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -45,7 +45,7 @@ public class SwarmMineMixin {
                         var offsetBuilder = suggestionsBuilder.createOffset(wordStart);
 
                         String lowerPrefix = prefix.toLowerCase();
-                        for (Identifier id : Registries.BLOCK.getIds()) {
+                        for (Identifier id : BuiltInRegistries.BLOCK.keySet()) {
                             String full = id.toString();
                             String path = id.getPath();
 
@@ -74,11 +74,11 @@ public class SwarmMineMixin {
                             List<Block> blocks = new ArrayList<>();
                             for (String part : parts) {
                                 Identifier id = Identifier.tryParse(part);
-                                if (id == null || !Registries.BLOCK.containsId(id)) {
+                                if (id == null || !BuiltInRegistries.BLOCK.containsKey(id)) {
                                     ChatUtils.error("Could not find block: " + part);
                                     continue;
                                 }
-                                blocks.add(Registries.BLOCK.get(id));
+                                blocks.add(BuiltInRegistries.BLOCK.getValue(id));
                             }
 
                             if (blocks.isEmpty()) {
@@ -250,7 +250,7 @@ public class SwarmMineMixin {
                     .suggests((ctx, sb) -> {
                         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                         if (mc.level != null) {
-                            for (net.minecraft.entity.player.PlayerEntity p : mc.level.getPlayers()) {
+                            for (net.minecraft.world.entity.player.Player p : mc.level.players()) {
                                 if (p == mc.player) continue;
                                 sb.suggest(p.getName().getString());
                             }
@@ -306,17 +306,17 @@ public class SwarmMineMixin {
 
         mc.execute(() -> {
             try {
-                net.minecraft.client.network.ServerAddress serverAddress =
-                    new net.minecraft.client.network.ServerAddress(finalHost, finalPort);
-                net.minecraft.client.network.ServerInfo serverInfo = new net.minecraft.client.network.ServerInfo(
+                net.minecraft.client.multiplayer.resolver.ServerAddress serverAddress =
+                    new net.minecraft.client.multiplayer.resolver.ServerAddress(finalHost, finalPort);
+                net.minecraft.client.multiplayer.ServerData serverInfo = new net.minecraft.client.multiplayer.ServerData(
                     finalHost, finalHost + ":" + finalPort,
-                    net.minecraft.client.network.ServerInfo.ServerType.OTHER
+                    net.minecraft.client.multiplayer.ServerData.Type.OTHER
                 );
-                net.minecraft.client.gui.screen.Screen returnScreen =
-                    mc.currentScreen != null ? mc.currentScreen : new net.minecraft.client.gui.screen.TitleScreen();
-                net.minecraft.client.gui.screen.multiplayer.ConnectScreen.connect(
+                net.minecraft.client.gui.screens.Screen returnScreen =
+                    mc.screen != null ? mc.screen : new net.minecraft.client.gui.screens.TitleScreen();
+                net.minecraft.client.gui.screens.ConnectScreen.startConnecting(
                     returnScreen, mc, serverAddress, serverInfo, false,
-                    new net.minecraft.client.network.CookieStorage(java.util.Map.of(), java.util.Map.of(), false)
+                    new net.minecraft.client.multiplayer.TransferState(java.util.Map.of(), java.util.Map.of(), false)
                 );
                 ChatUtils.info("Joining server " + finalHost + ":" + finalPort + "...");
             } catch (Exception e) {
@@ -335,7 +335,7 @@ public class SwarmMineMixin {
         if (mc.player == null || mc.level == null) return;
 
         java.util.List<String> currentPlayers = new java.util.ArrayList<>();
-        for (net.minecraft.entity.player.PlayerEntity p : mc.level.getPlayers()) {
+        for (net.minecraft.world.entity.player.Player p : mc.level.players()) {
             if (p == mc.player) continue;
             currentPlayers.add(p.getName().getString());
         }
@@ -387,7 +387,7 @@ public class SwarmMineMixin {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                 if (mc.player != null && mc.level != null) {
                     double closest = Double.MAX_VALUE;
-                    for (net.minecraft.entity.player.PlayerEntity p : mc.level.getPlayers()) {
+                    for (net.minecraft.world.entity.player.Player p : mc.level.players()) {
                         if (p == mc.player) continue;
                         double dist = mc.player.distanceTo(p);
                         if (dist < closest) {

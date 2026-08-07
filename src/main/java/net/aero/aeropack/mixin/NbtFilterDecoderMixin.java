@@ -3,8 +3,8 @@ package net.aero.aeropack.mixin;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import net.aero.aeropack.modules.misc.NbtFilter;
-import net.minecraft.network.handler.DecoderHandler;
-import net.minecraft.network.state.NetworkState;
+import net.minecraft.network.CompressionDecoder;
+import net.minecraft.network.ConnectionProtocol;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -14,11 +14,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
 
-@Mixin(DecoderHandler.class)
+@Mixin(CompressionDecoder.class)
 public abstract class NbtFilterDecoderMixin {
     @Shadow
     @Final
-    private NetworkState<?> state;
+    private ConnectionProtocol state;
 
     @Inject(method = "decode", at = @At("HEAD"), cancellable = true)
     private void aero$dropOversizedChunkPacket(ChannelHandlerContext context,

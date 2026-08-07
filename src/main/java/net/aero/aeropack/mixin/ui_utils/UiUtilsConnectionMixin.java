@@ -1,7 +1,7 @@
 package net.aero.aeropack.mixin.ui_utils;
 
-import net.minecraft.network.ClientConnection;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.Connection;
+import net.minecraft.network.protocol.Packet;
 import io.netty.channel.ChannelFutureListener;
 import net.aero.aeropack.uiutils.UiUtils;
 import net.aero.aeropack.uiutils.UiUtilsState;
@@ -10,11 +10,11 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import net.minecraft.network.packet.c2s.play.ClickSlotC2SPacket;
-import net.minecraft.network.packet.c2s.play.ButtonClickC2SPacket;
-import net.minecraft.network.packet.c2s.play.UpdateSignC2SPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerButtonClickPacket;
+import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket;
 
-@Mixin(ClientConnection.class)
+@Mixin(Connection.class)
 public class UiUtilsConnectionMixin {
 
     @Inject(at = @At("HEAD"),
@@ -25,8 +25,8 @@ public class UiUtilsConnectionMixin {
         if (!UiUtilsState.isUiEnabled())
             return;
 
-        boolean isUiPacket = packet instanceof ClickSlotC2SPacket
-            || packet instanceof ButtonClickC2SPacket;
+        boolean isUiPacket = packet instanceof ServerboundContainerClickPacket
+            || packet instanceof ServerboundContainerButtonClickPacket;
         if (isUiPacket) {
             UiUtils.chatIfEnabled(
                 "Sending UI packet: " + packet.getClass().getSimpleName());
@@ -47,7 +47,7 @@ public class UiUtilsConnectionMixin {
         }
 
         if (!UiUtilsState.shouldEditSign
-            && packet instanceof UpdateSignC2SPacket) {
+            && packet instanceof ServerboundSignUpdatePacket) {
             UiUtilsState.shouldEditSign = true;
             ci.cancel();
         }

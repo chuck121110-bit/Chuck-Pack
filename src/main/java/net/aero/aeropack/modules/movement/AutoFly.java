@@ -24,18 +24,18 @@ import net.aero.aeropack.autoflypath.PathFlightRuntime;
 import net.aero.aeropack.autoflypath.flight.BetterBlockPos;
 import net.aero.aeropack.autoflypath.flight.FlightController;
 import net.aero.aeropack.modules.misc.AntiSocial;
-import net.minecraft.client.gui.screen.DisconnectionScreen;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.projectile.AbstractFireballEntity;
-import net.minecraft.entity.projectile.PersistentProjectileEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlayerRespawnS2CPacket;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
+import net.minecraft.client.gui.screens.DisconnectedScreen;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.hurtingprojectile.AbstractHurtingProjectile;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.aero.aeropack.mixin.LocalPlayerAccessor;
 import net.aero.aeropack.mixin.PlayerMoveC2SPacketAccessor;
 import net.aero.aeropack.pathfinding.PathFinder;
@@ -417,7 +417,7 @@ public final class AutoFly extends Module
 	{
 		if(mc.player == null || mc.level == null)
 		{
-			error("Join a world before enabling AutoFly.");
+			error("Join a Level before enabling AutoFly.");
 			toggle();
 			return;
 		}
@@ -471,7 +471,7 @@ public final class AutoFly extends Module
 	@EventHandler
 	private void onScreenOpen(OpenScreenEvent event)
 	{
-		if(event.screen instanceof DisconnectionScreen && isActive())
+		if(event.screen instanceof DisconnectedScreen && isActive())
 		{
 			toggle();
 		}
@@ -517,7 +517,7 @@ public final class AutoFly extends Module
 			boolean input;
 			if(jumpDisengage.get())
 			{
-				boolean jumpNow = mc.options.jumpKey.isPressed();
+				boolean jumpNow = mc.options.keyJump.isDown();
 				long now = System.currentTimeMillis();
 				if(jumpNow && !jumpWasPressed)
 				{
@@ -539,12 +539,12 @@ public final class AutoFly extends Module
 			}
 			else
 			{
-				input = mc.options.forwardKey.isPressed()
-					|| mc.options.backKey.isPressed()
-					|| mc.options.leftKey.isPressed()
-					|| mc.options.rightKey.isPressed()
-					|| mc.options.jumpKey.isPressed()
-					|| mc.options.sneakKey.isPressed();
+				input = mc.options.keyUp.isDown()
+					|| mc.options.keyDown.isDown()
+					|| mc.options.keyLeft.isDown()
+					|| mc.options.keyRight.isDown()
+					|| mc.options.keyJump.isDown()
+					|| mc.options.keyShift.isDown();
 			}
 			if(input)
 			{
@@ -633,14 +633,14 @@ public final class AutoFly extends Module
 			double discRadius = disconnectRadius.get();
 			if(discRadius > 0 && mc.player != null && lastTarget != null)
 			{
-				double dist = mc.player.getEntityPos().distanceTo(Vec3d.ofCenter(lastTarget));
+				double dist = mc.player.position().distanceTo(Vec3.atCenterOf(lastTarget));
 				if(dist <= discRadius)
 				{
 					info("Near target! Disconnecting...");
 					pathFlightController.stop();
 					arrived = true;
 					stopAutoEnabledModules();
-					mc.player.setDeltaMovement(Vec3d.ZERO);
+					mc.player.setDeltaMovement(Vec3.ZERO);
 					net.aero.aeropack.modules.render.CoordinateLogout.hardDisconnect("AutoFly: Within disconnect radius");
 					return;
 				}
@@ -683,48 +683,48 @@ public final class AutoFly extends Module
 		long now = System.currentTimeMillis();
 		if(now - lastDangerAvoidMs < 1000) return;
 
-		Vec3d safe = findSafePosition();
+		Vec3 safe = findSafePosition();
 		if(safe != null)
 		{
-			mc.player.setPosition(safe);
-			mc.player.setDeltaMovement(Vec3d.ZERO);
+			mc.player.setPos(safe);
+			mc.player.setDeltaMovement(Vec3.ZERO);
 			lastDangerAvoidMs = now;
 			info("Teleported to safety!");
 		}
 	}
 
-	private Vec3d findSafePosition()
+	private Vec3 findSafePosition()
 	{
 		if(mc.player == null || mc.level == null) return null;
 
-		Vec3d playerPos = mc.player.getEntityPos();
+		Vec3 playerPos = mc.player.position();
 		BlockPos playerBlock = mc.player.blockPosition();
 
 		if(dodgeGhastFireballs.get())
 		{
-			Box scanBox = new Box(playerPos.x - ghastScanRange.get(), playerPos.y - ghastScanRange.get(), playerPos.z - ghastScanRange.get(),
+			AABB scanBox = new AABB(playerPos.x - ghastScanRange.get(), playerPos.y - ghastScanRange.get(), playerPos.z - ghastScanRange.get(),
 				playerPos.x + ghastScanRange.get(), playerPos.y + ghastScanRange.get(), playerPos.z + ghastScanRange.get());
 
 			List<Entity> fireballs = new ArrayList<>();
-			for(Entity e : mc.level.getEntities())
+			for(Entity e : mc.level.players())
 			{
-				if(e instanceof AbstractFireballEntity && scanBox.intersects(e.getBoundingBox()))
+				if(e instanceof AbstractHurtingProjectile && scanBox.intersects(e.getBoundingBox()))
 				{
 					fireballs.add(e);
 				}
 			}
 			for(Entity entity : fireballs)
 			{
-				if(entity.squaredDistanceTo(mc.player) > ghastScanRange.get() * ghastScanRange.get()) continue;
+				if(entity.distanceToSqr(mc.player) > ghastScanRange.get() * ghastScanRange.get()) continue;
 
-				if(entity instanceof AbstractFireballEntity fb && fb.getDeltaMovement().lengthSquared() > 0.01)
+				if(entity instanceof AbstractHurtingProjectile fb && fb.getDeltaMovement().lengthSqr() > 0.01)
 				{
-					Vec3d toPlayer = playerPos.subtract(fb.getEntityPos()).normalize();
-					double dot = fb.getDeltaMovement().normalize().dotProduct(toPlayer);
+					Vec3 toPlayer = playerPos.subtract(fb.position()).normalize();
+					double dot = fb.getDeltaMovement().normalize().dot(toPlayer);
 
 					if(dot > 0.1)
 					{
-						return sphereTeleport(playerPos, fb.getEntityPos(), ghastTeleportDistance.get());
+						return sphereTeleport(playerPos, fb.position(), ghastTeleportDistance.get());
 					}
 				}
 			}
@@ -732,13 +732,13 @@ public final class AutoFly extends Module
 
 		if(dodgeArrows.get())
 		{
-			Box scanBox = new Box(playerPos.x - arrowScanRange.get(), playerPos.y - arrowScanRange.get(), playerPos.z - arrowScanRange.get(),
+			AABB scanBox = new AABB(playerPos.x - arrowScanRange.get(), playerPos.y - arrowScanRange.get(), playerPos.z - arrowScanRange.get(),
 				playerPos.x + arrowScanRange.get(), playerPos.y + arrowScanRange.get(), playerPos.z + arrowScanRange.get());
 
 			List<Entity> allProjectiles = new ArrayList<>();
-			for(Entity e : mc.level.getEntities())
+			for(Entity e : mc.level.players())
 			{
-				if(e instanceof PersistentProjectileEntity && scanBox.intersects(e.getBoundingBox()))
+				if(e instanceof AbstractArrow && scanBox.intersects(e.getBoundingBox()))
 				{
 					allProjectiles.add(e);
 				}
@@ -746,16 +746,16 @@ public final class AutoFly extends Module
 
 			for(Entity entity : allProjectiles)
 			{
-				if(entity.squaredDistanceTo(mc.player) > arrowScanRange.get() * arrowScanRange.get()) continue;
+				if(entity.distanceToSqr(mc.player) > arrowScanRange.get() * arrowScanRange.get()) continue;
 
-				if(entity instanceof PersistentProjectileEntity proj && proj.getDeltaMovement().lengthSquared() > 0.01)
+				if(entity instanceof AbstractArrow proj && proj.getDeltaMovement().lengthSqr() > 0.01)
 				{
-					Vec3d toPlayer = playerPos.subtract(entity.getEntityPos()).normalize();
-					double dot = proj.getDeltaMovement().normalize().dotProduct(toPlayer);
+					Vec3 toPlayer = playerPos.subtract(entity.position()).normalize();
+					double dot = proj.getDeltaMovement().normalize().dot(toPlayer);
 
 					if(dot > 0.1)
 					{
-						return sphereTeleport(playerPos, entity.getEntityPos(), arrowTeleportDistance.get());
+						return sphereTeleport(playerPos, entity.position(), arrowTeleportDistance.get());
 					}
 				}
 			}
@@ -773,13 +773,13 @@ public final class AutoFly extends Module
 				{
 					for(int z = -scanRange; z <= scanRange; z++)
 					{
-						BlockPos check = playerBlock.add(x, y, z);
+						BlockPos check = playerBlock.offset(x, y, z);
 						var state = mc.level.getBlockState(check);
-						if(state.getBlock() == net.minecraft.block.Blocks.LAVA
-							|| state.getBlock() == net.minecraft.block.Blocks.FIRE
-							|| state.getBlock() == net.minecraft.block.Blocks.SOUL_FIRE)
+						if(state.getBlock() == net.minecraft.world.level.block.Blocks.LAVA
+							|| state.getBlock() == net.minecraft.world.level.block.Blocks.FIRE
+							|| state.getBlock() == net.minecraft.world.level.block.Blocks.SOUL_FIRE)
 						{
-							double distSq = playerPos.squaredDistanceTo(Vec3d.ofCenter(check));
+							double distSq = playerPos.distanceToSqr(Vec3.atCenterOf(check));
 							if(distSq < nearestDangerDistSq)
 							{
 								nearestDangerDistSq = distSq;
@@ -792,13 +792,13 @@ public final class AutoFly extends Module
 
 			if(nearestDanger != null && nearestDangerDistSq <= lavaScanRange.get() * lavaScanRange.get())
 			{
-				Vec3d dangerCenter = Vec3d.ofCenter(nearestDanger);
+				Vec3 dangerCenter = Vec3.atCenterOf(nearestDanger);
 				double playerDistFromDanger = Math.sqrt(nearestDangerDistSq);
-				Vec3d awayDir = playerPos.subtract(dangerCenter).normalize();
+				Vec3 awayDir = playerPos.subtract(dangerCenter).normalize();
 
-				if(awayDir.lengthSquared() < 0.01)
+				if(awayDir.lengthSqr() < 0.01)
 				{
-					awayDir = new Vec3d(0, 1, 0);
+					awayDir = new Vec3(0, 1, 0);
 				}
 
 				double radius = lavaTeleportDistance.get();
@@ -815,15 +815,15 @@ public final class AutoFly extends Module
 							double distSq = x * x + y * y + z * z;
 							if(distSq > radiusSq || distSq < 1) continue;
 
-							BlockPos candidate = playerBlock.add(x, y, z);
+							BlockPos candidate = playerBlock.offset(x, y, z);
 
 							if(!isAirBlock(candidate)) continue;
-							if(!isAirBlock(candidate.up())) continue;
-							if(!isAirBlock(candidate.up(2))) continue;
+							if(!isAirBlock(candidate.above())) continue;
+							if(!isAirBlock(candidate.above(2))) continue;
 
 							if(isDangerousAt(candidate)) continue;
 
-							Vec3d candidatePos = Vec3d.ofCenter(candidate);
+							Vec3 candidatePos = Vec3.atCenterOf(candidate);
 							double candidateDistFromDanger = candidatePos.distanceTo(dangerCenter);
 
 							if(candidateDistFromDanger > bestDistFromDanger + 0.5)
@@ -837,7 +837,7 @@ public final class AutoFly extends Module
 
 				if(bestCandidate != null)
 				{
-					return Vec3d.ofCenter(bestCandidate);
+					return Vec3.atCenterOf(bestCandidate);
 				}
 			}
 		}
@@ -855,10 +855,10 @@ public final class AutoFly extends Module
 			{
 				for(int dz = -1; dz <= 1; dz++)
 				{
-					var state = mc.level.getBlockState(pos.add(dx, dy, dz));
-					if(state.getBlock() == net.minecraft.block.Blocks.LAVA
-						|| state.getBlock() == net.minecraft.block.Blocks.FIRE
-						|| state.getBlock() == net.minecraft.block.Blocks.SOUL_FIRE)
+					var state = mc.level.getBlockState(pos.offset(dx, dy, dz));
+					if(state.getBlock() == net.minecraft.world.level.block.Blocks.LAVA
+						|| state.getBlock() == net.minecraft.world.level.block.Blocks.FIRE
+						|| state.getBlock() == net.minecraft.world.level.block.Blocks.SOUL_FIRE)
 					{
 						return true;
 					}
@@ -875,19 +875,19 @@ public final class AutoFly extends Module
 		return state.isAir();
 	}
 
-	private Vec3d teleportPosition(Vec3d from, Vec3d direction, double distance)
+	private Vec3 teleportPosition(Vec3 from, Vec3 direction, double distance)
 	{
 		double targetX = from.x + direction.x * distance;
 		double targetY = from.y + direction.y * distance;
 		double targetZ = from.z + direction.z * distance;
 
-		targetX = MathHelper.clamp(targetX, -29999999, 29999999);
-		targetZ = MathHelper.clamp(targetZ, -29999999, 29999999);
+		targetX = Mth.clamp(targetX, -29999999, 29999999);
+		targetZ = Mth.clamp(targetZ, -29999999, 29999999);
 
-		return new Vec3d(targetX, targetY, targetZ);
+		return new Vec3(targetX, targetY, targetZ);
 	}
 
-	private Vec3d sphereTeleport(Vec3d playerPos, Vec3d dangerPos, double radius)
+	private Vec3 sphereTeleport(Vec3 playerPos, Vec3 dangerPos, double radius)
 	{
 		BlockPos playerBlock = mc.player.blockPosition();
 		double radiusSq = radius * radius;
@@ -904,15 +904,15 @@ public final class AutoFly extends Module
 					double distSq = x * x + y * y + z * z;
 					if(distSq > radiusSq || distSq < 1) continue;
 
-					BlockPos candidate = playerBlock.add(x, y, z);
+					BlockPos candidate = playerBlock.offset(x, y, z);
 
 					if(!isAirBlock(candidate)) continue;
-					if(!isAirBlock(candidate.up())) continue;
-					if(!isAirBlock(candidate.up(2))) continue;
+					if(!isAirBlock(candidate.above())) continue;
+					if(!isAirBlock(candidate.above(2))) continue;
 
 					if(isDangerousAt(candidate)) continue;
 
-					Vec3d candidatePos = Vec3d.ofCenter(candidate);
+					Vec3 candidatePos = Vec3.atCenterOf(candidate);
 					double candidateDistFromDanger = candidatePos.distanceTo(dangerPos);
 
 					if(candidateDistFromDanger > bestDistFromDanger + 0.5)
@@ -926,11 +926,11 @@ public final class AutoFly extends Module
 
 		if(bestCandidate != null)
 		{
-			return Vec3d.ofCenter(bestCandidate);
+			return Vec3.atCenterOf(bestCandidate);
 		}
 
-		Vec3d awayDir = playerPos.subtract(dangerPos).normalize();
-		if(awayDir.lengthSquared() < 0.01) awayDir = new Vec3d(0, 1, 0);
+		Vec3 awayDir = playerPos.subtract(dangerPos).normalize();
+		if(awayDir.lengthSqr() < 0.01) awayDir = new Vec3(0, 1, 0);
 		return teleportPosition(playerPos, awayDir, radius);
 	}
 
@@ -999,14 +999,14 @@ public final class AutoFly extends Module
 		if(antiKickMode.get() != AntiKickMode.Packet) return;
 		if(!isActive() || mc.player == null) return;
 
-		if(event.packet instanceof PlayerMoveC2SPacket packet)
+		if(event.packet instanceof ServerboundMovePlayerPacket packet)
 		{
 			double currentY;
-			if(packet instanceof PlayerMoveC2SPacket.PositionAndOnGround posPacket)
+			if(packet instanceof ServerboundMovePlayerPacket.Pos posPacket)
 			{
 				currentY = posPacket.getY(0);
 			}
-			else if(packet instanceof PlayerMoveC2SPacket.Full fullPacket2)
+			else if(packet instanceof ServerboundMovePlayerPacket.PosRot fullPacket2)
 			{
 				currentY = fullPacket2.getY(0);
 			}
@@ -1021,22 +1021,22 @@ public final class AutoFly extends Module
 			}
 			else
 			{
-				PlayerMoveC2SPacket.Full fullPacket = new PlayerMoveC2SPacket.Full(
+				ServerboundMovePlayerPacket.PosRot fullPacket = new ServerboundMovePlayerPacket.PosRot(
 					mc.player.getX(), mc.player.getY(), mc.player.getZ(),
 					packet.getYRot(0), packet.getXRot(0),
 					packet.isOnGround(), mc.player.horizontalCollision
 				);
 				event.cancel();
 				antiKickPacket(fullPacket, mc.player.getY());
-				mc.getConnection().sendPacket(fullPacket);
+				mc.getConnection().getConnection().send(fullPacket);
 			}
 		}
 	}
 
-	private void antiKickPacket(PlayerMoveC2SPacket packet, double currentY)
+	private void antiKickPacket(ServerboundMovePlayerPacket packet, double currentY)
 	{
 		if(antiKickDelayLeft <= 0 && antiKickLastPacketY != Double.MAX_VALUE
-			&& shouldFlyDown(currentY, antiKickLastPacketY) && !mc.player.isOnGround())
+			&& shouldFlyDown(currentY, antiKickLastPacketY) && !mc.player.onGround())
 		{
 			((PlayerMoveC2SPacketAccessor) packet).aeropack$setY(antiKickLastPacketY - 0.0313);
 		}
@@ -1055,7 +1055,7 @@ public final class AutoFly extends Module
 	@EventHandler
 	private void onReceivePacket(PacketEvent.Receive event)
 	{
-		if(event.packet instanceof PlayerRespawnS2CPacket)
+		if(event.packet instanceof ClientboundRespawnPacket)
 		{
 			suppressSetbackUntilMs = System.currentTimeMillis() + 3000;
 		}
@@ -1191,7 +1191,7 @@ public final class AutoFly extends Module
 	{
 		if(mc.player == null || mc.level == null) return;
 
-		int minY = mc.level.getMinBuildHeight();
+		int minY = mc.level.getMinY();
 		y = Math.max(minY, Math.min(319, y));
 
 		removeAutoFlyWaypoint();
@@ -1232,7 +1232,7 @@ public final class AutoFly extends Module
 
 		syncConfig();
 
-		mc.player.setPosition(mc.player.getX(), mc.player.getY() + 2, mc.player.getZ());
+		mc.player.setPos(mc.player.getX(), mc.player.getY() + 2, mc.player.getZ());
 
 		mapClickTarget = new BlockPos(x, y, z);
 		if(mapClickYKnown)
@@ -1401,7 +1401,7 @@ public final class AutoFly extends Module
 
 		if(mc.level != null && mc.level.dimension() != null)
 		{
-			String dim = mc.level.dimension().getValue().toString();
+			String dim = mc.level.dimension().identifier().toString();
 			if(dim.equals("minecraft:the_nether"))
 			{
 				pathFlightConfig.waitChunks = waitChunksNether.get();
@@ -1612,10 +1612,10 @@ public final class AutoFly extends Module
 
 		Color color = pathColor.get();
 
-		Vec3d prev = mc.player.getEntityPos();
+		Vec3 prev = mc.player.position();
 		for(BetterBlockPos pos : path)
 		{
-			Vec3d center = Vec3d.ofCenter(pos);
+			Vec3 center = Vec3.atCenterOf(pos);
 			event.renderer.line(prev.x, prev.y, prev.z, center.x, center.y, center.z, color);
 			prev = center;
 		}

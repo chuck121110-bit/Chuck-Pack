@@ -5,11 +5,11 @@ import meteordevelopment.orbit.EventHandler;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import net.aero.aeropack.modules.movement.AutoFly;
-import net.minecraft.text.Text;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlayerRespawnS2CPacket;
-import net.minecraft.network.packet.s2c.play.GameJoinS2CPacket;
-import net.minecraft.network.packet.s2c.login.LoginSuccessS2CPacket;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
+import net.minecraft.network.protocol.game.ClientboundLoginPacket;
+import net.minecraft.network.protocol.login.ClientboundLoginFinishedPacket;
 
 public class SetbackDetector
 {
@@ -35,15 +35,15 @@ public class SetbackDetector
 	@EventHandler
 	public void onPacketReceive(PacketEvent.Receive event)
 	{
-		if(event.packet instanceof GameJoinS2CPacket
-			|| event.packet instanceof PlayerRespawnS2CPacket
-			|| event.packet instanceof LoginSuccessS2CPacket)
+		if(event.packet instanceof ClientboundLoginPacket
+			|| event.packet instanceof ClientboundRespawnPacket
+			|| event.packet instanceof ClientboundLoginFinishedPacket)
 		{
 			suppressUntilMs = System.currentTimeMillis() + JOIN_GRACE_MS;
 			return;
 		}
 
-		if(!(event.packet instanceof PlayerPositionLookS2CPacket)) return;
+		if(!(event.packet instanceof ClientboundPlayerPositionPacket)) return;
 
 		long now = System.currentTimeMillis();
 		if(now < suppressUntilMs) return;
@@ -57,6 +57,6 @@ public class SetbackDetector
 			af.onGlobalSetback(now);
 		}
 
-		ChatUtils.sendMsg(Text.literal("[WARNING] Setback detected.").styled(style -> style.withColor(net.minecraft.text.TextColor.fromRgb(0x615AFF))));
+		ChatUtils.sendMsg(Component.literal("[WARNING] Setback detected.").styled(style -> style.withColor(net.minecraft.Component.TextColor.fromRgb(0x615AFF))));
 	}
 }

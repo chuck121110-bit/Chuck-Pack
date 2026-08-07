@@ -9,27 +9,27 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.client.Minecraft;
-import net.minecraft.command.argument.EntityAnchorArgumentType;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.vehicle.BoatEntity;
-import net.minecraft.entity.vehicle.ChestBoatEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.vehicle.boat.Boat;
+import net.minecraft.world.entity.vehicle.boat.ChestBoat;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.Level;
 
 import java.util.*;
 
@@ -43,7 +43,7 @@ public class BedrockEscape extends Module {
 
     private final Setting<Boolean> renderTarget = sgGeneral.add(new BoolSetting.Builder()
         .name("render-target")
-        .description("Render a box around the landing zone.")
+        .description("Render a AABB around the landing zone.")
         .defaultValue(true)
         .build()
     );
@@ -109,7 +109,7 @@ public class BedrockEscape extends Module {
 
     private final Setting<Integer> shaftScanRadius = sgShaftESP.add(new IntSetting.Builder()
         .name("shaft-scan-radius")
-        .description("Chunk radius to scan for bedrock escape shafts.")
+        .description("LevelChunk radius to scan for bedrock escape shafts.")
         .defaultValue(3)
         .min(1)
         .max(8)
@@ -195,7 +195,7 @@ public class BedrockEscape extends Module {
     );
 
     private final Setting<SettingColor> boxColor = sgShaftColors.add(new ColorSetting.Builder()
-        .name("target-box-color")
+        .name("target-AABB-color")
         .description("Color for the teleport target box.")
         .defaultValue(new SettingColor(128, 0, 255))
         .build()
@@ -220,20 +220,20 @@ public class BedrockEscape extends Module {
 
     // --- State ---
 
-    private Vec3d teleportTarget;
-    private Box targetBox;
+    private Vec3 teleportTarget;
+    private AABB targetBox;
     private double damageHearts;
     private int damageColor = colorToInt(DAMAGE_COLOR_SAFE);
     private boolean isValidTarget;
     private boolean teleportedThisPress;
     private boolean showSafeTick;
     private boolean targetBelow;
-    private final List<net.minecraft.util.math.BlockPos> blocksBelowBedrock = new ArrayList<>();
+    private final List<net.minecraft.core.BlockPos> blocksBelowBedrock = new ArrayList<>();
     private int shiftBreakCooldown;
 
     // Boat state
     private int pendingBoatPlacementTicks;
-    private Hand pendingBoatHand;
+    private InteractionHand pendingBoatHand;
     private int pendingBoatEnterTicks;
 
     // Shaft ESP state
@@ -291,8 +291,8 @@ public class BedrockEscape extends Module {
         if (!isValidTarget) return;
         if (!showSafeTick && !ignoreSafeTick.get()) return;
 
-        boolean shiftOk = !targetBelow || !shiftClickActivation.get() || mc.options.sneakKey.isPressed();
-        boolean wantsTeleport = mc.options.attackKey.isPressed() && shiftOk;
+        boolean shiftOk = !targetBelow || !shiftClickActivation.get() || mc.options.keyShift.isDown();
+        boolean wantsTeleport = mc.options.keyAttack.isDown() && shiftOk;
         if (wantsTeleport) {
             if (!teleportedThisPress) {
                 performTeleport(teleportTarget);
@@ -303,7 +303,7 @@ public class BedrockEscape extends Module {
 
         teleportedThisPress = false;
 
-        boolean breakingBelowBedrock = isValidTarget && mc.options.sneakKey.isPressed();
+        boolean breakingBelowBedrock = isValidTarget && mc.options.keyShift.isDown();
         if (breakingBelowBedrock) {
             if (shiftBreakCooldown <= 0) {
                 breakBlocksBelowBedrock();
@@ -320,12 +320,12 @@ public class BedrockEscape extends Module {
     private boolean isActiveBedrockEscapeContext() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return false;
-        if (mc.level.dimension() == World.END) return false;
+        if (mc.level.dimension() == Level.END) return false;
 
-        net.minecraft.util.math.BlockPos playerPos = mc.player.blockPosition();
-        net.minecraft.util.math.BlockPos.Mutable probe = new net.minecraft.util.math.BlockPos.Mutable(
+        net.minecraft.core.BlockPos playerPos = mc.player.blockPosition();
+        net.minecraft.core.BlockPos.MutableBlockPos probe = new net.minecraft.core.BlockPos.MutableBlockPos(
             playerPos.getX(), playerPos.getY(), playerPos.getZ());
-        int minY = mc.level.getMinBuildHeight();
+        int minY = mc.level.getMinY();
         int maxY = minY + mc.level.getHeight() - 1;
         int startY = playerPos.getY();
         int downY = Math.max(minY, startY - BEDROCK_CONTEXT_RADIUS);
@@ -333,12 +333,12 @@ public class BedrockEscape extends Module {
 
         for (int y = startY; y >= downY; y--) {
             probe.set(playerPos.getX(), y, playerPos.getZ());
-            if (mc.level.getBlockState(probe).isOf(Blocks.BEDROCK)) return true;
+            if (mc.level.getBlockState(probe).is(Blocks.BEDROCK)) return true;
         }
 
         for (int y = startY + 1; y <= upY; y++) {
             probe.set(playerPos.getX(), y, playerPos.getZ());
-            if (mc.level.getBlockState(probe).isOf(Blocks.BEDROCK)) return true;
+            if (mc.level.getBlockState(probe).is(Blocks.BEDROCK)) return true;
         }
 
         return false;
@@ -369,27 +369,27 @@ public class BedrockEscape extends Module {
 
         if (mc.player == null || mc.level == null) return;
 
-        Vec3d start = mc.player.getEyePos();
-        Vec3d direction = mc.player.getRotationVec(1.0F).normalize();
+        Vec3 start = mc.player.getEyePosition();
+        Vec3 direction = mc.player.getLookAngle();
         double maxReach = reach.get();
         double step = 0.25;
-        Vec3d sample = start.add(direction.multiply(step));
+        Vec3 sample = start.add(direction.scale(step));
         double traveled = step;
         boolean inBedrock = false;
-        Vec3d fallback = null;
-        net.minecraft.util.math.BlockPos lastBreakable = null;
+        Vec3 fallback = null;
+        net.minecraft.core.BlockPos lastBreakable = null;
         blocksBelowBedrock.clear();
 
         while (traveled <= maxReach) {
-            net.minecraft.util.math.BlockPos candidate = net.minecraft.util.math.BlockPos.ofFloored(sample);
+            net.minecraft.core.BlockPos candidate = net.minecraft.core.BlockPos.containing(sample);
             BlockState state = mc.level.getBlockState(candidate);
 
-            if (state.isOf(Blocks.BEDROCK)) {
+            if (state.is(Blocks.BEDROCK)) {
                 inBedrock = true;
                 blocksBelowBedrock.clear();
                 lastBreakable = null;
             } else if (inBedrock) {
-                if (!state.isAir() && !state.isOf(Blocks.BEDROCK)) {
+                if (!state.isAir() && !state.is(Blocks.BEDROCK)) {
                     if (lastBreakable == null || !lastBreakable.equals(candidate)) {
                         blocksBelowBedrock.add(candidate);
                         lastBreakable = candidate;
@@ -405,7 +405,7 @@ public class BedrockEscape extends Module {
                 }
             }
 
-            sample = sample.add(direction.multiply(step));
+            sample = sample.add(direction.scale(step));
             traveled += step;
         }
 
@@ -434,18 +434,18 @@ public class BedrockEscape extends Module {
         showSafeTick = isValidTarget && safeFromDamage && isVertical && correctOrientation;
         targetBelow = dropDistance > 0;
 
-        targetBox = new Box(
+        targetBox = new AABB(
             teleportTarget.x - 0.5, teleportTarget.y, teleportTarget.z - 0.5,
             teleportTarget.x + 0.5, teleportTarget.y + 1.9, teleportTarget.z + 0.5
         );
     }
 
-    private boolean isSafeLanding(net.minecraft.util.math.BlockPos pos) {
+    private boolean isSafeLanding(net.minecraft.core.BlockPos pos) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return false;
 
         BlockState first = mc.level.getBlockState(pos);
-        BlockState second = mc.level.getBlockState(pos.up());
+        BlockState second = mc.level.getBlockState(pos.above());
 
         if (!isFluidClear(pos)) return false;
 
@@ -454,18 +454,18 @@ public class BedrockEscape extends Module {
 
     private boolean isAirLike(BlockState state) {
         return state.isAir() || state.getCollisionShape(Minecraft.getInstance().level,
-            net.minecraft.util.math.BlockPos.ORIGIN).isEmpty();
+            net.minecraft.core.BlockPos.ZERO).isEmpty();
     }
 
-    private boolean isFluidClear(net.minecraft.util.math.BlockPos pos) {
+    private boolean isFluidClear(net.minecraft.core.BlockPos pos) {
         if (allowLiquids.get()) return true;
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return false;
 
-        net.minecraft.util.math.BlockPos below = pos.down();
-        net.minecraft.util.math.BlockPos above = pos.up();
-        if (!mc.level.isChunkLoaded(pos) || !mc.level.isChunkLoaded(above) || !mc.level.isChunkLoaded(below)) {
+        net.minecraft.core.BlockPos below = pos.below();
+        net.minecraft.core.BlockPos above = pos.above();
+        if (!mc.level.hasChunk(pos.getX() >> 4, pos.getZ() >> 4) || !mc.level.hasChunk(above.getX() >> 4, above.getZ() >> 4) || !mc.level.hasChunk(below.getX() >> 4, below.getZ() >> 4)) {
             return false;
         }
 
@@ -475,8 +475,8 @@ public class BedrockEscape extends Module {
         return first.getFluidState().isEmpty() && second.getFluidState().isEmpty() && third.getFluidState().isEmpty();
     }
 
-    private Vec3d getAirTarget(net.minecraft.util.math.BlockPos pos) {
-        return new Vec3d(pos.getX() + 0.5, pos.getY() + 0.1, pos.getZ() + 0.5);
+    private Vec3 getAirTarget(net.minecraft.core.BlockPos pos) {
+        return new Vec3(pos.getX() + 0.5, pos.getY() + 0.1, pos.getZ() + 0.5);
     }
 
     // --- Block Breaking ---
@@ -485,11 +485,11 @@ public class BedrockEscape extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (blocksBelowBedrock.isEmpty() || mc.player == null || mc.getConnection() == null) return;
 
-        for (net.minecraft.util.math.BlockPos pos : blocksBelowBedrock) {
+        for (net.minecraft.core.BlockPos pos : blocksBelowBedrock) {
             if (mc.level != null && !mc.level.getBlockState(pos).isAir()) {
-                mc.getConnection().sendPacket(new PlayerInteractBlockC2SPacket(
-                    Hand.MAIN_HAND, new BlockHitResult(
-                        Vec3d.ofCenter(pos), Direction.UP, pos, false
+                mc.getConnection().getConnection().send(new ServerboundUseItemOnPacket(
+                    InteractionHand.MAIN_HAND, new BlockHitResult(
+                        Vec3.atCenterOf(pos), Direction.UP, pos, false
                     ), 0
                 ));
             }
@@ -498,23 +498,23 @@ public class BedrockEscape extends Module {
 
     // --- Teleport ---
 
-    private void performTeleport(Vec3d destination) {
+    private void performTeleport(Vec3 destination) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.getConnection() == null || destination == null) return;
 
         boolean upwardRoofEscape = destination.y > mc.player.getY() && destination.y > 127;
-        Hand boatHand = upwardRoofEscape ? getHeldBoatHand() : null;
+        InteractionHand boatHand = upwardRoofEscape ? getHeldBoatHand() : null;
 
         for (int i = 0; i < packetSpam.get(); i++) {
-            mc.getConnection().sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(
+            mc.getConnection().getConnection().send(new ServerboundMovePlayerPacket.Pos(
                 mc.player.getX(), mc.player.getY(), mc.player.getZ(),
-                mc.player.isOnGround(), mc.player.horizontalCollision
+                mc.player.onGround(), mc.player.horizontalCollision
             ));
         }
 
         sendMove(destination);
-        mc.player.setPosition(destination.x, destination.y, destination.z);
-        mc.player.setDeltaMovement(Vec3d.ZERO);
+        mc.player.setPos(destination.x, destination.y, destination.z);
+        mc.player.setDeltaMovement(Vec3.ZERO);
 
         if (boatHand != null) {
             scheduleBoatPlacementRetry(boatHand);
@@ -524,11 +524,11 @@ public class BedrockEscape extends Module {
         }
     }
 
-    private void sendMove(Vec3d destination) {
+    private void sendMove(Vec3 destination) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.getConnection() == null) return;
 
-        mc.getConnection().sendPacket(new PlayerMoveC2SPacket.Full(
+        mc.getConnection().getConnection().send(new ServerboundMovePlayerPacket.PosRot(
             destination.x, destination.y, destination.z,
             mc.player.getYRot(), mc.player.getXRot(),
             false, false
@@ -556,7 +556,7 @@ public class BedrockEscape extends Module {
 
         if (pendingBoatPlacementTicks <= 0 || pendingBoatHand == null) return;
 
-        if (!isBoat(mc.player.getStackInHand(pendingBoatHand)) || mc.player.getY() <= 127) {
+        if (!isBoat(mc.player.getItemInHand(pendingBoatHand)) || mc.player.getY() <= 127) {
             pendingBoatHand = null;
             pendingBoatPlacementTicks = 0;
             return;
@@ -569,8 +569,8 @@ public class BedrockEscape extends Module {
         if (pendingBoatPlacementTicks <= 0) pendingBoatHand = null;
     }
 
-    private void scheduleBoatPlacementRetry(Hand hand) {
-        pendingBoatHand = hand;
+    private void scheduleBoatPlacementRetry(InteractionHand InteractionHand) {
+        pendingBoatHand = InteractionHand;
         pendingBoatPlacementTicks = BOAT_PLACE_RETRY_TICKS;
     }
 
@@ -580,55 +580,55 @@ public class BedrockEscape extends Module {
         pendingBoatEnterTicks = 0;
     }
 
-    private Hand getHeldBoatHand() {
+    private InteractionHand getHeldBoatHand() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return null;
 
-        if (isBoat(mc.player.getMainItemStack())) return Hand.MAIN_HAND;
-        if (isBoat(mc.player.getOffhandItem())) return Hand.OFF_HAND;
+        if (isBoat(mc.player.getMainHandItem())) return InteractionHand.MAIN_HAND;
+        if (isBoat(mc.player.getOffhandItem())) return InteractionHand.OFF_HAND;
         return null;
     }
 
     private boolean isBoat(ItemStack stack) {
         if (stack.isEmpty()) return false;
-        String path = Registries.ITEM.getId(stack.getItem()).getPath();
+        String path = BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath();
         return path.endsWith("_boat") || path.endsWith("_chest_boat")
             || path.endsWith("_raft") || path.endsWith("_chest_raft");
     }
 
-    private boolean tryPlaceBoatAboveRoof(Hand hand) {
+    private boolean tryPlaceBoatAboveRoof(InteractionHand InteractionHand) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null || mc.gameMode == null
-            || hand == null || mc.player.isUsingItem()) {
+            || InteractionHand == null || mc.player.isUsingItem()) {
             return false;
         }
 
-        ItemStack stack = mc.player.getStackInHand(hand);
+        ItemStack stack = mc.player.getItemInHand(InteractionHand);
         if (!isBoat(stack)) return false;
 
-        net.minecraft.util.math.BlockPos roofBase = findRoofBoatPlacementBase();
+        net.minecraft.core.BlockPos roofBase = findRoofBoatPlacementBase();
         if (roofBase == null) return false;
 
-        Vec3d hitVec = Vec3d.ofCenter(roofBase).add(0, 0.5, 0);
+        Vec3 hitVec = Vec3.atCenterOf(roofBase).add(0, 0.5, 0);
         BlockHitResult hitResult = new BlockHitResult(hitVec, Direction.UP, roofBase, false);
 
-        mc.player.lookAt(EntityAnchorArgumentType.EntityAnchor.EYES, hitVec);
-        mc.getConnection().sendPacket(new PlayerMoveC2SPacket.Full(
+        mc.player.lookAt(EntityAnchorArgument.Anchor.EYES, hitVec);
+        mc.getConnection().getConnection().send(new ServerboundMovePlayerPacket.PosRot(
             mc.player.getX(), mc.player.getY(), mc.player.getZ(),
             mc.player.getYRot(), mc.player.getXRot(),
             false, false
         ));
-        mc.crosshairTarget = hitResult;
+        mc.hitResult = hitResult;
 
-        ActionResult result = mc.gameMode.interactBlock(mc.player, hand, hitResult);
-        if (!result.isAccepted()) {
-            result = mc.gameMode.interactItem(mc.player, hand);
+        InteractionResult result = mc.gameMode.useItemOn(mc.player, InteractionHand, hitResult);
+        if (!result.consumesAction()) {
+            result = mc.gameMode.useItem(mc.player, InteractionHand);
         }
 
-        mc.player.swingHand(hand);
-        if (result.isAccepted()) pendingBoatEnterTicks = BOAT_ENTER_RETRY_TICKS;
+        mc.player.swing(InteractionHand);
+        if (result.consumesAction()) pendingBoatEnterTicks = BOAT_ENTER_RETRY_TICKS;
 
-        return mc.player.getVehicle() != null || result.isAccepted();
+        return mc.player.getVehicle() != null || result.consumesAction();
     }
 
     private boolean tryEnterNearbyBoat() {
@@ -639,19 +639,19 @@ public class BedrockEscape extends Module {
         double bestDistance = Double.POSITIVE_INFINITY;
         Entity camera = mc.getCameraEntity();
         if (camera != null) {
-            Vec3d start = camera.getEyePos();
-            Vec3d look = camera.getRotationVec(1.0F).normalize();
-            Vec3d end = start.add(look.multiply(16.0));
+            Vec3 start = camera.getEyePosition();
+            Vec3 look = camera.getLookAngle();
+            Vec3 end = start.add(look.scale(16.0));
             boat = getClosestBoatHit(start, end);
             if (boat != null)
-                bestDistance = mc.player.squaredDistanceTo(boat);
+                bestDistance = mc.player.distanceToSqr(boat);
         }
 
         if (boat == null) {
-            Box searchBox = mc.player.getBoundingBox().expand(8.0, 8.0, 8.0);
-            List<Entity> entities = mc.level.getOtherEntities(mc.player, searchBox, this::isEnterableBoat);
+            AABB searchBox = mc.player.getBoundingBox().inflate(8.0, 8.0, 8.0);
+            List<Entity> entities = mc.level.getEntities(mc.player, searchBox, this::isEnterableBoat);
             for (Entity entity : entities) {
-                double distance = mc.player.squaredDistanceTo(entity);
+                double distance = mc.player.distanceToSqr(entity);
                 if (distance >= bestDistance) continue;
                 bestDistance = distance;
                 boat = entity;
@@ -660,44 +660,44 @@ public class BedrockEscape extends Module {
 
         if (boat == null) return false;
 
-        Vec3d targetVec = getBoatTopHitVec(boat);
+        Vec3 targetVec = getBoatTopHitVec(boat);
         EntityHitResult hitResult = new EntityHitResult(boat, targetVec);
-        mc.player.lookAt(EntityAnchorArgumentType.EntityAnchor.EYES, targetVec);
-        mc.getConnection().sendPacket(new PlayerMoveC2SPacket.Full(
+        mc.player.lookAt(EntityAnchorArgument.Anchor.EYES, targetVec);
+        mc.getConnection().getConnection().send(new ServerboundMovePlayerPacket.PosRot(
             mc.player.getX(), mc.player.getY(), mc.player.getZ(),
             mc.player.getYRot(), mc.player.getXRot(),
             false, false
         ));
 
-        for (Hand hand : Hand.values()) {
-            ActionResult result = mc.gameMode.interactEntity(mc.player, boat, hand);
-            if (result.isAccepted()) mc.player.swingHand(hand);
+        for (InteractionHand InteractionHand : InteractionHand.values()) {
+            InteractionResult result = mc.gameMode.interact(mc.player, boat, new net.minecraft.world.phys.EntityHitResult(boat), InteractionHand);
+            if (result.consumesAction()) mc.player.swing(InteractionHand);
             if (mc.player.getVehicle() != null) return true;
         }
 
         return mc.player.getVehicle() != null;
     }
 
-    private Entity getClosestBoatHit(Vec3d start, Vec3d end) {
+    private Entity getClosestBoatHit(Vec3 start, Vec3 end) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return null;
 
-        Vec3d dir = end.subtract(start);
+        Vec3 dir = end.subtract(start);
         double maxDist = dir.length();
         if (maxDist <= 0) return null;
 
-        Vec3d dirNorm = dir.normalize();
-        Box searchBox = new Box(start, end).expand(1);
+        Vec3 dirNorm = dir.normalize();
+        AABB searchBox = new AABB(start, end).inflate(1);
         Entity closest = null;
         double closestDist = Double.POSITIVE_INFINITY;
 
-        List<Entity> entities = mc.level.getOtherEntities(mc.player, searchBox, this::isEnterableBoat);
+        List<Entity> entities = mc.level.getEntities(mc.player, searchBox, this::isEnterableBoat);
         for (Entity entity : entities) {
-            Box box = entity.getBoundingBox();
-            Vec3d hit = raycastBox(box, start, end);
+            AABB box = entity.getBoundingBox();
+            Vec3 hit = raycastBox(box, start, end);
             if (hit == null) continue;
 
-            double dist = hit.subtract(start).dotProduct(dirNorm);
+            double dist = hit.subtract(start).dot(dirNorm);
             if (dist < 0 || dist > maxDist || dist >= closestDist) continue;
 
             closestDist = dist;
@@ -712,47 +712,47 @@ public class BedrockEscape extends Module {
         if (mc.player == null) return false;
         if (entity == null || entity.isRemoved() || entity == mc.player.getVehicle()) return false;
 
-        if (entity instanceof BoatEntity boat)
+        if (entity instanceof Boat boat)
             return boat.getControllingPassenger() == null;
-        if (entity instanceof ChestBoatEntity chestBoat)
+        if (entity instanceof ChestBoat chestBoat)
             return chestBoat.getControllingPassenger() == null;
 
         return false;
     }
 
-    private Vec3d getBoatTopHitVec(Entity boat) {
-        Box box = boat.getBoundingBox();
-        return new Vec3d(
+    private Vec3 getBoatTopHitVec(Entity boat) {
+        AABB box = boat.getBoundingBox();
+        return new Vec3(
             (box.minX + box.maxX) * 0.5,
             box.maxY - 0.05,
             (box.minZ + box.maxZ) * 0.5
         );
     }
 
-    private net.minecraft.util.math.BlockPos findRoofBoatPlacementBase() {
+    private net.minecraft.core.BlockPos findRoofBoatPlacementBase() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return null;
 
-        Vec3d look = mc.player.getRotationVec(1.0F);
+        Vec3 look = mc.player.getLookAngle();
         double horizontalLength = Math.hypot(look.x, look.z);
         int forwardX = horizontalLength < 1.0E-4 ? 0 : (int) Math.round(look.x / horizontalLength);
         int forwardZ = horizontalLength < 1.0E-4 ? 1 : (int) Math.round(look.z / horizontalLength);
 
         if (forwardX == 0 && forwardZ == 0) forwardZ = 1;
 
-        net.minecraft.util.math.BlockPos base = mc.player.blockPosition().down();
+        net.minecraft.core.BlockPos base = mc.player.blockPosition().below();
         int sideX = -forwardZ;
         int sideZ = forwardX;
 
         for (int forward = 2; forward <= 3; forward++) {
             for (int side = 0; side <= 1; side++) {
-                net.minecraft.util.math.BlockPos center = base.add(forwardX * forward, 0, forwardZ * forward);
-                net.minecraft.util.math.BlockPos candidate = side == 0 ? center
-                    : center.add(sideX * side, 0, sideZ * side);
+                net.minecraft.core.BlockPos center = base.offset(forwardX * forward, 0, forwardZ * forward);
+                net.minecraft.core.BlockPos candidate = side == 0 ? center
+                    : center.offset(sideX * side, 0, sideZ * side);
                 if (isValidBoatPlacementBase(candidate)) return candidate;
 
                 if (side > 0) {
-                    net.minecraft.util.math.BlockPos mirrored = center.add(-sideX * side, 0, -sideZ * side);
+                    net.minecraft.core.BlockPos mirrored = center.offset(-sideX * side, 0, -sideZ * side);
                     if (isValidBoatPlacementBase(mirrored)) return mirrored;
                 }
             }
@@ -761,15 +761,15 @@ public class BedrockEscape extends Module {
         return null;
     }
 
-    private boolean isValidBoatPlacementBase(net.minecraft.util.math.BlockPos pos) {
+    private boolean isValidBoatPlacementBase(net.minecraft.core.BlockPos pos) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return false;
 
         BlockState state = mc.level.getBlockState(pos);
         if (state.isAir() || !state.getFluidState().isEmpty()) return false;
 
-        BlockState above = mc.level.getBlockState(pos.up());
-        BlockState twoAbove = mc.level.getBlockState(pos.up(2));
+        BlockState above = mc.level.getBlockState(pos.above());
+        BlockState twoAbove = mc.level.getBlockState(pos.above(2));
         return above.isAir() && twoAbove.isAir();
     }
 
@@ -830,7 +830,7 @@ public class BedrockEscape extends Module {
             return;
         }
 
-        ChunkPos currentChunk = mc.player.getChunkPos();
+        ChunkPos currentChunk = mc.player.chunkPosition();
         if (lastShaftPlayerChunk == null || !lastShaftPlayerChunk.equals(currentChunk)) {
             lastShaftPlayerChunk = currentChunk;
             rebuildShaftScanQueue();
@@ -860,9 +860,9 @@ public class BedrockEscape extends Module {
     private void renderBoxes(Render3DEvent event, List<ColoredBox> boxes) {
         for (ColoredBox box : boxes) {
             if (shaftFillBoxes.get()) {
-                event.renderer.box(box.box, box.color, box.color, ShapeMode.Both, 0);
+                event.renderer.box(box.AABB(), box.color(), box.color(), ShapeMode.Both, 0);
             } else {
-                event.renderer.box(box.box, new Color(0, 0, 0, 0), box.color, ShapeMode.Lines, 0);
+                event.renderer.box(box.AABB(), new Color(0, 0, 0, 0), box.color(), ShapeMode.Lines, 0);
             }
         }
     }
@@ -874,13 +874,13 @@ public class BedrockEscape extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
-        ChunkPos center = mc.player.getChunkPos();
+        ChunkPos center = mc.player.chunkPosition();
         int radius = shaftScanRadius.get();
 
         HashSet<ChunkPos> currentArea = new HashSet<>();
         for (int x = -radius; x <= radius; x++) {
             for (int z = -radius; z <= radius; z++) {
-                ChunkPos pos = new ChunkPos(center.x + x, center.z + z);
+                ChunkPos pos = new ChunkPos(center.x() + x, center.z() + z);
                 currentArea.add(pos);
                 shaftScanQueue.addLast(pos);
                 queuedShaftChunks.add(pos);
@@ -895,17 +895,17 @@ public class BedrockEscape extends Module {
         if (mc.level == null || mc.player == null) return;
 
         ArrayList<ShaftCandidate> candidates = new ArrayList<>();
-        int minY = mc.level.getMinBuildHeight();
+        int minY = mc.level.getMinY();
         int maxY = minY + mc.level.getHeight() - 1;
         int depthLimit = shaftDepth.get();
         float playerHearts = getPlayerHearts();
 
-        net.minecraft.util.math.BlockPos.Mutable cursor = new net.minecraft.util.math.BlockPos.Mutable();
-        for (int x = chunkPos.getStartX(); x < chunkPos.getEndX(); x++) {
-            for (int z = chunkPos.getStartZ(); z < chunkPos.getEndZ(); z++) {
+        net.minecraft.core.BlockPos.MutableBlockPos cursor = new net.minecraft.core.BlockPos.MutableBlockPos();
+        for (int x = chunkPos.getMinBlockX(); x < chunkPos.getMaxBlockX(); x++) {
+            for (int z = chunkPos.getMinBlockZ(); z < chunkPos.getMaxBlockZ(); z++) {
                 for (int y = maxY; y >= minY; y--) {
                     cursor.set(x, y, z);
-                    if (!mc.level.getBlockState(cursor).isOf(Blocks.BEDROCK)) continue;
+                    if (!mc.level.getBlockState(cursor).is(Blocks.BEDROCK)) continue;
                     tryAddShaftCandidate(candidates, x, y, z, minY, maxY, depthLimit, playerHearts, true);
                     tryAddShaftCandidate(candidates, x, y, z, minY, maxY, depthLimit, playerHearts, false);
                 }
@@ -923,22 +923,22 @@ public class BedrockEscape extends Module {
         if (mc.level == null || mc.player == null) return;
         if (!isSideAllowed(fromAbove)) return;
 
-        net.minecraft.util.math.BlockPos above = new net.minecraft.util.math.BlockPos(x, y + 1, z);
-        net.minecraft.util.math.BlockPos below = new net.minecraft.util.math.BlockPos(x, y - 1, z);
-        boolean hasAbove = mc.level.isChunkLoaded(above);
-        boolean hasBelow = mc.level.isChunkLoaded(below);
+        net.minecraft.core.BlockPos above = new net.minecraft.core.BlockPos(x, y + 1, z);
+        net.minecraft.core.BlockPos below = new net.minecraft.core.BlockPos(x, y - 1, z);
+        boolean hasAbove = mc.level.hasChunk(above.getX() >> 4, above.getZ() >> 4);
+        boolean hasBelow = mc.level.hasChunk(below.getX() >> 4, below.getZ() >> 4);
         if (!hasAbove) return;
         if (fromAbove && !hasBelow) return;
 
         int landingY;
         if (fromAbove) {
             if (!isAirLike(mc.level.getBlockState(above))) return;
-            if (mc.level.getBlockState(below).isOf(Blocks.BEDROCK)) return;
+            if (mc.level.getBlockState(below).is(Blocks.BEDROCK)) return;
             if (hasBedrockWithinDepth(x, z, y - 1, minY, depthLimit)) return;
             landingY = findBreakableTwoHighLandingYDown(x, y - 1, z, minY, depthLimit);
         } else {
             if (hasBelow && !isAirLike(mc.level.getBlockState(below))) return;
-            if (mc.level.getBlockState(above).isOf(Blocks.BEDROCK)) return;
+            if (mc.level.getBlockState(above).is(Blocks.BEDROCK)) return;
             if (hasBedrockWithinDepthUp(x, z, y + 1, maxY, depthLimit)) return;
             landingY = findBreakableTwoHighLandingYUp(x, y + 1, z, maxY, depthLimit);
         }
@@ -956,7 +956,7 @@ public class BedrockEscape extends Module {
         boolean low = !safe && damage <= lowDamageLimit.get();
         if (!safe && !low) return;
 
-        candidates.add(new ShaftCandidate(new net.minecraft.util.math.BlockPos(x, y, z), landingY, safe, superSafe, fromAbove));
+        candidates.add(new ShaftCandidate(new net.minecraft.core.BlockPos(x, y, z), landingY, safe, superSafe, fromAbove));
     }
 
     private boolean hasBedrockWithinDepth(int x, int z, int startY, int minY, int depthLimit) {
@@ -964,11 +964,11 @@ public class BedrockEscape extends Module {
         if (mc.level == null) return true;
 
         int endY = Math.max(minY, startY - depthLimit);
-        net.minecraft.util.math.BlockPos.Mutable pos = new net.minecraft.util.math.BlockPos.Mutable();
+        net.minecraft.core.BlockPos.MutableBlockPos pos = new net.minecraft.core.BlockPos.MutableBlockPos();
         for (int y = startY; y >= endY; y--) {
             pos.set(x, y, z);
-            if (!mc.level.isChunkLoaded(pos)) return true;
-            if (mc.level.getBlockState(pos).isOf(Blocks.BEDROCK)) return true;
+            if (!mc.level.hasChunk(pos.getX() >> 4, pos.getZ() >> 4)) return true;
+            if (mc.level.getBlockState(pos).is(Blocks.BEDROCK)) return true;
         }
         return false;
     }
@@ -978,11 +978,11 @@ public class BedrockEscape extends Module {
         if (mc.level == null) return true;
 
         int endY = Math.min(maxY, startY + depthLimit);
-        net.minecraft.util.math.BlockPos.Mutable pos = new net.minecraft.util.math.BlockPos.Mutable();
+        net.minecraft.core.BlockPos.MutableBlockPos pos = new net.minecraft.core.BlockPos.MutableBlockPos();
         for (int y = startY; y <= endY; y++) {
             pos.set(x, y, z);
-            if (!mc.level.isChunkLoaded(pos)) return true;
-            if (mc.level.getBlockState(pos).isOf(Blocks.BEDROCK)) return true;
+            if (!mc.level.hasChunk(pos.getX() >> 4, pos.getZ() >> 4)) return true;
+            if (mc.level.getBlockState(pos).is(Blocks.BEDROCK)) return true;
         }
         return false;
     }
@@ -992,11 +992,11 @@ public class BedrockEscape extends Module {
         if (mc.level == null) return Integer.MIN_VALUE;
 
         int endY = Math.max(minY, startY - depthLimit);
-        net.minecraft.util.math.BlockPos.Mutable pos = new net.minecraft.util.math.BlockPos.Mutable();
+        net.minecraft.core.BlockPos.MutableBlockPos pos = new net.minecraft.core.BlockPos.MutableBlockPos();
         for (int y = startY - 1; y >= endY; y--) {
             pos.set(x, y, z);
             BlockState first = mc.level.getBlockState(pos);
-            BlockState second = mc.level.getBlockState(pos.up());
+            BlockState second = mc.level.getBlockState(pos.above());
             if (isBreakableEscapeBlock(first) && isBreakableEscapeBlock(second))
                 return y;
         }
@@ -1008,11 +1008,11 @@ public class BedrockEscape extends Module {
         if (mc.level == null) return Integer.MIN_VALUE;
 
         int endY = Math.min(maxY - 1, startY + depthLimit);
-        net.minecraft.util.math.BlockPos.Mutable pos = new net.minecraft.util.math.BlockPos.Mutable();
+        net.minecraft.core.BlockPos.MutableBlockPos pos = new net.minecraft.core.BlockPos.MutableBlockPos();
         for (int y = startY; y <= endY; y++) {
             pos.set(x, y, z);
             BlockState first = mc.level.getBlockState(pos);
-            BlockState second = mc.level.getBlockState(pos.up());
+            BlockState second = mc.level.getBlockState(pos.above());
             if (isBreakableEscapeBlock(first) && isBreakableEscapeBlock(second))
                 return y;
         }
@@ -1020,7 +1020,7 @@ public class BedrockEscape extends Module {
     }
 
     private boolean isBreakableEscapeBlock(BlockState state) {
-        if (state.isOf(Blocks.BEDROCK)) return false;
+        if (state.is(Blocks.BEDROCK)) return false;
         return state.getFluidState().isEmpty();
     }
 
@@ -1028,17 +1028,17 @@ public class BedrockEscape extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return true;
 
-        int minY = mc.level.getMinBuildHeight();
+        int minY = mc.level.getMinY();
         int beginY = Math.max(landingY - 1, minY);
         if (beginY > maxY) return false;
 
-        net.minecraft.util.math.BlockPos.Mutable pos = new net.minecraft.util.math.BlockPos.Mutable();
+        net.minecraft.core.BlockPos.MutableBlockPos pos = new net.minecraft.core.BlockPos.MutableBlockPos();
         for (int y = beginY; y <= maxY; y++) {
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     pos.set(x + dx, y, z + dz);
-                    if (!mc.level.isChunkLoaded(pos)) return true;
-                    if (mc.level.getBlockState(pos).getFluidState().isIn(FluidTags.LAVA))
+                    if (!mc.level.hasChunk(pos.getX() >> 4, pos.getZ() >> 4)) return true;
+                    if (mc.level.getBlockState(pos).getFluidState().is(FluidTags.LAVA))
                         return true;
                 }
             }
@@ -1054,14 +1054,14 @@ public class BedrockEscape extends Module {
         int px = mc.player.getBlockX();
         int py = mc.player.getBlockY();
         int pz = mc.player.getBlockZ();
-        int minY = mc.level.getMinBuildHeight();
+        int minY = mc.level.getMinY();
         int maxY = minY + mc.level.getHeight() - 1;
-        net.minecraft.util.math.BlockPos.Mutable pos = new net.minecraft.util.math.BlockPos.Mutable();
+        net.minecraft.core.BlockPos.MutableBlockPos pos = new net.minecraft.core.BlockPos.MutableBlockPos();
 
         int aboveY = Integer.MIN_VALUE;
         for (int y = py; y <= maxY; y++) {
             pos.set(px, y, pz);
-            if (mc.level.getBlockState(pos).isOf(Blocks.BEDROCK)) {
+            if (mc.level.getBlockState(pos).is(Blocks.BEDROCK)) {
                 aboveY = y;
                 break;
             }
@@ -1070,7 +1070,7 @@ public class BedrockEscape extends Module {
         int belowY = Integer.MIN_VALUE;
         for (int y = py; y >= minY; y--) {
             pos.set(px, y, pz);
-            if (mc.level.getBlockState(pos).isOf(Blocks.BEDROCK)) {
+            if (mc.level.getBlockState(pos).is(Blocks.BEDROCK)) {
                 belowY = y;
                 break;
             }
@@ -1093,7 +1093,7 @@ public class BedrockEscape extends Module {
 
     private boolean isSideAllowed(boolean fromAbove) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level != null && mc.player != null && mc.level.dimension() == World.NETHER) {
+        if (mc.level != null && mc.player != null && mc.level.dimension() == Level.NETHER) {
             int py = mc.player.getBlockY();
             if (py >= 123) return fromAbove;
             if (py <= NETHER_FLOOR_RENDER_Y) return !fromAbove;
@@ -1142,19 +1142,19 @@ public class BedrockEscape extends Module {
         lowCandidates.sort(byDistance);
 
         for (ShaftCandidate candidate : safeCandidates) {
-            Box markerBox = getShaftMarkerBox(candidate.surfacePos(), candidate.fromAbove(), candidate.landingY());
+            AABB markerBox = getShaftMarkerBox(candidate.surfacePos(), candidate.fromAbove(), candidate.landingY());
             safeShaftBoxes.add(new ColoredBox(markerBox, new Color(safeShaftColor.get().r, safeShaftColor.get().g, safeShaftColor.get().b, 0xC0)));
             foundSafeShafts++;
         }
 
         for (ShaftCandidate candidate : superSafeCandidates) {
-            Box markerBox = getShaftMarkerBox(candidate.surfacePos(), candidate.fromAbove(), candidate.landingY());
+            AABB markerBox = getShaftMarkerBox(candidate.surfacePos(), candidate.fromAbove(), candidate.landingY());
             superSafeShaftBoxes.add(new ColoredBox(markerBox, new Color(superSafeShaftColor.get().r, superSafeShaftColor.get().g, superSafeShaftColor.get().b, 0xC0)));
             foundSuperSafeShafts++;
         }
 
         for (ShaftCandidate candidate : lowCandidates) {
-            Box markerBox = getShaftMarkerBox(candidate.surfacePos(), candidate.fromAbove(), candidate.landingY());
+            AABB markerBox = getShaftMarkerBox(candidate.surfacePos(), candidate.fromAbove(), candidate.landingY());
             lowDamageShaftBoxes.add(new ColoredBox(markerBox, new Color(lowDamageShaftColor.get().r, lowDamageShaftColor.get().g, lowDamageShaftColor.get().b, 0xB8)));
             foundLowDamageShafts++;
         }
@@ -1167,24 +1167,24 @@ public class BedrockEscape extends Module {
         double cx = candidate.surfacePos().getX() + 0.5;
         double cy = candidate.surfacePos().getY() + 0.5;
         double cz = candidate.surfacePos().getZ() + 0.5;
-        return mc.player.squaredDistanceTo(cx, cy, cz);
+        return mc.player.distanceToSqr(cx, cy, cz);
     }
 
-    private Box getShaftMarkerBox(net.minecraft.util.math.BlockPos surfacePos, boolean fromAbove, int landingY) {
+    private AABB getShaftMarkerBox(net.minecraft.core.BlockPos surfacePos, boolean fromAbove, int landingY) {
         double x1 = surfacePos.getX();
         double y1 = surfacePos.getY();
         double z1 = surfacePos.getZ();
 
         if (!shaftSurfaceOnly.get()) {
             if (fromAbove)
-                return new Box(x1, y1, z1, x1 + 1, y1 + 1, z1 + 1);
-            return new Box(x1, landingY, z1, x1 + 1, landingY + 2, z1 + 1);
+                return new AABB(x1, y1, z1, x1 + 1, y1 + 1, z1 + 1);
+            return new AABB(x1, landingY, z1, x1 + 1, landingY + 2, z1 + 1);
         }
 
         if (fromAbove)
-            return new Box(x1 + 0.05, y1 + 0.98, z1 + 0.05, x1 + 0.95, y1 + 1.02, z1 + 0.95);
+            return new AABB(x1 + 0.05, y1 + 0.98, z1 + 0.05, x1 + 0.95, y1 + 1.02, z1 + 0.95);
 
-        return new Box(x1 + 0.05, landingY - 0.02, z1 + 0.05, x1 + 0.95, landingY + 0.02, z1 + 0.95);
+        return new AABB(x1 + 0.05, landingY - 0.02, z1 + 0.05, x1 + 0.95, landingY + 0.02, z1 + 0.95);
     }
 
     private void clearShaftScanState() {
@@ -1211,12 +1211,12 @@ public class BedrockEscape extends Module {
 
     // --- Records and data classes ---
 
-    private record ShaftCandidate(net.minecraft.util.math.BlockPos surfacePos, int landingY,
+    private record ShaftCandidate(net.minecraft.core.BlockPos surfacePos, int landingY,
         boolean safe, boolean superSafe, boolean fromAbove) {}
 
-    private record ColoredBox(Box box, Color color) {}
+    private record ColoredBox(AABB AABB, Color color) {}
 
-    private static Vec3d raycastBox(Box box, Vec3d start, Vec3d end) {
+    private static Vec3 raycastBox(AABB box, Vec3 start, Vec3 end) {
         double dx = end.x - start.x;
         double dy = end.y - start.y;
         double dz = end.z - start.z;
@@ -1257,6 +1257,6 @@ public class BedrockEscape extends Module {
         if (tmax < 0 || tmin > tmax) return null;
 
         double t = tmin >= 0 ? tmin : tmax;
-        return new Vec3d(start.x + dx * t, start.y + dy * t, start.z + dz * t);
+        return new Vec3(start.x + dx * t, start.y + dy * t, start.z + dz * t);
     }
 }

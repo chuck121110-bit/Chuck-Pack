@@ -11,12 +11,13 @@ import meteordevelopment.meteorclient.gui.widgets.containers.WTable;
 import meteordevelopment.meteorclient.gui.widgets.input.WTextBox;
 import meteordevelopment.meteorclient.gui.widgets.pressable.WButton;
 import meteordevelopment.meteorclient.utils.misc.Names;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.core.Registry;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.tags.EnchantmentTags;
 
 public class EnchantmentSelectScreen extends WindowScreen {
     private final GuiTheme theme;
@@ -49,10 +50,10 @@ public class EnchantmentSelectScreen extends WindowScreen {
         ca.action = () -> {
             String idtext = cc.get();
             if (!idtext.isEmpty()) {
-                Identifier id = Identifier.of(idtext);
+                Identifier id = Identifier.parse(idtext);
                 if (id != null) {
                     callback.selection(new RollingEnchantment(id, 0, 0, true));
-                    close();
+                    onClose();
                 }
             }
         };
@@ -62,27 +63,27 @@ public class EnchantmentSelectScreen extends WindowScreen {
 
     private void fillTable(WTable table) {
         if (MeteorClient.mc.level == null) return;
-        Registry<Enchantment> reg = MeteorClient.mc.level.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
+        Registry<Enchantment> reg = MeteorClient.mc.level.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
 
-        List<RegistryEntry<Enchantment>> available = new ArrayList<>();
-        for (RegistryEntry<Enchantment> e : reg.streamEntries().toList()) {
-            if (!onlyTradeable || e.isIn(net.minecraft.registry.tag.EnchantmentTags.TRADEABLE)) {
+        List<Holder<Enchantment>> available = new ArrayList<>();
+        for (Holder<Enchantment> e : reg.listElements().toList()) {
+            if (!onlyTradeable || e.is(EnchantmentTags.TRADEABLE)) {
                 available.add(e);
             }
         }
 
-        for (RegistryEntry<Enchantment> e : available.stream().sorted((o1, o2) ->
+        for (Holder<Enchantment> e : available.stream().sorted((o1, o2) ->
                 Names.get(o1).compareToIgnoreCase(Names.get(o2))).toList()) {
             if (filterText.isEmpty() || Names.get(e).toLowerCase().startsWith(filterText.toLowerCase())) {
                 table.add(theme.label(Names.get(e))).expandCellX();
                 WButton a = table.add(theme.button("Select")).widget();
                 a.action = () -> {
-                    Identifier id = e.getKey().map(RegistryKey::getValue).orElse(null);
+                    Identifier id = e.unwrapKey().map(ResourceKey::identifier).orElse(null);
                     if (id != null) {
                         callback.selection(new RollingEnchantment(id, e.value().getMaxLevel(),
                             RollingEnchantment.getMinimumPrice(e), true));
                     }
-                    close();
+                    onClose();
                 };
                 table.row();
             }

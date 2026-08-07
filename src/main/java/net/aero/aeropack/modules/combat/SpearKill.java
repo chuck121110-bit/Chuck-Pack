@@ -12,23 +12,23 @@ import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.movement.NoFall;
 import meteordevelopment.meteorclient.utils.Utils;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
-import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
 
 import java.util.*;
 
@@ -252,10 +252,10 @@ public class SpearKill extends Module {
 
     // --- State ---
 
-    private final List<PlayerMoveC2SPacket> packets = new ArrayList<>();
+    private final List<ServerboundMovePlayerPacket> packets = new ArrayList<>();
     private boolean isBlinking = false;
     private boolean isFlushing = false;
-    private Vec3d startPos = null;
+    private Vec3 startPos = null;
     private boolean wasCharging = false;
     private double lastTargetDistance = Double.MAX_VALUE;
     private boolean wasApproaching = false;
@@ -263,7 +263,7 @@ public class SpearKill extends Module {
     private int blinkChargeTicks = 0;
     private int flushCooldown = 0;
     private boolean firstPhase = false;
-    private Vec3d aboveTargetPos = null;
+    private Vec3 aboveTargetPos = null;
     private boolean wasNoFallEnabled = false;
     private boolean noFallToggled = false;
     private boolean currentlyCharging = false;
@@ -367,7 +367,7 @@ public class SpearKill extends Module {
             } else if (wasApproaching && !isApproaching && currentDistance < 8.0) {
                 shouldFlush = true;
             } else if (!blinkLunge.get() && startPos != null
-                && mc.player.getEntityPos().distanceTo(startPos) >= maxFlushRange.get()) {
+                && mc.player.position().distanceTo(startPos) >= maxFlushRange.get()) {
                 flushPackets();
                 startBlink();
             }
@@ -378,7 +378,7 @@ public class SpearKill extends Module {
                 if (blinkLunge.get()) flushCooldown = blinkLungeTicks.get();
 
                 isBlinking = true;
-                startPos = new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
+                startPos = new Vec3(mc.player.getX(), mc.player.getY(), mc.player.getZ());
                 synchronized (packets) { packets.clear(); }
                 lastTargetDistance = mc.player.distanceTo(killTarget);
                 wasApproaching = false;
@@ -423,23 +423,23 @@ public class SpearKill extends Module {
         if (currentlyCharging && blinkLunge.get() && killTarget != null && flushCooldown == 0) {
             if (blinkChargeTicks >= blinkLungeTicks.get()) {
                 rotateToTarget(killTarget);
-                Vec3d viewDir = Vec3d.fromPolar(mc.player.getXRot(), mc.player.getYRot());
+                Vec3 viewDir = Vec3.directionFromRotation(mc.player.getXRot(), mc.player.getYRot());
                 mc.player.setSprinting(true);
-                mc.player.setDeltaMovement(viewDir.multiply(blinkLungeStrength.get()));
+                mc.player.setDeltaMovement(viewDir.scale(blinkLungeStrength.get()));
             }
         }
     }
 
     private void doLunge() {
-        int readyTicks = mc.player.getUseItemHand() == Hand.MAIN_HAND
-            ? getReadyTicks(mc.player.getMainItemStack().getItem())
+        int readyTicks = mc.player.getUsedItemHand() == InteractionHand.MAIN_HAND
+            ? getReadyTicks(mc.player.getMainHandItem().getItem())
             : getReadyTicks(mc.player.getOffhandItem().getItem());
 
         rotateToTarget(killTarget);
 
-        if (mc.player.getItemUseTime() > readyTicks) {
-            Box playerBox = mc.player.getBoundingBox().expand(stopDistance.get());
-            Box targetBox = killTarget.getBoundingBox();
+        if (mc.player.getUseItemRemainingTicks() > readyTicks) {
+            AABB playerBox = mc.player.getBoundingBox().inflate(stopDistance.get());
+            AABB targetBox = killTarget.getBoundingBox();
             boolean atTarget = playerBox.intersects(targetBox);
 
             if (atTarget) {
@@ -454,23 +454,23 @@ public class SpearKill extends Module {
             }
 
             double speed = lungeStrength.get();
-            Vec3d viewDir;
+            Vec3 viewDir;
 
             if (killTarget == null) return;
 
             switch (lungeDirectionMode.get()) {
                 case DirectionBased -> {
-                    viewDir = killTarget.getBoundingBox().getCenter().subtract(mc.player.getEntityPos()).normalize();
+                    viewDir = killTarget.getBoundingBox().getCenter().subtract(mc.player.position()).normalize();
                     mc.player.setSprinting(true);
-                    mc.player.setDeltaMovement(viewDir.multiply(speed));
+                    mc.player.setDeltaMovement(viewDir.scale(speed));
                 }
                 case FromAbove -> {
                     if (!firstPhase || aboveTargetPos == null) {
-                        Vec3d tc = killTarget.getBoundingBox().getCenter();
-                        aboveTargetPos = new Vec3d(tc.x, tc.y + aboveHeight.get(), tc.z);
+                        Vec3 tc = killTarget.getBoundingBox().getCenter();
+                        aboveTargetPos = new Vec3(tc.x, tc.y + aboveHeight.get(), tc.z);
                         firstPhase = true;
                     }
-                    Vec3d pp = mc.player.getEntityPos();
+                    Vec3 pp = mc.player.position();
                     double distToAbove = pp.distanceTo(aboveTargetPos);
                     if (distToAbove < aboveHeightTriggerDistance.get()) {
                         viewDir = killTarget.getBoundingBox().getCenter().subtract(pp).normalize();
@@ -479,15 +479,15 @@ public class SpearKill extends Module {
                         viewDir = aboveTargetPos.subtract(pp).normalize();
                     }
                     mc.player.setSprinting(true);
-                    mc.player.setDeltaMovement(viewDir.multiply(speed));
+                    mc.player.setDeltaMovement(viewDir.scale(speed));
                 }
                 case Auto_FromAboveFirst -> {
                     if (!firstPhase || aboveTargetPos == null) {
-                        Vec3d tc = killTarget.getBoundingBox().getCenter();
-                        aboveTargetPos = new Vec3d(tc.x, tc.y + aboveHeight.get(), tc.z);
+                        Vec3 tc = killTarget.getBoundingBox().getCenter();
+                        aboveTargetPos = new Vec3(tc.x, tc.y + aboveHeight.get(), tc.z);
                         firstPhase = true;
                     }
-                    Vec3d pp = mc.player.getEntityPos();
+                    Vec3 pp = mc.player.position();
                     double distToAbove = pp.distanceTo(aboveTargetPos);
                     boolean pathValid = isAbovePathValid(aboveTargetPos, killTarget);
                     if (!pathValid) {
@@ -500,15 +500,15 @@ public class SpearKill extends Module {
                         viewDir = aboveTargetPos.subtract(pp).normalize();
                     }
                     mc.player.setSprinting(true);
-                    mc.player.setDeltaMovement(viewDir.multiply(speed));
+                    mc.player.setDeltaMovement(viewDir.scale(speed));
                 }
             }
         }
     }
 
-    private boolean isAbovePathValid(Vec3d abovePos, Entity target) {
+    private boolean isAbovePathValid(Vec3 abovePos, Entity target) {
         if (mc.level == null || abovePos == null) return false;
-        Vec3d targetCenter = target.getBoundingBox().getCenter();
+        Vec3 targetCenter = target.getBoundingBox().getCenter();
 
         if (isInvalid(abovePos)) return false;
 
@@ -518,7 +518,7 @@ public class SpearKill extends Module {
             for (int x = -radius; x <= radius; x++) {
                 for (int y = -radius; y <= radius; y++) {
                     for (int z = -radius; z <= radius; z++) {
-                        Vec3d testPos = abovePos.add(x, y, z);
+                        Vec3 testPos = abovePos.add(x, y, z);
                         if (testPos.distanceTo(abovePos) <= checkDist && isInvalid(testPos)) return false;
                     }
                 }
@@ -533,21 +533,21 @@ public class SpearKill extends Module {
         return true;
     }
 
-    private final BlockPos.Mutable mutablePos = new BlockPos.Mutable();
-    private final Map<Vec3d, Boolean> positionCache = new HashMap<>();
+    private final BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+    private final Map<Vec3, Boolean> positionCache = new HashMap<>();
 
-    private boolean isInvalid(Vec3d pos) {
+    private boolean isInvalid(Vec3 pos) {
         if (mc.level == null) return true;
-        double clampedY = MathHelper.clamp(pos.y, mc.level.getMinBuildHeight(), mc.level.getMaxBuildHeight() - 1);
+        double clampedY = Mth.clamp(pos.y, mc.level.getMinY(), mc.level.getMinY() + mc.level.getHeight() - 1);
         if (clampedY != pos.y) return true;
 
-        BlockPos floored = BlockPos.ofFloored(pos);
+        BlockPos floored = BlockPos.containing(pos);
         if (mc.level.getChunk(floored.getX() >> 4, floored.getZ() >> 4) == null) return true;
         if (positionCache.containsKey(pos)) return positionCache.get(pos);
 
         Entity entity = mc.player;
-        Vec3d delta = pos.subtract(entity.getEntityPos());
-        Box box = entity.getBoundingBox().offset(delta);
+        Vec3 delta = pos.subtract(entity.position());
+        AABB AABB = entity.getBoundingBox().move(delta);
 
         mutablePos.set(floored);
         for (int x = -1; x <= 1; x++) {
@@ -557,9 +557,9 @@ public class SpearKill extends Module {
                 for (int z = -1; z <= 1; z++) {
                     mutablePos.setZ(floored.getZ() + z);
                     BlockState state = mc.level.getBlockState(mutablePos);
-                    if (state.isOf(Blocks.LAVA) || state.isOf(Blocks.FIRE) || state.isOf(Blocks.SOUL_FIRE)
-                        || state.isOf(Blocks.MAGMA_BLOCK) || state.isOf(Blocks.CAMPFIRE)
-                        || state.isOf(Blocks.SWEET_BERRY_BUSH) || state.isOf(Blocks.POWDER_SNOW)) {
+                    if (state.is(Blocks.LAVA) || state.is(Blocks.FIRE) || state.is(Blocks.SOUL_FIRE)
+                        || state.is(Blocks.MAGMA_BLOCK) || state.is(Blocks.CAMPFIRE)
+                        || state.is(Blocks.SWEET_BERRY_BUSH) || state.is(Blocks.POWDER_SNOW)) {
                         positionCache.put(pos, true);
                         return true;
                     }
@@ -567,25 +567,25 @@ public class SpearKill extends Module {
             }
         }
 
-        for (Entity e : mc.level.getOtherEntities(entity, box)) {
-            if (e.isCollidable(entity)) {
+        for (Entity e : mc.level.getEntities(entity, AABB)) {
+            if (e.canCollideWith(entity)) {
                 positionCache.put(pos, true);
                 return true;
             }
         }
 
-        boolean collides = mc.level.getBlockCollisions(entity, box).iterator().hasNext();
+        boolean collides = mc.level.getBlockCollisions(entity, AABB).iterator().hasNext();
         positionCache.put(pos, collides);
         return collides;
     }
 
     private void rotateToTarget(Entity target) {
         if (mc.player == null || target == null) return;
-        Vec3d playerPos = mc.player.getEyePos();
-        Box box = target.getBoundingBox();
-        double targetCenterY = box.getCenter().y;
+        Vec3 playerPos = mc.player.getEyePosition();
+        AABB boundingBox = target.getBoundingBox();
+        double targetCenterY = boundingBox.getCenter().y;
         double heightDiff = targetCenterY - playerPos.y;
-        double boxHeight = box.maxY - box.minY;
+        double boxHeight = boundingBox.maxY - boundingBox.minY;
         double targetY;
 
         if (Math.abs(heightDiff) < 1.0) {
@@ -598,24 +598,24 @@ public class SpearKill extends Module {
             targetY = targetCenterY + (boxHeight * offset);
         }
 
-        Vec3d targetPos = new Vec3d(box.getCenter().x, targetY, box.getCenter().z);
-        Vec3d toTarget = targetPos.subtract(playerPos).normalize();
+        Vec3 targetPos = new Vec3(boundingBox.getCenter().x, targetY, boundingBox.getCenter().z);
+        Vec3 toTarget = targetPos.subtract(playerPos).normalize();
         float yaw = (float) (Math.toDegrees(Math.atan2(toTarget.z, toTarget.x)) - 90.0);
         float pitch = (float) -Math.toDegrees(Math.asin(toTarget.y));
         mc.player.setYRot(yaw);
-        mc.player.setHeadYaw(yaw);
+        mc.player.setYHeadRot(yaw);
         mc.player.setXRot(pitch);
     }
 
     @EventHandler
     private void onSendPacket(PacketEvent.Send event) {
         if (!Utils.canUpdate()) return;
-        if (!(event.packet instanceof PlayerMoveC2SPacket p)) return;
+        if (!(event.packet instanceof ServerboundMovePlayerPacket p)) return;
         if (mode.get() == Mode.Blink && isBlinking && !isFlushing) {
             event.cancel();
             synchronized (packets) {
                 if (!packets.isEmpty()) {
-                    PlayerMoveC2SPacket last = packets.get(packets.size() - 1);
+                    ServerboundMovePlayerPacket last = packets.get(packets.size() - 1);
                     if (isSamePacket(p, last)) return;
                 }
                 packets.add(p);
@@ -626,10 +626,10 @@ public class SpearKill extends Module {
     @EventHandler
     private void onReceivePacket(PacketEvent.Receive event) {
         if (mc.level == null) return;
-        if (!(event.packet instanceof PlayerPositionLookS2CPacket)) return;
+        if (!(event.packet instanceof ClientboundPlayerPositionPacket)) return;
         if (mode.get() == Mode.Blink && isBlinking) {
             synchronized (packets) { packets.clear(); }
-            startPos = new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
+            startPos = new Vec3(mc.player.getX(), mc.player.getY(), mc.player.getZ());
             lastTargetDistance = killTarget != null ? mc.player.distanceTo(killTarget) : Double.MAX_VALUE;
             wasApproaching = false;
         }
@@ -649,13 +649,13 @@ public class SpearKill extends Module {
 
     private void startBlink() {
         isBlinking = true;
-        startPos = new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
+        startPos = new Vec3(mc.player.getX(), mc.player.getY(), mc.player.getZ());
         synchronized (packets) { packets.clear(); }
         lastTargetDistance = killTarget != null ? mc.player.distanceTo(killTarget) : Double.MAX_VALUE;
         wasApproaching = false;
     }
 
-    private boolean isSamePacket(PlayerMoveC2SPacket a, PlayerMoveC2SPacket b) {
+    private boolean isSamePacket(ServerboundMovePlayerPacket a, ServerboundMovePlayerPacket b) {
         return a.isOnGround() == b.isOnGround()
             && a.getYRot(-1) == b.getYRot(-1)
             && a.getXRot(-1) == b.getXRot(-1)
@@ -665,11 +665,11 @@ public class SpearKill extends Module {
     }
 
     private void flushPackets() {
-        if (mc.player == null || mc.player.networkHandler == null) return;
+        if (mc.player == null || mc.player.connection == null) return;
         synchronized (packets) {
             if (packets.isEmpty()) return;
             isFlushing = true;
-            Vec3d currentPos = mc.player.getEntityPos();
+            Vec3 currentPos = mc.player.position();
             double distance = startPos != null ? startPos.distanceTo(currentPos) : 0;
             if (distance < flushRange.get()) {
                 packets.clear();
@@ -677,36 +677,36 @@ public class SpearKill extends Module {
                 return;
             }
 
-            Vec3d sendStartPos = startPos;
+            Vec3 sendStartPos = startPos;
             double boost = blinkDistanceBoost.get();
             if (boost > 0 && startPos != null) {
-                Vec3d direction = currentPos.subtract(startPos);
-                Vec3d horizontalDir = new Vec3d(direction.x, 0, direction.z).normalize();
+                Vec3 direction = currentPos.subtract(startPos);
+                Vec3 horizontalDir = new Vec3(direction.x, 0, direction.z).normalize();
                 if (horizontalDir.length() > 0.01) {
-                    Vec3d targetPos = startPos.subtract(horizontalDir.multiply(boost));
-                    HitResult hit = mc.level.raycast(new RaycastContext(
+                    Vec3 targetPos = startPos.subtract(horizontalDir.scale(boost));
+                    HitResult hit = mc.level.clipIncludingBorder(new ClipContext(
                         startPos, targetPos,
-                        RaycastContext.ShapeType.COLLIDER,
-                        RaycastContext.FluidHandling.NONE,
+                        ClipContext.Block.COLLIDER,
+                        ClipContext.Fluid.NONE,
                         mc.player));
                     if (hit.getType() == HitResult.Type.MISS) {
                         sendStartPos = targetPos;
                     } else {
-                        sendStartPos = hit.getPos().add(horizontalDir.multiply(0.5));
+                        sendStartPos = hit.getLocation().add(horizontalDir.scale(0.5));
                     }
                 }
             }
 
             if (sendStartPos != null) {
-                mc.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.Full(
+                mc.player.connection.send(new ServerboundMovePlayerPacket.PosRot(
                     sendStartPos.x, sendStartPos.y, sendStartPos.z,
                     mc.player.getYRot(), mc.player.getXRot(), false, false));
             }
 
-            mc.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.Full(
+            mc.player.connection.send(new ServerboundMovePlayerPacket.PosRot(
                 currentPos.x, currentPos.y, currentPos.z,
                 mc.player.getYRot(), mc.player.getXRot(),
-                mc.player.isOnGround(), mc.player.horizontalCollision));
+                mc.player.onGround(), mc.player.horizontalCollision));
 
             packets.clear();
             isFlushing = false;
@@ -715,46 +715,46 @@ public class SpearKill extends Module {
 
     private Entity target() {
         if (mc.player == null || mc.level == null) return null;
-        if (mc.crosshairTarget instanceof EntityHitResult hit) {
+        if (mc.hitResult instanceof EntityHitResult hit) {
             if (isValidTarget(hit.getEntity())) return hit.getEntity();
         }
         double range = maxRange.get();
-        Vec3d eyePos = mc.player.getEyePos();
-        Vec3d lookVec = mc.player.getRotationVec(1.0f);
-        HitResult blockHit = mc.level.raycast(new RaycastContext(eyePos,
-            eyePos.add(lookVec.multiply(range)), RaycastContext.ShapeType.COLLIDER,
-            RaycastContext.FluidHandling.NONE, mc.player));
+        Vec3 eyePos = mc.player.getEyePosition();
+        Vec3 lookVec = mc.player.getLookAngle();
+        HitResult blockHit = mc.level.clipIncludingBorder(new ClipContext(eyePos,
+            eyePos.add(lookVec.scale(range)), ClipContext.Block.COLLIDER,
+            ClipContext.Fluid.NONE, mc.player));
         double rayLength = blockHit.getType() == HitResult.Type.MISS ? range :
-            eyePos.distanceTo(blockHit.getPos());
-        List<Entity> candidates = mc.level.getOtherEntities(mc.player,
-            mc.player.getBoundingBox().stretch(lookVec.multiply(rayLength)),
+            eyePos.distanceTo(blockHit.getLocation());
+        List<Entity> candidates = mc.level.getEntities(mc.player,
+            mc.player.getBoundingBox().expandTowards(lookVec.scale(rayLength)),
             e -> e instanceof LivingEntity && e.isAlive() && e != mc.player);
-        candidates.sort(Comparator.comparingDouble(e -> eyePos.squaredDistanceTo(e.getBoundingBox().getCenter())));
+        candidates.sort(Comparator.comparingDouble(e -> eyePos.distanceToSqr(e.getBoundingBox().getCenter())));
         for (Entity e : candidates) {
             double dist = eyePos.distanceTo(e.getBoundingBox().getCenter());
             if (dist > range) break;
             if (!isValidTarget(e) || !canSeeTarget(e)) continue;
-            Vec3d toEntity = e.getBoundingBox().getCenter().subtract(eyePos).normalize();
-            if (lookVec.dotProduct(toEntity) > 0.999) return e;
+            Vec3 toEntity = e.getBoundingBox().getCenter().subtract(eyePos).normalize();
+            if (lookVec.dot(toEntity) > 0.999) return e;
         }
         return null;
     }
 
     private boolean canSeeTarget(Entity target) {
         if (mc.player == null || mc.level == null) return false;
-        Vec3d eyePos = mc.player.getEyePos();
-        Vec3d targetCenter = target.getBoundingBox().getCenter();
-        HitResult result = mc.level.raycast(new RaycastContext(
+        Vec3 eyePos = mc.player.getEyePosition();
+        Vec3 targetCenter = target.getBoundingBox().getCenter();
+        HitResult result = mc.level.clipIncludingBorder(new ClipContext(
             eyePos, targetCenter,
-            RaycastContext.ShapeType.COLLIDER,
-            RaycastContext.FluidHandling.NONE, mc.player));
+            ClipContext.Block.COLLIDER,
+            ClipContext.Fluid.NONE, mc.player));
         if (result.getType() == HitResult.Type.MISS) return true;
-        return eyePos.distanceTo(result.getPos()) >= eyePos.distanceTo(targetCenter) - 0.5;
+        return eyePos.distanceTo(result.getLocation()) >= eyePos.distanceTo(targetCenter) - 0.5;
     }
 
     private boolean isValidTarget(Entity entity) {
         if (entity == null) return false;
-        if (entity instanceof PlayerEntity player && ignoreFriends.get() && Friends.get().isFriend(player)) return false;
+        if (entity instanceof Player player && ignoreFriends.get() && Friends.get().isFriend(player)) return false;
         EntityType<?> type = entity.getType();
         boolean inList = targetEntities.get().contains(type);
         return targetListMode.get() == TargetListMode.Whitelist ? (inList || targetEntities.get().isEmpty()) : !inList;

@@ -18,17 +18,17 @@ import meteordevelopment.meteorclient.utils.render.RenderUtils;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.item.*;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.tag.ItemTags;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.*;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
 
 import java.util.*;
 
@@ -130,31 +130,31 @@ public class MobGearESP extends Module {
             .visible(() -> enchants.get())
             .build()
     );
-    private final Setting<Set<RegistryKey<Enchantment>>> toolenchants = sgGeneral.add(new EnchantmentListSetting.Builder()
+    private final Setting<Set<ResourceKey<Enchantment>>> toolenchants = sgGeneral.add(new EnchantmentListSetting.Builder()
             .name("Mining Tool Enchants")
             .description("List of enchantments required.")
             .visible(() -> enchants.get() && certainenchants.get())
             .defaultValue(Enchantments.EFFICIENCY, Enchantments.UNBREAKING, Enchantments.MENDING)
             .build());
-    private final Setting<Set<RegistryKey<Enchantment>>> swordenchants = sgGeneral.add(new EnchantmentListSetting.Builder()
+    private final Setting<Set<ResourceKey<Enchantment>>> swordenchants = sgGeneral.add(new EnchantmentListSetting.Builder()
             .name("Sword Enchants")
             .description("List of enchantments required.")
             .visible(() -> enchants.get() && certainenchants.get())
             .defaultValue(Enchantments.UNBREAKING, Enchantments.MENDING)
             .build());
-    private final Setting<Set<RegistryKey<Enchantment>>> armorenchants = sgGeneral.add(new EnchantmentListSetting.Builder()
+    private final Setting<Set<ResourceKey<Enchantment>>> armorenchants = sgGeneral.add(new EnchantmentListSetting.Builder()
             .name("Armor Enchants")
             .description("List of enchantments required.")
             .visible(() -> enchants.get() && certainenchants.get())
             .defaultValue(Enchantments.UNBREAKING, Enchantments.MENDING)
             .build());
-    private final Setting<Set<RegistryKey<Enchantment>>> maceenchants = sgGeneral.add(new EnchantmentListSetting.Builder()
+    private final Setting<Set<ResourceKey<Enchantment>>> maceenchants = sgGeneral.add(new EnchantmentListSetting.Builder()
             .name("Mace Enchants")
             .description("List of enchantments required.")
             .visible(() -> enchants.get() && certainenchants.get())
             .defaultValue(Enchantments.UNBREAKING, Enchantments.MENDING)
             .build());
-    private final Setting<Set<RegistryKey<Enchantment>>> tridentenchants = sgGeneral.add(new EnchantmentListSetting.Builder()
+    private final Setting<Set<ResourceKey<Enchantment>>> tridentenchants = sgGeneral.add(new EnchantmentListSetting.Builder()
             .name("Trident Enchants")
             .description("List of enchantments required.")
             .visible(() -> enchants.get() && certainenchants.get())
@@ -190,7 +190,7 @@ public class MobGearESP extends Module {
     );
     private final Setting<SettingColor> monstersColor = sgColors.add(new ColorSetting.Builder()
             .name("monsters-color")
-            .description("The mob's bounding box and tracer color.")
+            .description("The mob's bounding AABB and tracer color.")
             .defaultValue(new SettingColor(255, 25, 25, 255))
             .build()
     );
@@ -202,7 +202,7 @@ public class MobGearESP extends Module {
     );
     private final Setting<SettingColor> distantColor = sgColors.add(new ColorSetting.Builder()
             .name("distant-color")
-            .description("The mob's bounding box and tracer color when you are far away.")
+            .description("The mob's bounding AABB and tracer color when you are far away.")
             .defaultValue(new SettingColor(25, 25, 255, 255))
             .visible(distance::get)
             .build()
@@ -227,21 +227,21 @@ public class MobGearESP extends Module {
     @EventHandler
     private void onRender3D(Render3DEvent event) {
         count = 0;
-        for (Entity entity : mc.level.getEntities()) {
+        for (Entity entity : mc.level.players()) {
             if (!(entity instanceof LivingEntity livingEntity)) continue;
             if (shouldSkip(livingEntity)) continue;
             if (!scannedEntities.contains(entity)) {
-                StringBuilder message = new StringBuilder(entity.getType().getName().getString() + " found most likely wearing player gear");
+                StringBuilder message = new StringBuilder(entity.getType().getDescription().getString() + " found most likely wearing player gear");
                 if (coordsInChat.get()) message.append(" at ").append(entity.getBlockX()).append(", ").append(entity.getBlockY()).append(", ").append(entity.getBlockZ());
                 if (itemsInChat.get()) {
                     ArrayList<Item> playerItems = getPlayerItems(livingEntity);
                     message.append(" holding ");
                     for (Item item : playerItems) {
-                        message.append(item.getTranslationKey().split("\\.")[2]).append(", ");
+                        message.append(item.getDescriptionId().split("\\.")[2]).append(", ");
                     }
                     message.setLength(message.length() - 2);
                 }
-                ChatUtils.sendMsg(Text.of(message.toString()));
+                ChatUtils.sendMsg(Component.literal(message.toString()));
             }
             scannedEntities.add(entity);
             drawBoundingBox(event, entity);
@@ -266,24 +266,24 @@ public class MobGearESP extends Module {
             sideColor.set(color).a((int) (sideColor.a * fillOpacity.get()));
         }
 
-        double x = MathHelper.lerp(event.tickDelta, entity.lastRenderX, entity.getX()) - entity.getX();
-        double y = MathHelper.lerp(event.tickDelta, entity.lastRenderY, entity.getY()) - entity.getY();
-        double z = MathHelper.lerp(event.tickDelta, entity.lastRenderZ, entity.getZ()) - entity.getZ();
-        Box box = entity.getBoundingBox();
-        event.renderer.box(x + box.minX, y + box.minY, z + box.minZ, x + box.maxX, y + box.maxY, z + box.maxZ, sideColor, lineColor, shapeMode.get(), 0);
+        double x = Mth.lerp(event.tickDelta, entity.xOld, entity.getX()) - entity.getX();
+        double y = Mth.lerp(event.tickDelta, entity.yOld, entity.getY()) - entity.getY();
+        double z = Mth.lerp(event.tickDelta, entity.zOld, entity.getZ()) - entity.getZ();
+        AABB AABB = entity.getBoundingBox();
+        event.renderer.box(x + AABB.minX, y + AABB.minY, z + AABB.minZ, x + AABB.maxX, y + AABB.maxY, z + AABB.maxZ, sideColor, lineColor, shapeMode.get(), 0);
     }
 
     private void drawTracer(Render3DEvent event, Entity entity) {
-        if (mc.options.hudHidden) return;
+        if (mc.options.hideGui) return;
 
         Color baseColor = monstersColor.get();
         if (distance.get()){
             baseColor = getOpposingColor(baseColor, entity);
         }
 
-        double x = entity.lastX + (entity.getX() - entity.lastX) * event.tickDelta;
-        double y = entity.lastY + (entity.getY() - entity.lastY) * event.tickDelta;
-        double z = entity.lastZ + (entity.getZ() - entity.lastZ) * event.tickDelta;
+        double x = entity.xOld + (entity.getX() - entity.xOld) * event.tickDelta;
+        double y = entity.yOld + (entity.getY() - entity.yOld) * event.tickDelta;
+        double z = entity.zOld + (entity.getZ() - entity.zOld) * event.tickDelta;
         double height = entity.getBoundingBox().maxY - entity.getBoundingBox().minY;
         y += height / 2;
 
@@ -292,10 +292,10 @@ public class MobGearESP extends Module {
     private Color getOpposingColor(Color c, Entity e) {
         Color oppositeColor = distantColor.get();
 
-        double dist = Math.sqrt(mc.player.squaredDistanceTo(e));
+        double dist = Math.sqrt(mc.player.distanceToSqr(e));
 
         double maxDistance = distanceInt.get();
-        double percent = MathHelper.clamp(dist / maxDistance, 0, 1);
+        double percent = Mth.clamp(dist / maxDistance, 0, 1);
 
         int r = (int) (c.r + (oppositeColor.r - c.r) * percent);
         int g = (int) (c.g + (oppositeColor.g - c.g) * percent);
@@ -306,29 +306,29 @@ public class MobGearESP extends Module {
     }
     public static ArrayList<ItemStack> getArmorItems(LivingEntity livingEntity) {
         ArrayList<ItemStack> armorItems = new ArrayList<>();
-        armorItems.add(livingEntity.getEquippedStack(EquipmentSlot.HEAD));
-        armorItems.add(livingEntity.getEquippedStack(EquipmentSlot.CHEST));
-        armorItems.add(livingEntity.getEquippedStack(EquipmentSlot.LEGS));
-        armorItems.add(livingEntity.getEquippedStack(EquipmentSlot.FEET));
+        armorItems.add(livingEntity.getItemBySlot(EquipmentSlot.HEAD));
+        armorItems.add(livingEntity.getItemBySlot(EquipmentSlot.CHEST));
+        armorItems.add(livingEntity.getItemBySlot(EquipmentSlot.LEGS));
+        armorItems.add(livingEntity.getItemBySlot(EquipmentSlot.FEET));
         return armorItems;
     }
     public static ArrayList<ItemStack> getHandItems(LivingEntity livingEntity) {
         ArrayList<ItemStack> handItems = new ArrayList<>();
-        handItems.add(livingEntity.getEquippedStack(EquipmentSlot.MAINHAND));
-        handItems.add(livingEntity.getEquippedStack(EquipmentSlot.OFFHAND));
+        handItems.add(livingEntity.getItemBySlot(EquipmentSlot.MAINHAND));
+        handItems.add(livingEntity.getItemBySlot(EquipmentSlot.OFFHAND));
         return handItems;
     }
     public static boolean isArmor(ItemStack itemStack) {
-        return itemStack.isIn(ItemTags.HEAD_ARMOR) ||
-                itemStack.isIn(ItemTags.CHEST_ARMOR) ||
-                itemStack.isIn(ItemTags.LEG_ARMOR) ||
-                itemStack.isIn(ItemTags.FOOT_ARMOR);
+        return itemStack.is(ItemTags.HEAD_ARMOR) ||
+                itemStack.is(ItemTags.CHEST_ARMOR) ||
+                itemStack.is(ItemTags.LEG_ARMOR) ||
+                itemStack.is(ItemTags.FOOT_ARMOR);
     }
     public static boolean isTool(ItemStack itemStack) {
-        return itemStack.isIn(ItemTags.AXES) ||
-                itemStack.isIn(ItemTags.HOES) ||
-                itemStack.isIn(ItemTags.PICKAXES) ||
-                itemStack.isIn(ItemTags.SHOVELS) ||
+        return itemStack.is(ItemTags.AXES) ||
+                itemStack.is(ItemTags.HOES) ||
+                itemStack.is(ItemTags.PICKAXES) ||
+                itemStack.is(ItemTags.SHOVELS) ||
                 itemStack.getItem() instanceof ShearsItem ||
                 itemStack.getItem() instanceof FlintAndSteelItem;
     }
@@ -349,11 +349,11 @@ public class MobGearESP extends Module {
         for (ItemStack item : getHandItems(livingEntity)) {
             boolean skip = false;
             if (enchants.get()) {
-                if (!certainenchants.get() && (isTool(item) || isArmor(item) || item.isIn(ItemTags.SWORDS) || item.getItem() instanceof FishingRodItem || item.getItem() instanceof FlintAndSteelItem || item.getItem() instanceof MaceItem || item.getItem() instanceof ShearsItem || item.getItem() instanceof ShieldItem || item.getItem() instanceof TridentItem) && item.isEnchantable() && item.getEnchantments().isEmpty()) skip = true;
+                if (!certainenchants.get() && (isTool(item) || isArmor(item) || item.is(ItemTags.SWORDS) || item.getItem() instanceof FishingRodItem || item.getItem() instanceof FlintAndSteelItem || item.getItem() instanceof MaceItem || item.getItem() instanceof ShearsItem || item.getItem() instanceof ShieldItem || item.getItem() instanceof TridentItem) && item.isEnchantable() && item.getEnchantments().isEmpty()) skip = true;
                 else if (certainenchants.get()){
                     if (isTool(item)){
                         skip = compareEnchants(item, toolenchants);
-                    } else if (item.isIn(ItemTags.SWORDS)){
+                    } else if (item.is(ItemTags.SWORDS)){
                         skip = compareEnchants(item, swordenchants);
                     } else if (isArmor(item)){
                         skip = compareEnchants(item, armorenchants);
@@ -369,13 +369,13 @@ public class MobGearESP extends Module {
         }
         return playerItems;
     }
-    private boolean compareEnchants(ItemStack stack, Setting<Set<RegistryKey<Enchantment>>> enchantsetting) {
+    private boolean compareEnchants(ItemStack stack, Setting<Set<ResourceKey<Enchantment>>> enchantsetting) {
         boolean skip = false;
-        Set<RegistryKey<Enchantment>> itemenchants = new HashSet<>();
-        stack.getEnchantments().getEnchantments().forEach(enchantment -> {
-            itemenchants.add(enchantment.getKey().get());
+        Set<ResourceKey<Enchantment>> itemenchants = new HashSet<>();
+        stack.getEnchantments().keySet().forEach(enchantment -> {
+            enchantment.unwrapKey().ifPresent(itemenchants::add);
         });
-        for (RegistryKey<Enchantment> enchantKey : enchantsetting.get()) {
+        for (ResourceKey<Enchantment> enchantKey : enchantsetting.get()) {
             if (!itemenchants.contains(enchantKey)) {
                 skip = true;
                 break;
@@ -384,9 +384,9 @@ public class MobGearESP extends Module {
         return skip;
     }
     public boolean shouldSkip(LivingEntity entity) {
-        if (entity.isPlayer()) return true;
+        if (entity instanceof net.minecraft.world.entity.player.Player) return true;
         ArrayList<Item> playerItems = getPlayerItems(entity);
-        if (entity == mc.getCameraEntity() && mc.options.getPerspective().isFirstPerson()) return true;
+        if (entity == mc.getCameraEntity() && mc.options.getCameraType().isFirstPerson()) return true;
         return playerItems.isEmpty() || !EntityUtils.isInRenderDistance(entity);
     }
 
@@ -401,7 +401,7 @@ public class MobGearESP extends Module {
     }
 
     private double getFadeAlpha(Entity entity) {
-        double dist = PlayerUtils.squaredDistanceToCamera(entity.getX() + entity.getWidth() / 2, entity.getY() + entity.getEyeHeight(entity.getPose()), entity.getZ() + entity.getWidth() / 2);
+        double dist = PlayerUtils.squaredDistanceToCamera(entity.getX() + entity.getBbWidth() / 2, entity.getY() + entity.getEyeHeight(entity.getPose()), entity.getZ() + entity.getBbWidth() / 2);
         double fadeDist = Math.pow(fadeDistance.get(), 2);
         double alpha = 1;
         if (dist <= fadeDist * fadeDist) alpha = (float) (Math.sqrt(dist) / fadeDist);
@@ -416,7 +416,7 @@ public class MobGearESP extends Module {
     @EventHandler
     private void onPreTick(TickEvent.Pre event) {
         if (mc.level != null){
-            Iterable<net.minecraft.entity.Entity> entities = mc.level.getEntities();
+            Iterable<? extends net.minecraft.world.entity.Entity> entities = mc.level.players();
             scannedEntities.removeIf(entity -> {
                 Set<Entity> entitySet = new HashSet<>();
                 entities.forEach(entity1 -> entitySet.add(entity1));

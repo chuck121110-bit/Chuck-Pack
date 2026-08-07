@@ -81,9 +81,9 @@ public class PlayerTriangulateHud extends HudElement {
             long now = System.currentTimeMillis();
             for (PlayerTriangulate.TriangulationResult result : toDisplay) {
                 long ageSeconds = (now - result.lastUpdated) / 1000;
-                String text = String.format("%s: (%.1f, %.1f) [%ds ago]", result.playerName, result.wx, result.wz, ageSeconds);
-                renderer.text(text, x, y + yOffset, Color.WHITE, true);
-                maxWidth = Math.max(maxWidth, renderer.textWidth(text, true));
+                String Component = String.format("%s: (%.1f, %.1f) [%ds ago]", result.playerName, result.wx, result.wz, ageSeconds);
+                renderer.text(Component, x, y + yOffset, Color.WHITE, true);
+                maxWidth = Math.max(maxWidth, renderer.textWidth(Component, true));
                 yOffset += renderer.textHeight(true) + 2;
             }
         }

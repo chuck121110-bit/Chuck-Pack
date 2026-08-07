@@ -1,6 +1,6 @@
 package net.aero.aeropack.util;
 
-import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.CompoundTag;
 
 import java.util.regex.Pattern;
 
@@ -46,8 +46,8 @@ public class Keyword {
         }
     }
 
-    public NbtCompound toNbt() {
-        NbtCompound nbt = new NbtCompound();
+    public CompoundTag toNbt() {
+        CompoundTag nbt = new CompoundTag();
         nbt.putString("name", name);
         nbt.putBoolean("caseSensitive", caseSensitive);
         nbt.putBoolean("wholeWord", wholeWord);
@@ -55,7 +55,7 @@ public class Keyword {
         return nbt;
     }
 
-    public static Keyword fromNbt(NbtCompound nbt) {
+    public static Keyword fromNbt(CompoundTag nbt) {
         Keyword keyword = new Keyword(
             nbt.getString("name").orElse(""),
             nbt.getBoolean("caseSensitive").orElse(false),

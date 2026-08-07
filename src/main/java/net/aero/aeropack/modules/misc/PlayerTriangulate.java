@@ -15,12 +15,12 @@ import meteordevelopment.meteorclient.systems.waypoints.Waypoints;
 import meteordevelopment.meteorclient.systems.waypoints.Waypoint;
 import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.Vec3i;
-import net.minecraft.world.waypoint.TrackedWaypoint;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.network.chat.Component;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.waypoints.TrackedWaypoint;
 
 import java.util.Map;
 import java.util.UUID;
@@ -65,8 +65,8 @@ public class PlayerTriangulate extends Module {
     private final Map<UUID, Waypoint> playerWaypoints = new ConcurrentHashMap<>();
 
     private static class TriangulationSamples {
-        public Vec3d position1;
-        public Vec3d position2;
+        public Vec3 position1;
+        public Vec3 position2;
         public float azi1 = Float.NaN;
         public float azi2 = Float.NaN;
     }
@@ -135,7 +135,7 @@ public class PlayerTriangulate extends Module {
         Waypoint waypoint = new Waypoint.Builder()
                 .name(wpName)
                 .pos(newPos)
-                .dimension(PlayerUtils.dimensionType())
+                .dimension(PlayerUtils.getDimension())
                 .build();
 
         waypoints.add(waypoint);
@@ -145,11 +145,11 @@ public class PlayerTriangulate extends Module {
 
     @EventHandler
     private void onPreTick(TickEvent.Pre event) {
-        if (mc.getConnection() != null && mc.getConnection().getPlayerList() != null) {
-            for (PlayerListEntry entry : mc.getConnection().getPlayerList()) {
+        if (mc.getConnection() != null && mc.getConnection().getOnlinePlayers() != null) {
+            for (PlayerInfo entry : mc.getConnection().getOnlinePlayers()) {
                 UUID uuid = entry.getProfile().id();
                 if (uuid != null) {
-                    Text displayName = entry.getDisplayName();
+                    Component displayName = entry.getTabListDisplayName();
                     String name = displayName != null ? displayName.getString() : entry.getProfile().name();
 
                     if (name != null && !name.isEmpty()) {
@@ -159,95 +159,6 @@ public class PlayerTriangulate extends Module {
             }
         }
 
-        mc.getConnection().getWaypointHandler().forEachWaypoint(mc.player, waypoint -> {
-            UUID currentUuid = waypoint.getSource().left().orElse(null);
-            if (currentUuid == null) return;
-
-            if (waypoint instanceof TrackedWaypoint.Positional posWaypoint) {
-                Vec3i pos = posWaypoint.pos;
-                double wx = pos.getX();
-                double wz = pos.getZ();
-
-                String playerName = uuidToName.getOrDefault(currentUuid, currentUuid.toString());
-                TriangulationResult result = new TriangulationResult(wx, wz, playerName);
-                lastResults.put(currentUuid, result);
-
-                addOrUpdateWaypoint(currentUuid, playerName, wx, wz);
-
-                if (outputMode.get() == OutputMode.CHAT) {
-                    if (chatFeedback) info(Text.of("Direct position for " + playerName + ": (" + wx + ", " + wz + ")"));
-                }
-                return;
-            }
-
-            if (!(waypoint instanceof TrackedWaypoint.Azimuth azimuthWaypoint)) return;
-
-            TriangulationSamples samples = triangulations.computeIfAbsent(currentUuid, k -> new TriangulationSamples());
-
-            if (Float.isNaN(samples.azi1)) {
-                samples.azi1 = azimuthWaypoint.azimuth;
-                samples.position1 = new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
-            } else if (Float.isNaN(samples.azi2)) {
-                Vec3d current = new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
-                if (samples.position1 != null && current.distanceTo(samples.position1) < minMove.get()) {
-                    return;
-                }
-                float angleDelta = Math.abs(samples.azi1 - azimuthWaypoint.azimuth);
-                double angleDeltaDegrees = Math.toDegrees(angleDelta);
-                if (angleDeltaDegrees > minDelta.get()) {
-                    samples.azi2 = azimuthWaypoint.azimuth;
-                    samples.position2 = current;
-                }
-            }
-        });
-
-        for (Map.Entry<UUID, TriangulationSamples> entry : triangulations.entrySet()) {
-            UUID uuid = entry.getKey();
-            TriangulationSamples samples = entry.getValue();
-
-            if (!Float.isNaN(samples.azi1) && !Float.isNaN(samples.azi2)
-                    && samples.position1 != null && samples.position2 != null) {
-
-                double x1 = samples.position1.getX();
-                double z1 = samples.position1.getZ();
-                double x2 = samples.position2.getX();
-                double z2 = samples.position2.getZ();
-
-                double dx1 = -Math.sin(samples.azi1);
-                double dz1 =  Math.cos(samples.azi1);
-                double dx2 = -Math.sin(samples.azi2);
-                double dz2 =  Math.cos(samples.azi2);
-
-                double denominator = dx1 * dz2 - dz1 * dx2;
-                if (Math.abs(denominator) < 1e-8) {
-                    if (chatFeedback) error("Lines are parallel; cannot triangulate for " + uuidToName.getOrDefault(uuid, uuid.toString()));
-                    samples.azi1 = Float.NaN;
-                    samples.azi2 = Float.NaN;
-                    samples.position1 = null;
-                    samples.position2 = null;
-                    continue;
-                }
-
-                double t = ((x2 - x1) * dz2 - (z2 - z1) * dx2) / denominator;
-                double wx = x1 + t * dx1;
-                double wz = z1 + t * dz1;
-
-                String playerName = uuidToName.getOrDefault(uuid, uuid.toString());
-
-                TriangulationResult result = new TriangulationResult(wx, wz, playerName);
-                lastResults.put(uuid, result);
-
-                addOrUpdateWaypoint(uuid, playerName, wx, wz);
-
-                if (outputMode.get() == OutputMode.CHAT) {
-                    if (chatFeedback) info(Text.of("Estimated position for " + playerName + ": (" + wx + ", " + wz + ")"));
-                }
-
-                samples.azi1 = Float.NaN;
-                samples.azi2 = Float.NaN;
-                samples.position1 = null;
-                samples.position2 = null;
-            }
-        }
+        // TODO: Port getWaypointHandler - Meteor 26.1.2 API changed
     }
 }

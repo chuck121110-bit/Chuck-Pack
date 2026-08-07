@@ -28,19 +28,18 @@ import meteordevelopment.orbit.EventHandler;
 import net.aero.aeropack.render.AeroRenderMode;
 import net.aero.aeropack.render.AeroShaderHelper;
 import net.aero.aeropack.render.AeroShaderSource;
-import net.minecraft.block.BlockState;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.client.render.Frustum;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.util.shape.VoxelShapes;
-import net.minecraft.world.World;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.ChunkSection;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.core.Direction;
+import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -54,11 +53,11 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     private final SettingGroup sgTParams = settings.createGroup("Tunnel Parameters");
     private final SettingGroup sgSParams = settings.createGroup("Stairs Parameters");
     private final SettingGroup sgRender = settings.createGroup("Rendering");
-    private final SettingGroup sgWorld = settings.createGroup("World Toggle");
+    private final SettingGroup sgWorld = settings.createGroup("Level Toggle");
 
     private final Setting<AeroRenderMode> renderMode = sgGeneral.add(new EnumSetting.Builder<AeroRenderMode>()
         .name("aeropack-render-mode")
-        .description("Box ESP draws normal boxes. Shader uses the same post-process outline shader as Storage ESP.")
+        .description("AABB ESP draws normal boxes. Shader uses the same post-process outline shader as Storage ESP.")
         .defaultValue(AeroRenderMode.BoxESP)
         .build()
     );
@@ -262,10 +261,10 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     );
 
     private final Long2ObjectMap<TChunk> chunks = new Long2ObjectOpenHashMap<>();
-    private final Queue<Chunk> chunkQueue = new LinkedList<>();
-    private final Set<Box> holes = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private final Set<Box> tunnels = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private final Set<Box> staircases = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Queue<LevelChunk> chunkQueue = new LinkedList<>();
+    private final Set<AABB> holes = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<AABB> tunnels = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<AABB> staircases = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private final MeshBuilder mesh = new MeshBuilder(MeteorRenderPipelines.WORLD_COLORED);
     private final MeshBuilderVertexConsumerProvider vcp = new MeshBuilderVertexConsumerProvider(mesh);
@@ -290,12 +289,12 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     @EventHandler
     private void onTick(TickEvent.Post event) {
         if (mc.level != null) {
-            RegistryKey<World> dim = mc.level.dimension();
+            ResourceKey<Level> dim = mc.level.dimension();
 
             if (
-                (dim == World.OVERWORLD && !overworld.get()) ||
-                (dim == World.NETHER && !nether.get()) ||
-                (dim == World.END && !end.get())
+                (dim == Level.OVERWORLD && !overworld.get()) ||
+                (dim == Level.NETHER && !nether.get()) ||
+                (dim == Level.END && !end.get())
             ) {
                 this.clearData();
                 return;
@@ -305,12 +304,12 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
         synchronized (chunks) {
             for (TChunk tChunk : chunks.values()) tChunk.marked = false;
 
-            for (Chunk chunk : Utils.chunks(true)) {
-                long key = ChunkPos.toLong(chunk.getPos().x, chunk.getPos().z);
+            for (var chunk : Utils.chunks(true)) {
+                long key = ChunkPos.pack(chunk.getPos().x(), chunk.getPos().z());
 
                 if (chunks.containsKey(key)) chunks.get(key).marked = true;
-                else if (!chunkQueue.contains(chunk)) {
-                    chunkQueue.add(chunk);
+                else if (chunk instanceof LevelChunk wc && !chunkQueue.contains(wc)) {
+                    chunkQueue.add(wc);
                 }
             }
 
@@ -322,7 +321,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
 
     private void removeBoxesOutsideRenderDistance() {
         Set<LevelChunk> chunkSet = new HashSet<>();
-        for (Chunk c : Utils.chunks(true)) {
+        for (var c : Utils.chunks(true)) {
             if (c instanceof LevelChunk wc) chunkSet.add(wc);
         }
         removeBoxesOutsideRenderDistance(holes, chunkSet);
@@ -330,9 +329,9 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
         removeBoxesOutsideRenderDistance(staircases, chunkSet);
     }
 
-    private void removeBoxesOutsideRenderDistance(Set<Box> boxSet, Set<LevelChunk> worldChunks) {
-        boxSet.removeIf(box -> {
-            BlockPos boxPos = new BlockPos((int) Math.floor(box.getCenter().x), (int) Math.floor(box.getCenter().y), (int) Math.floor(box.getCenter().z));
+    private void removeBoxesOutsideRenderDistance(Set<AABB> boxSet, Set<LevelChunk> worldChunks) {
+        boxSet.removeIf(AABB -> {
+            BlockPos boxPos = new BlockPos((int) Math.floor(AABB.getCenter().x), (int) Math.floor(AABB.getCenter().y), (int) Math.floor(AABB.getCenter().z));
             assert mc.level != null;
             return !worldChunks.contains(mc.level.getChunk(boxPos));
         });
@@ -383,30 +382,30 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     }
 
     private void renderHoles(Renderer3D renderer) {
-        for (Box box : holes) {
-            if (frustumCulling.get() && !isBoxVisible(box)) continue;
-            renderer.box(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, holeSideColor.get(), holeLineColor.get(), shapeMode.get(), 0);
+        for (AABB AABB : holes) {
+            if (frustumCulling.get() && !isBoxVisible(AABB)) continue;
+            renderer.box(AABB.minX, AABB.minY, AABB.minZ, AABB.maxX, AABB.maxY, AABB.maxZ, holeSideColor.get(), holeLineColor.get(), shapeMode.get(), 0);
         }
     }
 
     private void renderTunnels(Renderer3D renderer) {
-        for (Box box : tunnels) {
-            if (frustumCulling.get() && !isBoxVisible(box)) continue;
-            renderer.box(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, tunnelSideColor.get(), tunnelLineColor.get(), shapeMode.get(), 0);
+        for (AABB AABB : tunnels) {
+            if (frustumCulling.get() && !isBoxVisible(AABB)) continue;
+            renderer.box(AABB.minX, AABB.minY, AABB.minZ, AABB.maxX, AABB.maxY, AABB.maxZ, tunnelSideColor.get(), tunnelLineColor.get(), shapeMode.get(), 0);
         }
     }
 
     private void renderStaircases(Renderer3D renderer) {
-        for (Box box : staircases) {
-            if (frustumCulling.get() && !isBoxVisible(box)) continue;
-            renderer.box(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, staircaseSideColor.get(), staircaseLineColor.get(), shapeMode.get(), 0);
+        for (AABB AABB : staircases) {
+            if (frustumCulling.get() && !isBoxVisible(AABB)) continue;
+            renderer.box(AABB.minX, AABB.minY, AABB.minZ, AABB.maxX, AABB.maxY, AABB.maxZ, staircaseSideColor.get(), staircaseLineColor.get(), shapeMode.get(), 0);
         }
     }
 
-    private boolean isBoxVisible(Box box) {
-        Frustum frustum = mc.levelRenderer.getCapturedFrustum();
+    private boolean isBoxVisible(AABB AABB) {
+        Frustum frustum = mc.gameRenderer.getMainCamera().getCullFrustum();
         if (frustum == null) return true;
-        return frustum.isVisible(box);
+        return frustum.isVisible(AABB);
     }
 
     private void renderShader(Render3DEvent event) {
@@ -455,12 +454,12 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
         AeroShaderHelper.markDirty();
     }
 
-    private void renderBoxesShader(MeshBuilder mesh, Set<Box> boxSet, Color color) {
+    private void renderBoxesShader(MeshBuilder mesh, Set<AABB> boxSet, Color color) {
         Color shaderColor = new Color(color.r, color.g, color.b, 255);
-        Frustum frustum = frustumCulling.get() ? mc.levelRenderer.getCapturedFrustum() : null;
-        for (Box box : boxSet) {
-            if (frustum != null && !frustum.isVisible(box)) continue;
-            meshBox(mesh, box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, shaderColor);
+        Frustum frustum = frustumCulling.get() ? mc.gameRenderer.getMainCamera().getCullFrustum() : null;
+        for (AABB AABB : boxSet) {
+            if (frustum != null && !frustum.isVisible(AABB)) continue;
+            meshBox(mesh, AABB.minX, AABB.minY, AABB.minZ, AABB.maxX, AABB.maxY, AABB.maxZ, shaderColor);
         }
     }
 
@@ -483,8 +482,8 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
         );
     }
 
-    private Set<Box> getActiveBoxes() {
-        Set<Box> active = new HashSet<>();
+    private Set<AABB> getActiveBoxes() {
+        Set<AABB> active = new HashSet<>();
         switch (detectionMode.get()) {
             case ALL:
                 active.addAll(holes);
@@ -516,13 +515,13 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
         return active;
     }
 
-    private void renderBoxBlocks(Box box) {
-        int minX = (int) Math.floor(box.minX);
-        int minY = (int) Math.floor(box.minY);
-        int minZ = (int) Math.floor(box.minZ);
-        int maxX = (int) Math.floor(box.maxX);
-        int maxY = (int) Math.floor(box.maxY);
-        int maxZ = (int) Math.floor(box.maxZ);
+    private void renderBoxBlocks(AABB AABB) {
+        int minX = (int) Math.floor(AABB.minX);
+        int minY = (int) Math.floor(AABB.minY);
+        int minZ = (int) Math.floor(AABB.minZ);
+        int maxX = (int) Math.floor(AABB.maxX);
+        int maxY = (int) Math.floor(AABB.maxY);
+        int maxZ = (int) Math.floor(AABB.maxZ);
 
         Set<BlockPos> rendered = new HashSet<>();
 
@@ -533,7 +532,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
                     if (!isPassableBlock(pos)) continue;
 
                     for (Direction dir : DIRECTIONS_FULL) {
-                        BlockPos neighbor = pos.offset(dir);
+                        BlockPos neighbor = pos.relative(dir);
                         if (!rendered.add(neighbor)) continue;
 
                         BlockState state = mc.level.getBlockState(neighbor);
@@ -552,9 +551,9 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
         int processed = 0;
 
         while (!chunkQueue.isEmpty() && processed < maxChunksPerTick) {
-            Chunk chunk = chunkQueue.poll();
+            LevelChunk chunk = chunkQueue.poll();
             if (chunk != null) {
-                TChunk tChunk = new TChunk(chunk.getPos().x, chunk.getPos().z);
+                TChunk tChunk = new TChunk(chunk.getPos().x(), chunk.getPos().z());
                 chunks.put(tChunk.getKey(), tChunk);
 
                 MeteorExecutor.execute(() -> searchChunk(chunk, tChunk));
@@ -563,19 +562,19 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
         }
     }
 
-    private void searchChunk(Chunk chunk, TChunk tChunk) {
-        var sections = chunk.getSectionArray();
-        int Ymin = mc.level.getMinBuildHeight() + minY.get();
-        int Ymax = mc.level.getMaxBuildHeight() - maxY.get();
-        int Y = mc.level.getMinBuildHeight();
-        for (ChunkSection section : sections) {
-            if (section != null && !section.isEmpty()) {
+    private void searchChunk(LevelChunk chunk, TChunk tChunk) {
+        var sections = chunk.getSections();
+        int Ymin = mc.level.getMinY() + minY.get();
+        int Ymax = mc.level.getMinY() + mc.level.getHeight() - maxY.get();
+        int Y = mc.level.getMinY();
+        for (LevelChunkSection section : sections) {
+            if (section != null && !section.hasOnlyAir()) {
                 for (int z = 0; z <= 16; z++) {
                     for (int x = 0; x < 16; x++) {
                         for (int y = 0; y < 16; y++) {
                             int currentY = Y + y;
                             if (currentY <= Ymin || currentY >= Ymax) continue;
-                            BlockPos pos = chunk.getPos().getBlockPos(x, currentY, z);
+                            BlockPos pos = chunk.getPos().getBlockAt(x, currentY, z);
                             if (isPassableBlock(pos)) {
                                 switch (detectionMode.get()) {
                                     case ALL:
@@ -618,14 +617,14 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
         }
     }
 
-    private void checkHole(BlockPos pos, Set<Box> holes) {
+    private void checkHole(BlockPos pos, Set<AABB> holes) {
         if (isValidHoleSection(pos)) {
-            BlockPos.Mutable currentPos = pos.mutableCopy();
+            BlockPos.MutableBlockPos currentPos = pos.mutable();
             while (isValidHoleSection(currentPos)) {
                 currentPos.move(Direction.UP);
             }
             if (currentPos.getY() - pos.getY() >= minHoleDepth.get()) {
-                Box holeBox = new Box(
+                AABB holeBox = new AABB(
                     pos.getX(), pos.getY(), pos.getZ(),
                     pos.getX() + 1, currentPos.getY(), pos.getZ() + 1
                 );
@@ -642,25 +641,25 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
 
     private void checkTunnel(BlockPos pos) {
         for (Direction dir : DIRECTIONS) {
-            BlockPos.Mutable currentPos = pos.mutableCopy();
+            BlockPos.MutableBlockPos currentPos = pos.mutable();
             int stepCount = 0;
             BlockPos startPos = null;
             BlockPos endPos = null;
             int maxHeight = 0;
             if (startPos == null && isTunnelSection(currentPos, dir)) {
-                startPos = currentPos.toImmutable();
+                startPos = currentPos.immutable();
             }
             while (isTunnelSection(currentPos, dir)) {
                 maxHeight = Math.max(maxHeight, getTunnelHeight(currentPos));
 
-                endPos = currentPos.toImmutable();
+                endPos = currentPos.immutable();
 
                 currentPos.move(dir);
                 stepCount++;
             }
 
             if (stepCount >= minTunnelLength.get() && maxHeight >= minTunnelHeight.get() && maxHeight <= maxTunnelHeight.get()) {
-                Box tunnelBox = new Box(
+                AABB tunnelBox = new AABB(
                     Math.min(startPos.getX(), endPos.getX()),
                     startPos.getY(),
                     Math.min(startPos.getZ(), endPos.getZ()),
@@ -679,11 +678,11 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     private boolean isTunnelSection(BlockPos pos, Direction dir) {
         int height = getTunnelHeight(pos);
         if (height < minTunnelHeight.get() || height > maxTunnelHeight.get()) return false;
-        if (isPassableBlock(pos.down()) || isPassableBlock(pos.up(height))) return false;
+        if (isPassableBlock(pos.below()) || isPassableBlock(pos.above(height))) return false;
         Direction[] perpDirs = dir.getAxis() == Direction.Axis.X ? new Direction[]{Direction.NORTH, Direction.SOUTH} : new Direction[]{Direction.EAST, Direction.WEST};
         for (Direction perpDir : perpDirs) {
             for (int i = 0; i < height; i++) {
-                if (isPassableBlock(pos.up(i).offset(perpDir))) {
+                if (isPassableBlock(pos.above(i).relative(perpDir))) {
                     return false;
                 }
             }
@@ -694,16 +693,16 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     private void checkDiagonalTunnel(BlockPos pos) {
         for (Direction dir : DIRECTIONS) {
             for (int i = minDiagonalWidth.get() - 1; i < maxDiagonalWidth.get(); i++) {
-                BlockPos.Mutable currentPos = pos.mutableCopy();
+                BlockPos.MutableBlockPos currentPos = pos.mutable();
                 int stepCount = 0;
-                List<Box> potentialBoxes = new ArrayList<>();
+                List<AABB> potentialBoxes = new ArrayList<>();
 
                 Direction checkingDir = dir;
                 boolean turnRight = true;
 
                 while (isDiagonalTunnelSection(currentPos, checkingDir)) {
                     int height = getTunnelHeight(currentPos);
-                    Box tunnelBox = new Box(
+                    AABB tunnelBox = new AABB(
                         currentPos.getX(),
                         currentPos.getY(),
                         currentPos.getZ(),
@@ -716,12 +715,12 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
                     }
 
                     if (turnRight) {
-                        checkingDir = checkingDir.rotateClockwise(Direction.Axis.Y);
-                        currentPos.move(checkingDir.rotateClockwise(Direction.Axis.Y), i);
+                        checkingDir = checkingDir.getClockWise(Direction.Axis.Y);
+                        currentPos.move(checkingDir.getClockWise(Direction.Axis.Y), i);
                         turnRight = false;
                     } else {
-                        checkingDir = checkingDir.rotateCounterclockwise(Direction.Axis.Y);
-                        currentPos.move(checkingDir.rotateCounterclockwise(Direction.Axis.Y), i);
+                        checkingDir = checkingDir.getCounterClockWise(Direction.Axis.Y);
+                        currentPos.move(checkingDir.getCounterClockWise(Direction.Axis.Y), i);
                         turnRight = true;
                     }
                     stepCount++;
@@ -741,18 +740,18 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     private boolean isDiagonalTunnelSection(BlockPos pos, Direction dir) {
         int height = getTunnelHeight(pos);
         if (height < minTunnelHeight.get() || height > maxTunnelHeight.get()) return false;
-        if (isPassableBlock(pos.down()) || isPassableBlock(pos.up(height))) return false;
+        if (isPassableBlock(pos.below()) || isPassableBlock(pos.above(height))) return false;
 
         boolean waspassableblockfound = false;
         for (int i = 0; i < height; i++) {
-            if (isPassableBlock(pos.up(i).offset(dir))) waspassableblockfound = true;
+            if (isPassableBlock(pos.above(i).relative(dir))) waspassableblockfound = true;
         }
         return !waspassableblockfound;
     }
 
     private int getTunnelHeight(BlockPos pos) {
         int height = 0;
-        while (isPassableBlock(pos.up(height)) && height < maxTunnelHeight.get()) {
+        while (isPassableBlock(pos.above(height)) && height < maxTunnelHeight.get()) {
             height++;
         }
         return height;
@@ -760,13 +759,13 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
 
     private void checkStaircase(BlockPos pos) {
         for (Direction dir : DIRECTIONS) {
-            BlockPos.Mutable currentPos = pos.mutableCopy();
+            BlockPos.MutableBlockPos currentPos = pos.mutable();
             int stepCount = 0;
-            List<Box> potentialStaircaseBoxes = new ArrayList<>();
+            List<AABB> potentialStaircaseBoxes = new ArrayList<>();
 
             while (isStaircaseSection(currentPos, dir)) {
                 int height = getStaircaseHeight(currentPos);
-                Box stairsBox = new Box(
+                AABB stairsBox = new AABB(
                     currentPos.getX(),
                     currentPos.getY(),
                     currentPos.getZ(),
@@ -782,7 +781,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
                 stepCount++;
             }
 
-            for (Box stairsBox : potentialStaircaseBoxes) {
+            for (AABB stairsBox : potentialStaircaseBoxes) {
                 if (stepCount >= minStaircaseLength.get() && !staircases.contains(stairsBox) && !staircases.stream().anyMatch(existingStaircase -> existingStaircase.intersects(stairsBox))) {
                     staircases.add(stairsBox);
                 }
@@ -792,7 +791,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
 
     private int getStaircaseHeight(BlockPos pos) {
         int height = 0;
-        while (isPassableBlock(pos.up(height)) && height < maxStaircaseHeight.get()) {
+        while (isPassableBlock(pos.above(height)) && height < maxStaircaseHeight.get()) {
             height++;
         }
         return height;
@@ -801,11 +800,11 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     private boolean isStaircaseSection(BlockPos pos, Direction dir) {
         int height = getStaircaseHeight(pos);
         if (height < minStaircaseHeight.get() || height > maxStaircaseHeight.get()) return false;
-        if (isPassableBlock(pos.down()) || isPassableBlock(pos.up(height))) return false;
+        if (isPassableBlock(pos.below()) || isPassableBlock(pos.above(height))) return false;
         Direction[] perpDirs = dir.getAxis() == Direction.Axis.X ? new Direction[]{Direction.NORTH, Direction.SOUTH} : new Direction[]{Direction.EAST, Direction.WEST};
         for (Direction perpDir : perpDirs) {
             for (int i = 0; i < height; i++) {
-                if (isPassableBlock(pos.up(i).offset(perpDir))) {
+                if (isPassableBlock(pos.above(i).relative(perpDir))) {
                     return false;
                 }
             }
@@ -819,7 +818,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
             return state.isAir();
         } else {
             VoxelShape shape = state.getCollisionShape(mc.level, pos);
-            return shape.isEmpty() || !VoxelShapes.fullCube().equals(shape);
+            return shape.isEmpty() || !Shapes.block().equals(shape);
         }
     }
 
@@ -849,7 +848,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
         }
 
         public long getKey() {
-            return ChunkPos.toLong(x, z);
+            return ChunkPos.pack(x, z);
         }
     }
 }

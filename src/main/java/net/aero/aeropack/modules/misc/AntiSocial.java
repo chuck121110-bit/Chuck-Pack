@@ -5,8 +5,8 @@ import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.friends.Friends;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.world.entity.player.Player;
 import net.aero.aeropack.modules.render.CoordinateLogout;
 
 import java.util.Collection;
@@ -41,15 +41,15 @@ public class AntiSocial extends Module {
         double py = mc.player.getY();
         double pz = mc.player.getZ();
 
-        Collection<PlayerListEntry> players = mc.getConnection().getPlayerList();
+        Collection<PlayerInfo> players = mc.getConnection().getOnlinePlayers();
         if (players == null) return;
 
-        for (PlayerListEntry entry : players) {
+        for (PlayerInfo entry : players) {
             String name = entry.getProfile().name();
             if (name.equals(myName)) continue;
 
             if (mc.level != null) {
-                for (PlayerEntity player : mc.level.getPlayers()) {
+                for (Player player : mc.level.players()) {
                     if (player.getName().getString().equals(name)) {
                         if (Friends.get().isFriend(player)) break;
 

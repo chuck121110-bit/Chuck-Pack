@@ -6,8 +6,8 @@ import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.systems.friends.Friends;
 import meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -38,10 +38,10 @@ public class SwarmMixin {
         net.aero.aeropack.modules.combat.SwarmGuard guard = net.aero.aeropack.modules.combat.SwarmGuard.get();
         if (guard != null) guard.hostTick(mc);
 
-        PlayerEntity host = mc.player;
+        Player host = mc.player;
         if (host.hurtTime > 0) {
-            LivingEntity lastAttacker = host.getAttacker();
-            if (lastAttacker instanceof PlayerEntity player && !Friends.get().isFriend(player)) {
+            LivingEntity lastAttacker = host.getLastHurtByMob();
+            if (lastAttacker instanceof Player player && !Friends.get().isFriend(player)) {
                 self.host.sendMessage("swarm aeropack-retaliate " + player.getName().getString());
             }
         }

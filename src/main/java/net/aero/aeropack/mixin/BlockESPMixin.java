@@ -19,9 +19,9 @@ import meteordevelopment.meteorclient.utils.render.MeshBuilderVertexConsumerProv
 import meteordevelopment.meteorclient.utils.render.SimpleBlockRenderer;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.postprocess.PostProcessShaders;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.core.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -35,7 +35,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import net.minecraft.block.BlockRenderType;
+import net.minecraft.world.level.block.RenderShape;
 
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
@@ -59,7 +59,7 @@ public abstract class BlockESPMixin implements AeroShaderSource {
 
         aeropack$renderMode = sgShader.add(new EnumSetting.Builder<AeroRenderMode>()
             .name("aeropack-render-mode")
-            .description("Box ESP draws normal boxes. Shader uses the same post-process outline shader as Storage ESP.")
+            .description("AABB ESP draws normal boxes. Shader uses the same post-process outline shader as Storage ESP.")
             .defaultValue(AeroRenderMode.BoxESP)
             .build()
         );
@@ -72,19 +72,19 @@ public abstract class BlockESPMixin implements AeroShaderSource {
         HashSet<Long> trackedSet = new HashSet<>();
 
         synchronized (chunks) {
-            for (ESPChunk chunk : chunks.values()) {
-                if (chunk.blocks == null) continue;
-                for (ESPBlock block : chunk.blocks.values()) {
+            for (ESPChunk LevelChunk : chunks.values()) {
+                if (LevelChunk.blocks == null) continue;
+                for (ESPBlock block : LevelChunk.blocks.values()) {
                     trackedSet.add(ESPBlock.getKey(block.x, block.y, block.z));
                 }
             }
 
             aeropack$mesh.begin();
 
-            for (ESPChunk chunk : chunks.values()) {
-                if (chunk.blocks == null) continue;
+            for (ESPChunk LevelChunk : chunks.values()) {
+                if (LevelChunk.blocks == null) continue;
 
-                for (ESPBlock block : chunk.blocks.values()) {
+                for (ESPBlock block : LevelChunk.blocks.values()) {
                     int bx = block.x, by = block.y, bz = block.z;
 
                     if (trackedSet.contains(ESPBlock.getKey(bx + 1, by, bz))
@@ -106,7 +106,7 @@ public abstract class BlockESPMixin implements AeroShaderSource {
                     Color lc = blockData.lineColor;
                     aeropack$vcp.setColor(new Color(lc.r, lc.g, lc.b, 255));
 
-                    if (state.getRenderType() != BlockRenderType.MODEL) {
+                    if (state.getRenderShape() != RenderShape.MODEL) {
                         aeropack$vcp.setOffset(0, 0, 0);
                         aeropack$renderFullBlock(bx, by, bz, new Color(lc.r, lc.g, lc.b, 255));
                     } else {

@@ -1,9 +1,9 @@
 package net.aero.aeropack.mixin.ui_utils;
 
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.Slot;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
 import net.aero.aeropack.modules.misc.UiUtilsMod;
 import net.aero.aeropack.uiutils.UiUtilsModAccess;
 import net.aero.aeropack.uiutils.UiUtilsState;
@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(HandledScreen.class)
+@Mixin(AbstractContainerScreen.class)
 public abstract class ChestSlotOverlayMixin {
 
     @Shadow
@@ -29,12 +29,12 @@ public abstract class ChestSlotOverlayMixin {
     protected int backgroundHeight;
 
     @Shadow
-    public abstract ScreenHandler getScreenHandler();
+    public abstract AbstractContainerMenu getMenu();
 
     @Inject(
-        method = "render(Lnet/minecraft/client/gui/DrawContext;IIF)V",
+        method = "render(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IIF)V",
         at = @At("TAIL"))
-    private void aeropack$renderSlotOverlay(DrawContext graphics,
+    private void aeropack$renderSlotOverlay(GuiGraphicsExtractor graphics,
         int mouseX, int mouseY, float delta, CallbackInfo ci) {
         UiUtilsMod hack = UiUtilsModAccess.get();
         boolean drawSlotNumbers = UiUtilsState.isUiEnabled() && hack != null
@@ -43,18 +43,18 @@ public abstract class ChestSlotOverlayMixin {
         if (!drawSlotNumbers)
             return;
 
-        ScreenHandler screenHandler = getScreenHandler();
-        if (screenHandler == null)
+        AbstractContainerMenu AbstractContainerMenu = getMenu();
+        if (AbstractContainerMenu == null)
             return;
 
-        int totalSlots = screenHandler.slots.size();
+        int totalSlots = AbstractContainerMenu.slots.size();
         int color = hack.getSlotOverlayColorI();
         int offsetX = hack.getSlotOverlayOffsetX();
         int offsetY = hack.getSlotOverlayOffsetY();
         boolean hoverOnly = hack.isSlotOverlayHoverOnly();
 
         for (int index = 0; index < totalSlots; index++) {
-            Slot slot = screenHandler.slots.get(index);
+            Slot slot = AbstractContainerMenu.slots.get(index);
             if (slot == null)
                 continue;
 
@@ -68,7 +68,7 @@ public abstract class ChestSlotOverlayMixin {
             int textX = x + slot.x + offsetX;
             int textY = y + slot.y + offsetY;
             String label = String.valueOf(index);
-            graphics.drawTextWithShadow(net.minecraft.client.Minecraft.getInstance().font, label, textX, textY, color);
+            graphics.text(net.minecraft.client.Minecraft.getInstance().font, label, textX, textY, color);
         }
     }
 }

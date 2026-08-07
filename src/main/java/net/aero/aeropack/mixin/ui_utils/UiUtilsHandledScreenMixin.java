@@ -8,26 +8,25 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.widget.CyclingButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.input.KeyInput;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.input.KeyEvent;
+import org.lwjgl.glfw.GLFW;
 import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.c2s.play.ButtonClickC2SPacket;
-import net.minecraft.network.packet.c2s.play.ClickSlotC2SPacket;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.screen.sync.ItemStackHash;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ServerboundContainerButtonClickPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ClickAction;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.aero.aeropack.modules.misc.UiUtilsMod;
@@ -37,17 +36,17 @@ import net.aero.aeropack.uiutils.UiUtilsState;
 import java.util.ArrayList;
 import java.util.List;
 
-@Mixin(HandledScreen.class)
+@Mixin(AbstractContainerScreen.class)
 public abstract class UiUtilsHandledScreenMixin extends Screen {
 
     @Unique
-    private TextFieldWidget uiUtilsChatField;
+    private EditBox uiUtilsChatField;
 
     @Unique
-    private ButtonWidget uiUtilsSpamButton;
+    private Button uiUtilsSpamButton;
 
     @Unique
-    private ButtonWidget uiUtilsQueueButton;
+    private Button uiUtilsQueueButton;
 
     @Shadow
     protected int x;
@@ -65,49 +64,49 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     private int fabricateMode = MODE_CLICK_SLOT;
 
     @Unique
-    private ButtonWidget overlayClickSlotModeButton;
+    private Button overlayClickSlotModeButton;
 
     @Unique
-    private ButtonWidget overlayButtonClickModeButton;
+    private Button overlayButtonClickModeButton;
 
     @Unique
-    private TextFieldWidget overlayClickSyncIdField;
+    private EditBox overlayClickSyncIdField;
 
     @Unique
-    private TextFieldWidget overlayClickRevisionField;
+    private EditBox overlayClickRevisionField;
 
     @Unique
-    private TextFieldWidget overlayClickSlotField;
+    private EditBox overlayClickSlotField;
 
     @Unique
-    private TextFieldWidget overlayClickButtonField;
+    private EditBox overlayClickButtonField;
 
     @Unique
-    private CyclingButtonWidget<SlotActionType> overlayClickActionButton;
+    private CycleButton<ClickAction> overlayClickActionButton;
 
     @Unique
-    private CyclingButtonWidget<Boolean> overlayClickDelayToggle;
+    private CycleButton<Boolean> overlayClickDelayToggle;
 
     @Unique
-    private TextFieldWidget overlayClickTimesField;
+    private EditBox overlayClickTimesField;
 
     @Unique
-    private ButtonWidget overlayClickSendButton;
+    private Button overlayClickSendButton;
 
     @Unique
-    private TextFieldWidget overlayButtonSyncIdField;
+    private EditBox overlayButtonSyncIdField;
 
     @Unique
-    private TextFieldWidget overlayButtonIdField;
+    private EditBox overlayButtonIdField;
 
     @Unique
-    private CyclingButtonWidget<Boolean> overlayButtonDelayToggle;
+    private CycleButton<Boolean> overlayButtonDelayToggle;
 
     @Unique
-    private TextFieldWidget overlayButtonTimesField;
+    private EditBox overlayButtonTimesField;
 
     @Unique
-    private ButtonWidget overlayButtonSendButton;
+    private Button overlayButtonSendButton;
 
     @Unique
     private static final int OVERLAY_WIDTH = 260;
@@ -163,7 +162,7 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     @Unique
     private int dragOffsetY;
 
-    private UiUtilsHandledScreenMixin(Text title) {
+    private UiUtilsHandledScreenMixin(Component title) {
         super(title);
     }
 
@@ -184,37 +183,37 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
         int startY = Math.max(5, (this.height - blockHeight) / 2);
         int baseX = 8;
         int nextY = UiUtils.addUiWidgets(mc, baseX, startY, spacing,
-            this::addDrawableChild);
+            this::addRenderableWidget);
         uiUtilsChatField =
             UiUtils.createChatField(mc, this.font, baseX, nextY + spacing);
-        addDrawableChild(uiUtilsChatField);
+        addRenderableWidget(uiUtilsChatField);
 
         initFabricateOverlay();
     }
 
     @Inject(at = @At("TAIL"),
-        method = "render(Lnet/minecraft/client/gui/DrawContext;IIF)V")
-    private void onRender(DrawContext graphics, int mouseX, int mouseY,
+        method = "render(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IIF)V")
+    private void onRender(GuiGraphicsExtractor graphics, int mouseX, int mouseY,
         float partialTicks, CallbackInfo ci) {
         if (!UiUtilsState.isUiEnabled())
             return;
 
         UiUtils.refreshLabels();
 
-        ScreenHandler screenHandler = ((HandledScreen<?>) (Object) this).getScreenHandler();
-        UiUtils.renderSyncInfo(Minecraft.getInstance(), graphics, screenHandler);
+        AbstractContainerMenu AbstractContainerMenu = ((AbstractContainerScreen<?>) (Object) this).getMenu();
+        UiUtils.renderSyncInfo(Minecraft.getInstance(), graphics, AbstractContainerMenu);
 
         updateOverlayVisibility();
 
         if (UiUtilsState.fabricateOverlayOpen) {
             layoutFabricateOverlay();
-            if (screenHandler != null)
-                updateOverlaySyncInfo(screenHandler);
+            if (AbstractContainerMenu != null)
+                updateOverlaySyncInfo(AbstractContainerMenu);
             drawFabricateLabels(graphics);
             if (overlayDragging) {
-                int newX = MathHelper.clamp(mouseX - dragOffsetX, 0,
+                int newX = Mth.clamp(mouseX - dragOffsetX, 0,
                     this.width - OVERLAY_WIDTH);
-                int newY = MathHelper.clamp(mouseY - dragOffsetY, 0,
+                int newY = Mth.clamp(mouseY - dragOffsetY, 0,
                     Math.max(0, this.height - 40));
                 UiUtilsState.fabricateOverlayX = newX;
                 UiUtilsState.fabricateOverlayY = newY;
@@ -223,9 +222,9 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     }
 
     @Inject(at = @At("HEAD"),
-        method = "render(Lnet/minecraft/client/gui/DrawContext;IIF)V")
+        method = "render(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IIF)V")
     private void aeropack$renderFabricateOverlayBackground(
-        DrawContext graphics, int mouseX, int mouseY,
+        GuiGraphicsExtractor graphics, int mouseX, int mouseY,
         float partialTicks, CallbackInfo ci) {
         if (!UiUtilsState.isUiEnabled())
             return;
@@ -246,32 +245,32 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     }
 
     @Inject(at = @At("HEAD"),
-        method = "keyPressed(Lnet/minecraft/client/input/KeyInput;)Z",
+        method = "keyPressed(Lnet/minecraft/client/input/KeyEvent;)Z",
         cancellable = true)
-    private void onKeyPressed(KeyInput keyInput,
+    private void onKeyPressed(KeyEvent keyEvent,
         CallbackInfoReturnable<Boolean> cir) {
         if (!UiUtilsState.isUiEnabled())
             return;
 
         if (uiUtilsChatField != null && uiUtilsChatField.isFocused()) {
-            if (keyInput.key() == 257) {
-                String msg = uiUtilsChatField.getText().trim();
+            if (keyEvent.input() == 257) {
+                String msg = uiUtilsChatField.getValue().trim();
                 Minecraft mc = Minecraft.getInstance();
                 if (!msg.isEmpty() && mc.player != null) {
-                    mc.player.networkHandler.sendChatMessage(msg);
+                    mc.player.connection.sendChat(msg);
                 }
-                uiUtilsChatField.setText("");
+                uiUtilsChatField.setValue("");
                 uiUtilsChatField.setFocused(false);
                 cir.setReturnValue(true);
                 return;
             }
 
-            if (uiUtilsChatField.keyPressed(keyInput)) {
+            if (uiUtilsChatField.keyPressed(keyEvent)) {
                 cir.setReturnValue(true);
                 return;
             }
 
-            if (keyInput.key() == net.minecraft.client.util.InputUtil.GLFW_KEY_ESCAPE) {
+            if (keyEvent.input() == GLFW.GLFW_KEY_ESCAPE) {
                 uiUtilsChatField.setFocused(false);
                 cir.setReturnValue(true);
                 return;
@@ -279,9 +278,9 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
         }
 
         if (UiUtilsState.fabricateOverlayOpen && fabricateOverlayInitialized) {
-            TextFieldWidget focused = getFocusedOverlayField();
+            EditBox focused = getFocusedOverlayField();
             if (focused != null && focused != uiUtilsChatField) {
-                if (focused.keyPressed(keyInput)) {
+                if (focused.keyPressed(keyEvent)) {
                     cir.setReturnValue(true);
                     return;
                 }
@@ -290,7 +289,7 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     }
 
     @Unique
-    private TextFieldWidget getFocusedOverlayField() {
+    private EditBox getFocusedOverlayField() {
         if (overlayClickSyncIdField != null && overlayClickSyncIdField.isFocused())
             return overlayClickSyncIdField;
         if (overlayClickRevisionField != null && overlayClickRevisionField.isFocused())
@@ -315,82 +314,82 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
         if (fabricateOverlayInitialized)
             return;
 
-        overlayClickSlotModeButton = ButtonWidget.builder(
-            Text.literal("Click Slot"),
+        overlayClickSlotModeButton = Button.builder(
+            Component.literal("Click Slot"),
             b -> switchFabricateMode(MODE_CLICK_SLOT))
-            .dimensions(0, 0, MODE_BUTTON_WIDTH, 20).build();
-        addDrawableChild(overlayClickSlotModeButton);
+            .pos(0, 0).size(MODE_BUTTON_WIDTH, 20).build();
+        addRenderableWidget(overlayClickSlotModeButton);
 
-        overlayButtonClickModeButton = ButtonWidget.builder(
-            Text.literal("Button Click"),
+        overlayButtonClickModeButton = Button.builder(
+            Component.literal("Button Click"),
             b -> switchFabricateMode(MODE_BUTTON_CLICK))
-            .dimensions(0, 0, MODE_BUTTON_WIDTH, 20).build();
-        addDrawableChild(overlayButtonClickModeButton);
+            .pos(0, 0).size(MODE_BUTTON_WIDTH, 20).build();
+        addRenderableWidget(overlayButtonClickModeButton);
 
-        overlayClickSyncIdField = new TextFieldWidget(textRenderer, 0, 0, FIELD_WIDTH, 20,
-            Text.literal("Sync Id"));
-        addDrawableChild(overlayClickSyncIdField);
+        overlayClickSyncIdField = new EditBox(Minecraft.getInstance().font, 0, 0, FIELD_WIDTH, 20,
+            Component.literal("Sync Id"));
+        addRenderableWidget(overlayClickSyncIdField);
 
-        overlayClickRevisionField = new TextFieldWidget(textRenderer, 0, 0, FIELD_WIDTH, 20,
-            Text.literal("Revision"));
-        addDrawableChild(overlayClickRevisionField);
+        overlayClickRevisionField = new EditBox(Minecraft.getInstance().font, 0, 0, FIELD_WIDTH, 20,
+            Component.literal("Revision"));
+        addRenderableWidget(overlayClickRevisionField);
 
         overlayClickSlotField =
-            new TextFieldWidget(textRenderer, 0, 0, FIELD_WIDTH, 20, Text.literal("Slot"));
-        overlayClickSlotField.setText("0");
-        addDrawableChild(overlayClickSlotField);
+            new EditBox(Minecraft.getInstance().font, 0, 0, FIELD_WIDTH, 20, Component.literal("Slot"));
+        overlayClickSlotField.setValue("0");
+        addRenderableWidget(overlayClickSlotField);
 
-        overlayClickButtonField = new TextFieldWidget(textRenderer, 0, 0, FIELD_WIDTH, 20,
-            Text.literal("Button"));
-        overlayClickButtonField.setText("0");
-        addDrawableChild(overlayClickButtonField);
+        overlayClickButtonField = new EditBox(Minecraft.getInstance().font, 0, 0, FIELD_WIDTH, 20,
+            Component.literal("Button"));
+        overlayClickButtonField.setValue("0");
+        addRenderableWidget(overlayClickButtonField);
 
-        overlayClickActionButton = CyclingButtonWidget
-            .<SlotActionType>builder(
-                action -> Text.literal(action.name()),
-                () -> SlotActionType.PICKUP)
-            .values(SlotActionType.values()).build(0, 0, FIELD_WIDTH, 20,
-                Text.literal("Action"), (button, value) -> {});
-        addDrawableChild(overlayClickActionButton);
+        overlayClickActionButton = CycleButton
+            .<ClickAction>builder(
+                action -> Component.literal(action.name()),
+                () -> ClickAction.PRIMARY)
+            .withValues(ClickAction.values()).create(0, 0, FIELD_WIDTH, 20,
+                Component.literal("Action"), (button, value) -> {});
+        addRenderableWidget(overlayClickActionButton);
 
         overlayClickDelayToggle =
-            CyclingButtonWidget.onOffBuilder(false).build(0, 0, DELAY_BUTTON_WIDTH, 20,
-                Text.literal("Delay"), (button, value) -> {});
-        addDrawableChild(overlayClickDelayToggle);
+            CycleButton.onOffBuilder(false).create(0, 0, DELAY_BUTTON_WIDTH, 20,
+                Component.literal("Delay"), (button, value) -> {});
+        addRenderableWidget(overlayClickDelayToggle);
 
-        overlayClickTimesField = new TextFieldWidget(textRenderer, 0, 0, TIMES_FIELD_WIDTH, 20,
-            Text.literal("Times to send"));
-        overlayClickTimesField.setText("1");
-        addDrawableChild(overlayClickTimesField);
+        overlayClickTimesField = new EditBox(Minecraft.getInstance().font, 0, 0, TIMES_FIELD_WIDTH, 20,
+            Component.literal("Times to send"));
+        overlayClickTimesField.setValue("1");
+        addRenderableWidget(overlayClickTimesField);
 
         overlayClickSendButton =
-            ButtonWidget.builder(Text.literal("Send"), b -> sendClickSlot())
-                .dimensions(0, 0, 90, 20).build();
-        addDrawableChild(overlayClickSendButton);
+            Button.builder(Component.literal("Send"), b -> sendClickSlot())
+                .pos(0, 0).size(90, 20).build();
+        addRenderableWidget(overlayClickSendButton);
 
-        overlayButtonSyncIdField = new TextFieldWidget(textRenderer, 0, 0, FIELD_WIDTH, 20,
-            Text.literal("Sync Id"));
-        addDrawableChild(overlayButtonSyncIdField);
+        overlayButtonSyncIdField = new EditBox(Minecraft.getInstance().font, 0, 0, FIELD_WIDTH, 20,
+            Component.literal("Sync Id"));
+        addRenderableWidget(overlayButtonSyncIdField);
 
-        overlayButtonIdField = new TextFieldWidget(textRenderer, 0, 0, FIELD_WIDTH, 20,
-            Text.literal("Button Id"));
-        overlayButtonIdField.setText("0");
-        addDrawableChild(overlayButtonIdField);
+        overlayButtonIdField = new EditBox(Minecraft.getInstance().font, 0, 0, FIELD_WIDTH, 20,
+            Component.literal("Button Id"));
+        overlayButtonIdField.setValue("0");
+        addRenderableWidget(overlayButtonIdField);
 
         overlayButtonDelayToggle =
-            CyclingButtonWidget.onOffBuilder(false).build(0, 0, DELAY_BUTTON_WIDTH, 20,
-                Text.literal("Delay"), (button, value) -> {});
-        addDrawableChild(overlayButtonDelayToggle);
+            CycleButton.onOffBuilder(false).create(0, 0, DELAY_BUTTON_WIDTH, 20,
+                Component.literal("Delay"), (button, value) -> {});
+        addRenderableWidget(overlayButtonDelayToggle);
 
-        overlayButtonTimesField = new TextFieldWidget(textRenderer, 0, 0, TIMES_FIELD_WIDTH, 20,
-            Text.literal("Times to send"));
-        overlayButtonTimesField.setText("1");
-        addDrawableChild(overlayButtonTimesField);
+        overlayButtonTimesField = new EditBox(Minecraft.getInstance().font, 0, 0, TIMES_FIELD_WIDTH, 20,
+            Component.literal("Times to send"));
+        overlayButtonTimesField.setValue("1");
+        addRenderableWidget(overlayButtonTimesField);
 
         overlayButtonSendButton =
-            ButtonWidget.builder(Text.literal("Send"), b -> sendButtonClick())
-                .dimensions(0, 0, 90, 20).build();
-        addDrawableChild(overlayButtonSendButton);
+            Button.builder(Component.literal("Send"), b -> sendButtonClick())
+                .pos(0, 0).size(90, 20).build();
+        addRenderableWidget(overlayButtonSendButton);
 
         fabricateOverlayInitialized = true;
         switchFabricateMode(MODE_CLICK_SLOT);
@@ -400,9 +399,9 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     @Unique
     private void switchFabricateMode(int mode) {
         fabricateMode = mode;
-        overlayClickSlotModeButton.setMessage(Text.literal(
+        overlayClickSlotModeButton.setMessage(Component.literal(
             "Click Slot" + (fabricateMode == MODE_CLICK_SLOT ? " ✓" : "")));
-        overlayButtonClickModeButton.setMessage(Text.literal(
+        overlayButtonClickModeButton.setMessage(Component.literal(
             "Button Click" + (fabricateMode == MODE_BUTTON_CLICK ? " ✓" : "")));
 
         boolean showClick = fabricateMode == MODE_CLICK_SLOT;
@@ -440,7 +439,7 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     }
 
     @Unique
-    private void setWidgetVisibleAndActive(ClickableWidget widget,
+    private void setWidgetVisibleAndActive(AbstractWidget widget,
         boolean visible) {
         if (widget == null)
             return;
@@ -483,7 +482,7 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     }
 
     @Unique
-    private void parkWidget(ClickableWidget widget, int offscreen) {
+    private void parkWidget(AbstractWidget widget, int offscreen) {
         if (widget == null)
             return;
         widget.setX(offscreen);
@@ -495,10 +494,10 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
         int overlayX = this.x + this.backgroundWidth + 8;
         int overlayY = this.y;
         if (UiUtilsState.fabricateOverlayX >= 0)
-            overlayX = MathHelper.clamp(UiUtilsState.fabricateOverlayX, 0,
+            overlayX = Mth.clamp(UiUtilsState.fabricateOverlayX, 0,
                 this.width - OVERLAY_WIDTH);
         if (UiUtilsState.fabricateOverlayY >= 0)
-            overlayY = MathHelper.clamp(UiUtilsState.fabricateOverlayY, 0,
+            overlayY = Mth.clamp(UiUtilsState.fabricateOverlayY, 0,
                 Math.max(0, this.height - 40));
         if (overlayX + OVERLAY_WIDTH > this.width - 8)
             overlayX = this.width - OVERLAY_WIDTH - 8;
@@ -563,7 +562,7 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     }
 
     @Unique
-    private void drawFabricateLabels(DrawContext graphics) {
+    private void drawFabricateLabels(GuiGraphicsExtractor graphics) {
         if (fabricateMode == MODE_CLICK_SLOT) {
             drawLabel(graphics, "Sync Id", overlayClickSyncIdField);
             drawLabel(graphics, "Revision", overlayClickRevisionField);
@@ -576,17 +575,17 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     }
 
     @Unique
-    private void drawLabel(DrawContext graphics, String text,
-        TextFieldWidget field) {
-        graphics.drawTextWithShadow(this.font, text, field.getX(), field.getY() - LABEL_OFFSET,
+    private void drawLabel(GuiGraphicsExtractor graphics, String Component,
+        EditBox field) {
+        graphics.text(this.font, Component, field.getX(), field.getY() - LABEL_OFFSET,
             0xFFAAAAAA);
     }
 
     @Inject(at = @At("HEAD"),
-        method = "mouseClicked(Lnet/minecraft/client/gui/Click;Z)Z",
+        method = "mouseClicked(Lnet/minecraft/client/input/MouseButtonEvent;Z)Z",
         cancellable = true)
     private void aeropack$fabricateOverlayMouseClicked(
-        Click context,
+        net.minecraft.client.input.MouseButtonEvent context,
         boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
         if (!UiUtilsState.isUiEnabled() || !UiUtilsState.fabricateOverlayOpen)
             return;
@@ -608,10 +607,10 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     }
 
     @Inject(at = @At("HEAD"),
-        method = "mouseReleased(Lnet/minecraft/client/gui/Click;)Z",
+        method = "mouseReleased(Lnet/minecraft/client/input/MouseButtonEvent;)Z",
         cancellable = true)
     private void aeropack$fabricateOverlayMouseReleased(
-        Click context,
+        net.minecraft.client.input.MouseButtonEvent context,
         CallbackInfoReturnable<Boolean> cir) {
         if (!overlayDragging)
             return;
@@ -621,117 +620,44 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     }
 
     @Unique
-    private void updateOverlaySyncInfo(ScreenHandler screenHandler) {
-        if (screenHandler == null)
+    private void updateOverlaySyncInfo(AbstractContainerMenu menu) {
+        if (menu == null)
             return;
 
         if (!overlayClickSyncIdField.isFocused())
-            overlayClickSyncIdField.setText(String.valueOf(screenHandler.syncId));
+            overlayClickSyncIdField.setValue(String.valueOf(menu.containerId));
         if (!overlayClickRevisionField.isFocused())
             overlayClickRevisionField
-                .setText(String.valueOf(screenHandler.getRevision()));
+                .setValue(String.valueOf(menu.getStateId()));
         if (!overlayButtonSyncIdField.isFocused())
-            overlayButtonSyncIdField.setText(String.valueOf(screenHandler.syncId));
+            overlayButtonSyncIdField.setValue(String.valueOf(menu.containerId));
     }
 
     @Unique
     private void sendClickSlot() {
-        if (!UiUtils.isInteger(overlayClickSyncIdField.getText())
-            || !UiUtils.isInteger(overlayClickRevisionField.getText())
-            || !UiUtils.isInteger(overlayClickSlotField.getText())
-            || !UiUtils.isInteger(overlayClickButtonField.getText())
-            || !UiUtils.isInteger(overlayClickTimesField.getText())) {
-            return;
-        }
-
-        Minecraft mc = Minecraft.getInstance();
-        int syncId = Integer.parseInt(overlayClickSyncIdField.getText());
-        short slot = Short.parseShort(overlayClickSlotField.getText());
-        byte button = Byte.parseByte(overlayClickButtonField.getText());
-        int timesToSend = Integer.parseInt(overlayClickTimesField.getText());
-        if (timesToSend < 1)
-            return;
-
-        SlotActionType action = overlayClickActionButton.getValue();
-        if (action == null)
-            return;
-
-        if (mc.getConnection() == null || mc.player == null)
-            return;
-
-        ScreenHandler screenHandler = mc.player.currentScreenHandler;
-        if (screenHandler == null)
-            return;
-
-        ClientPacketListener networkHandler = mc.getConnection();
-        net.minecraft.screen.sync.ComponentChangesHash.ComponentHasher hashGenerator =
-            networkHandler.getComponentHasher();
-
-        List<net.minecraft.item.ItemStack> beforeStacks =
-            new ArrayList<>(screenHandler.slots.size());
-        for (int i = 0; i < screenHandler.slots.size(); i++)
-            beforeStacks.add(screenHandler.slots.get(i).getStack().copy());
-        net.minecraft.item.ItemStack carriedBeforeStack =
-            screenHandler.getCursorStack().copy();
-
-        screenHandler.onSlotClick(slot, button, action, mc.player);
-
-        int revision = screenHandler.getRevision();
-
-        Int2ObjectMap<ItemStackHash> diffSlots = new Int2ObjectArrayMap<>();
-        for (int i = 0; i < screenHandler.slots.size(); i++) {
-            net.minecraft.item.ItemStack beforeStack =
-                beforeStacks.get(i);
-            net.minecraft.item.ItemStack afterStack =
-                screenHandler.slots.get(i).getStack();
-            boolean changed;
-            if (beforeStack.isEmpty() && afterStack.isEmpty())
-                changed = false;
-            else if (beforeStack.isEmpty() != afterStack.isEmpty())
-                changed = true;
-            else
-                changed = beforeStack.getItem() != afterStack.getItem()
-                    || beforeStack.getCount() != afterStack.getCount();
-            if (changed) {
-                diffSlots.put(i, ItemStackHash.fromItemStack(afterStack, hashGenerator));
-            }
-        }
-
-        ItemStackHash cursor =
-            ItemStackHash.fromItemStack(screenHandler.getCursorStack(), hashGenerator);
-        ItemStackHash carriedBefore =
-            ItemStackHash.fromItemStack(carriedBeforeStack, hashGenerator);
-
-        ClickSlotC2SPacket packet =
-            new ClickSlotC2SPacket(syncId, revision, slot, button,
-                action, diffSlots, cursor);
-
-        UiUtils.chatIfEnabled("ClickSlot: slot=" + slot + ", action=" + action
-            + ", diff=" + diffSlots.size());
-
-        Runnable toRun = UiUtils.getFabricatePacketRunnable(mc,
-            overlayClickDelayToggle.getValue(), packet);
-        for (int i = 0; i < timesToSend; i++)
-            toRun.run();
+        // TODO: Port sendClickSlot to 26.1.2 API — ServerboundContainerClickPacket constructor changed
+        // (now takes ContainerInput, HashedStack instead of ClickAction, Component).
+        // Component.fromItemStack and ComponentChangesHash.ComponentHasher no longer exist.
+        UiUtils.chatIfEnabled("ClickSlot: not yet ported to MC 26.1.2");
     }
 
     @Unique
     private void sendButtonClick() {
-        if (!UiUtils.isInteger(overlayButtonSyncIdField.getText())
-            || !UiUtils.isInteger(overlayButtonIdField.getText())
-            || !UiUtils.isInteger(overlayButtonTimesField.getText())) {
+        if (!UiUtils.isInteger(overlayButtonSyncIdField.getValue())
+            || !UiUtils.isInteger(overlayButtonIdField.getValue())
+            || !UiUtils.isInteger(overlayButtonTimesField.getValue())) {
             return;
         }
 
         Minecraft mc = Minecraft.getInstance();
-        int syncId = Integer.parseInt(overlayButtonSyncIdField.getText());
-        int buttonId = Integer.parseInt(overlayButtonIdField.getText());
-        int timesToSend = Integer.parseInt(overlayButtonTimesField.getText());
+        int syncId = Integer.parseInt(overlayButtonSyncIdField.getValue());
+        int buttonId = Integer.parseInt(overlayButtonIdField.getValue());
+        int timesToSend = Integer.parseInt(overlayButtonTimesField.getValue());
         if (timesToSend < 1)
             return;
 
-        ButtonClickC2SPacket packet =
-            new ButtonClickC2SPacket(syncId, buttonId);
+        ServerboundContainerButtonClickPacket packet =
+            new ServerboundContainerButtonClickPacket(syncId, buttonId);
 
         UiUtils.chatIfEnabled(
             "ButtonClick: buttonId=" + buttonId + ", times=" + timesToSend);

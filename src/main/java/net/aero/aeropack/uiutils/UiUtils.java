@@ -2,15 +2,15 @@ package net.aero.aeropack.uiutils;
 
 import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.text.Text;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,8 +20,8 @@ public final class UiUtils {
     public static int spamCount = 1;
     public static Packet<?> lastFabricatedPacket = null;
 
-    private static ButtonWidget spamButtonRef;
-    private static ButtonWidget queueButtonRef;
+    private static Button spamButtonRef;
+    private static Button queueButtonRef;
 
     private static int spamButtonX;
     private static int spamButtonY;
@@ -43,38 +43,38 @@ public final class UiUtils {
     }
 
     public static int addUiWidgets(Minecraft mc, int x, int startY, int spacing,
-                                   Consumer<ClickableWidget> addWidget) {
+                                   Consumer<AbstractWidget> addWidget) {
         int y = startY;
         int halfGap = 4;
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("Close without packet"),
+        addWidget.accept(Button.builder(
+            Component.literal("Close without packet"),
             b -> {
                 mc.setScreen(null);
                 UiUtils.chatIfEnabled("Closed screen without packet");
             }).dimensions(x, y, BTN_WIDTH, BTN_HEIGHT).build());
         y += BTN_HEIGHT + spacing;
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("Send packets: " + UiUtilsState.sendUiPackets),
+        addWidget.accept(Button.builder(
+            Component.literal("Send packets: " + UiUtilsState.sendUiPackets),
             b -> {
                 UiUtilsState.sendUiPackets = !UiUtilsState.sendUiPackets;
-                b.setMessage(Text.literal("Send packets: " + UiUtilsState.sendUiPackets));
+                b.setMessage(Component.literal("Send packets: " + UiUtilsState.sendUiPackets));
                 UiUtils.chatIfEnabled("sendUiPackets=" + UiUtilsState.sendUiPackets);
             }).dimensions(x, y, BTN_WIDTH, BTN_HEIGHT).build());
         y += BTN_HEIGHT + spacing;
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("Delay packets: " + UiUtilsState.delayUiPackets),
+        addWidget.accept(Button.builder(
+            Component.literal("Delay packets: " + UiUtilsState.delayUiPackets),
             b -> {
                 UiUtilsState.delayUiPackets = !UiUtilsState.delayUiPackets;
-                b.setMessage(Text.literal("Delay packets: " + UiUtilsState.delayUiPackets));
+                b.setMessage(Component.literal("Delay packets: " + UiUtilsState.delayUiPackets));
                 UiUtils.chatIfEnabled("delayUiPackets=" + UiUtilsState.delayUiPackets);
             }).dimensions(x, y, BTN_WIDTH, BTN_HEIGHT).build());
         y += BTN_HEIGHT + spacing;
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("Leave & send packets"),
+        addWidget.accept(Button.builder(
+            Component.literal("Leave & send packets"),
             b -> {
                 sendDelayedPackets();
                 mc.setScreen(null);
@@ -82,27 +82,27 @@ public final class UiUtils {
             }).dimensions(x, y, BTN_WIDTH, BTN_HEIGHT).build());
         y += BTN_HEIGHT + spacing;
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("Disconnect & send packets"),
+        addWidget.accept(Button.builder(
+            Component.literal("Disconnect & send packets"),
             b -> {
                 sendDelayedPackets();
                 if (mc.getConnection() != null)
                     mc.getConnection().getConnection().disconnect(
-                        Text.literal("Disconnecting (UI-UTILS)"));
+                        Component.literal("Disconnecting (UI-UTILS)"));
                 UiUtils.chatIfEnabled("Disconnected and sent delayed packets");
             }).dimensions(x, y, BTN_WIDTH, BTN_HEIGHT).build());
         y += BTN_HEIGHT + spacing;
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("Fabricate packet"),
+        addWidget.accept(Button.builder(
+            Component.literal("Fabricate packet"),
             b -> {
                 UiUtilsState.fabricateOverlayOpen = !UiUtilsState.fabricateOverlayOpen;
                 UiUtils.chatIfEnabled("Fabricate overlay: " + UiUtilsState.fabricateOverlayOpen);
             }).dimensions(x, y, BTN_WIDTH, BTN_HEIGHT).build());
         y += BTN_HEIGHT + spacing;
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("Copy GUI Title JSON"),
+        addWidget.accept(Button.builder(
+            Component.literal("Copy GUI Title JSON"),
             b -> {
                 if (mc.currentScreen != null) {
                     String title = mc.currentScreen.getTitle().getString();
@@ -112,28 +112,28 @@ public final class UiUtils {
             }).dimensions(x, y, BTN_WIDTH, BTN_HEIGHT).build());
         y += BTN_HEIGHT + spacing;
 
-        ButtonWidget queueBtn = ButtonWidget.builder(
-            Text.literal("Queue: " + UiUtilsState.delayedUiPackets.size()),
+        Button queueBtn = Button.builder(
+            Component.literal("Queue: " + UiUtilsState.delayedUiPackets.size()),
             b -> {}).dimensions(x + HALF_BTN_WIDTH + halfGap, y, HALF_BTN_WIDTH, BTN_HEIGHT).build();
         queueButtonRef = queueBtn;
         queueButtonX = x + HALF_BTN_WIDTH + halfGap;
         queueButtonY = y;
         queueButtonWidth = HALF_BTN_WIDTH;
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("Clear Queue"),
+        addWidget.accept(Button.builder(
+            Component.literal("Clear Queue"),
             b -> {
                 int count = UiUtilsState.delayedUiPackets.size();
                 UiUtilsState.delayedUiPackets.clear();
-                queueBtn.setMessage(Text.literal("Queue: 0"));
+                queueBtn.setMessage(Component.literal("Queue: 0"));
                 UiUtils.chatIfEnabled("Cleared " + count + " queued packets");
             }).dimensions(x, y, HALF_BTN_WIDTH, BTN_HEIGHT).build());
 
         addWidget.accept(queueBtn);
         y += BTN_HEIGHT + spacing;
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("Resync Inv"),
+        addWidget.accept(Button.builder(
+            Component.literal("Resync Inv"),
             b -> {
                 if (mc.player != null && mc.getConnection() != null) {
                     mc.player.currentScreenHandler = mc.player.playerScreenHandler;
@@ -142,12 +142,12 @@ public final class UiUtils {
                 }
             }).dimensions(x, y, HALF_BTN_WIDTH, BTN_HEIGHT).build());
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("Disconnect"),
+        addWidget.accept(Button.builder(
+            Component.literal("Disconnect"),
             b -> {
                 if (mc.getConnection() != null) {
                     mc.getConnection().getConnection().disconnect(
-                        Text.literal("Disconnecting (UI-UTILS)"));
+                        Component.literal("Disconnecting (UI-UTILS)"));
                     UiUtils.chatIfEnabled("Disconnected");
                 }
             }).dimensions(x + HALF_BTN_WIDTH + halfGap, y, HALF_BTN_WIDTH, BTN_HEIGHT).build());
@@ -158,8 +158,8 @@ public final class UiUtils {
         int plusWidth = 20;
         int spamBtnWidth = spamTotalWidth - minusWidth - halfGap - plusWidth - halfGap;
 
-        ButtonWidget localSpamButton = ButtonWidget.builder(
-            Text.literal("Spam (x" + spamCount + ")"),
+        Button localSpamButton = Button.builder(
+            Component.literal("Spam (x" + spamCount + ")"),
             b -> {
                 for (int i = 0; i < spamCount; i++) {
                     if (lastFabricatedPacket != null) {
@@ -175,55 +175,55 @@ public final class UiUtils {
                     }
                 }
                 if (UiUtilsState.delayUiPackets) {
-                    queueBtn.setMessage(Text.literal("Queue: " + UiUtilsState.delayedUiPackets.size()));
+                    queueBtn.setMessage(Component.literal("Queue: " + UiUtilsState.delayedUiPackets.size()));
                 }
                 UiUtils.chatIfEnabled("Spammed " + spamCount + " packets");
             }).dimensions(x + minusWidth + halfGap, y, spamBtnWidth, BTN_HEIGHT).build();
-        final ButtonWidget spamBtn = localSpamButton;
+        final Button spamBtn = localSpamButton;
         spamButtonRef = spamBtn;
         spamButtonX = x + minusWidth + halfGap;
         spamButtonY = y;
         spamButtonWidth = spamBtnWidth;
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("-"),
+        addWidget.accept(Button.builder(
+            Component.literal("-"),
             b -> {
                 spamCount = Math.max(1, spamCount - 1);
-                spamBtn.setMessage(Text.literal("Spam (x" + spamCount + ")"));
+                spamBtn.setMessage(Component.literal("Spam (x" + spamCount + ")"));
                 UiUtils.chatIfEnabled("Spam count: " + spamCount);
             }).dimensions(x, y, minusWidth, BTN_HEIGHT).build());
 
         addWidget.accept(spamBtn);
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("+"),
+        addWidget.accept(Button.builder(
+            Component.literal("+"),
             b -> {
                 spamCount = Math.min(64, spamCount + 1);
-                spamBtn.setMessage(Text.literal("Spam (x" + spamCount + ")"));
+                spamBtn.setMessage(Component.literal("Spam (x" + spamCount + ")"));
                 UiUtils.chatIfEnabled("Spam count: " + spamCount);
             }).dimensions(x + minusWidth + halfGap + spamBtnWidth + halfGap, y, plusWidth, BTN_HEIGHT).build());
         y += BTN_HEIGHT + spacing;
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("Send One"),
+        addWidget.accept(Button.builder(
+            Component.literal("Send One"),
             b -> {
                 if (!UiUtilsState.delayedUiPackets.isEmpty()) {
                     Packet<?> pkt = UiUtilsState.delayedUiPackets.remove(0);
                     sendPacket(pkt);
-                    queueBtn.setMessage(Text.literal("Queue: " + UiUtilsState.delayedUiPackets.size()));
+                    queueBtn.setMessage(Component.literal("Queue: " + UiUtilsState.delayedUiPackets.size()));
                     UiUtils.chatIfEnabled("Sent 1 packet, " + UiUtilsState.delayedUiPackets.size() + " remaining");
                 } else {
                     UiUtils.chatIfEnabled("Queue is empty");
                 }
             }).dimensions(x, y, HALF_BTN_WIDTH, BTN_HEIGHT).build());
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("Pop Last"),
+        addWidget.accept(Button.builder(
+            Component.literal("Pop Last"),
             b -> {
                 if (!UiUtilsState.delayedUiPackets.isEmpty()) {
                     UiUtilsState.delayedUiPackets.remove(
                         UiUtilsState.delayedUiPackets.size() - 1);
-                    queueBtn.setMessage(Text.literal("Queue: " + UiUtilsState.delayedUiPackets.size()));
+                    queueBtn.setMessage(Component.literal("Queue: " + UiUtilsState.delayedUiPackets.size()));
                     UiUtils.chatIfEnabled("Popped last, " + UiUtilsState.delayedUiPackets.size() + " remaining");
                 } else {
                     UiUtils.chatIfEnabled("Queue is empty");
@@ -231,8 +231,8 @@ public final class UiUtils {
             }).dimensions(x + HALF_BTN_WIDTH + halfGap, y, HALF_BTN_WIDTH, BTN_HEIGHT).build());
         y += BTN_HEIGHT + spacing;
 
-        addWidget.accept(ButtonWidget.builder(
-            Text.literal("How to Use"),
+        addWidget.accept(Button.builder(
+            Component.literal("How to Use"),
             b -> {
                 Minecraft.getInstance().setScreen(
                     new net.aero.aeropack.gui.screens.UiUtilsDocumentationScreen(
@@ -243,9 +243,9 @@ public final class UiUtils {
         return y;
     }
 
-    public static TextFieldWidget createChatField(Minecraft mc, TextRenderer textRenderer,
+    public static EditBox createChatField(Minecraft mc, Font Font,
                                                    int x, int y) {
-        TextFieldWidget field = new TextFieldWidget(textRenderer, x, y, 200, 20, Text.literal("")) {
+        EditBox field = new EditBox(Font, x, y, 200, 20, Component.literal("")) {
             @Override
             public void setFocused(boolean focused) {
                 super.setFocused(focused);
@@ -254,9 +254,9 @@ public final class UiUtils {
             }
 
             @Override
-            public void setText(String text) {
-                super.setText(text);
-                if (isFocused() || !text.isEmpty()) setSuggestion(null);
+            public void setText(String Component) {
+                super.setText(Component);
+                if (isFocused() || !Component.isEmpty()) setSuggestion(null);
                 else setSuggestion("Chat ...");
             }
         };
@@ -264,13 +264,13 @@ public final class UiUtils {
         return field;
     }
 
-    public static void renderSyncInfo(Minecraft mc, DrawContext graphics,
-                                      ScreenHandler screenHandler) {
-        if (screenHandler == null) return;
-        TextRenderer textRenderer = mc.font;
-        String info = "SyncID: " + screenHandler.syncId + " Rev: " + screenHandler.getRevision()
-                + " Slots: " + screenHandler.slots.size();
-        graphics.drawTextWithShadow(textRenderer, info, 4, 4, 0xFFFFFF);
+    public static void renderSyncInfo(Minecraft mc, GuiGraphicsExtractor graphics,
+                                      AbstractContainerMenu AbstractContainerMenu) {
+        if (AbstractContainerMenu == null) return;
+        Font Font = mc.font;
+        String info = "SyncID: " + AbstractContainerMenu.syncId + " Rev: " + AbstractContainerMenu.getRevision()
+                + " Slots: " + AbstractContainerMenu.slots.size();
+        graphics.drawTextWithShadow(Font, info, 4, 4, 0xFFFFFF);
     }
 
     public static void chatIfEnabled(String message) {
@@ -280,7 +280,7 @@ public final class UiUtils {
                 var mod = meteordevelopment.meteorclient.systems.modules.Modules.get().get(
                     net.aero.aeropack.modules.misc.UiUtilsMod.class);
                 if (mod != null && mod.isLogToChat()) {
-                    mc.player.sendMessage(Text.literal("[UI-Utils] " + message), false);
+                    mc.player.sendSystemMessage(Component.literal("[UI-Utils] " + message));
                 }
             } catch (Throwable ignored) {
             }
@@ -289,14 +289,14 @@ public final class UiUtils {
 
     public static void refreshLabels() {
         if (spamButtonRef != null) {
-            spamButtonRef.setMessage(Text.literal("Spam (x" + spamCount + ")"));
+            spamButtonRef.setMessage(Component.literal("Spam (x" + spamCount + ")"));
         }
         if (queueButtonRef != null) {
-            queueButtonRef.setMessage(Text.literal("Queue: " + UiUtilsState.delayedUiPackets.size()));
+            queueButtonRef.setMessage(Component.literal("Queue: " + UiUtilsState.delayedUiPackets.size()));
         }
     }
 
-    public static void renderLabels(DrawContext graphics, TextRenderer textRenderer) {
+    public static void renderLabels(GuiGraphicsExtractor graphics, Font Font) {
     }
 
     public static boolean isInteger(String str) {

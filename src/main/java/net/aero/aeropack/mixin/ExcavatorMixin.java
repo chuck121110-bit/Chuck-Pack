@@ -18,8 +18,8 @@ import meteordevelopment.meteorclient.utils.render.MeshBuilderVertexConsumerProv
 import meteordevelopment.meteorclient.utils.render.SimpleBlockRenderer;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.postprocess.PostProcessShaders;
-import net.minecraft.block.BlockState;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.core.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -45,7 +45,7 @@ public abstract class ExcavatorMixin implements AeroShaderSource {
     private void aeropack$addShaderSettings(CallbackInfo ci) {
         aeropack$renderMode = sgRendering.add(new EnumSetting.Builder<AeroRenderMode>()
             .name("aeropack-render-mode")
-            .description("Box ESP draws a normal box outline. Shader uses the same post-process outline shader as Storage ESP.")
+            .description("AABB ESP draws a normal AABB outline. Shader uses the same post-process outline shader as Storage ESP.")
             .defaultValue(AeroRenderMode.BoxESP)
             .build()
         );
@@ -60,7 +60,7 @@ public abstract class ExcavatorMixin implements AeroShaderSource {
         method = "onRender3D",
         at = @At(
             value = "INVOKE",
-            target = "Lmeteordevelopment/meteorclient/renderer/Renderer3D;box(Lnet/minecraft/util/math/BlockPos;Lmeteordevelopment/meteorclient/utils/render/color/Color;Lmeteordevelopment/meteorclient/utils/render/color/Color;Lmeteordevelopment/meteorclient/renderer/ShapeMode;I)V"
+            target = "Lmeteordevelopment/meteorclient/renderer/Renderer3D;AABB(Lnet/minecraft/util/math/BlockPos;Lmeteordevelopment/meteorclient/utils/render/color/Color;Lmeteordevelopment/meteorclient/utils/render/color/Color;Lmeteordevelopment/meteorclient/renderer/ShapeMode;I)V"
         )
     )
     private void aeropack$redirectBox(Renderer3D renderer, BlockPos pos, Color side, Color line, ShapeMode shapeMode, int excludeDir) {

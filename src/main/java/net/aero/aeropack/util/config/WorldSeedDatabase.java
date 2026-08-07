@@ -1,8 +1,8 @@
 package net.aero.aeropack.util.config;
 
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.ListTag;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,19 +22,19 @@ public class WorldSeedDatabase {
             this.seed = seed != null ? seed : "0";
         }
 
-        public NbtCompound toTag() {
-            NbtCompound tag = new NbtCompound();
+        public CompoundTag toTag() {
+            CompoundTag tag = new CompoundTag();
             tag.putString("address", address);
             tag.putString("worldName", worldName);
             tag.putString("seed", seed);
             return tag;
         }
 
-        public static SeedEntry fromTag(NbtCompound tag) {
+        public static SeedEntry fromTag(CompoundTag tag) {
             return new SeedEntry(
-                tag.getString("address", ""),
-                tag.getString("worldName", ""),
-                tag.getString("seed", "0")
+                tag.getStringOr("address", ""),
+                tag.getStringOr("worldName", ""),
+                tag.getStringOr("seed", "0")
             );
         }
 
@@ -45,12 +45,12 @@ public class WorldSeedDatabase {
     }
 
     public static List<SeedEntry> load() {
-        NbtCompound data = AeroConfig.load(FOLDER, FILE);
+        CompoundTag data = AeroConfig.load(FOLDER, FILE);
         List<SeedEntry> entries = new ArrayList<>();
-        NbtList list = data.getListOrEmpty("entries");
+        ListTag list = data.getListOrEmpty("entries");
         for (int i = 0; i < list.size(); i++) {
-            NbtElement element = list.get(i);
-            if (element instanceof NbtCompound compound) {
+            Tag element = list.get(i);
+            if (element instanceof CompoundTag compound) {
                 entries.add(SeedEntry.fromTag(compound));
             }
         }
@@ -58,8 +58,8 @@ public class WorldSeedDatabase {
     }
 
     public static void save(List<SeedEntry> entries) {
-        NbtCompound data = new NbtCompound();
-        NbtList list = new NbtList();
+        CompoundTag data = new CompoundTag();
+        ListTag list = new ListTag();
         for (SeedEntry entry : entries) {
             list.add(entry.toTag());
         }

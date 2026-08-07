@@ -27,7 +27,7 @@ public class EditSeedEntryScreen extends WindowScreen {
         WTextBox addressBox = table.add(theme.textBox(entry.address)).expandX().widget();
         table.row();
 
-        table.add(theme.label("World Name:"));
+        table.add(theme.label("Level Name:"));
         WTextBox worldBox = table.add(theme.textBox(entry.worldName)).expandX().widget();
         table.row();
 
@@ -44,7 +44,7 @@ public class EditSeedEntryScreen extends WindowScreen {
             entry.worldName = worldBox.get();
             entry.seed = seedBox.get();
             onComplete.run();
-            close();
+            minecraft.setScreen(null);
         };
     }
 }

@@ -3,7 +3,6 @@ package net.aero.aeropack.pathfinding;
 import java.util.ArrayList;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.movement.Flight;
-import meteordevelopment.meteorclient.utils.player.RotationUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.util.Mth;
@@ -72,8 +71,8 @@ public class FlyPathProcessor extends PathProcessor
 		if(horizontal)
 		{
 			facePosition(nextPos);
-			if(Math.abs(Mth.wrapDegrees(RotationUtils
-				.getHorizontalAngleToLookVec(Vec3.atCenterOf(nextPos)))) > 1)
+			// TODO: RotationUtils removed in Meteor 26.1 — use MC look angle calculation instead
+			if(Math.abs(Mth.wrapDegrees(net.minecraft.client.Minecraft.getInstance().player.getYRot() - (float) Math.toDegrees(Math.atan2(nextPos.getX() - pos.getX(), nextPos.getZ() - pos.getZ())))) > 1)
 				return;
 		}
 		

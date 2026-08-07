@@ -12,13 +12,13 @@ import meteordevelopment.meteorclient.utils.entity.Target;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.meteorclient.utils.player.Rotations;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.CreeperEntity;
-import net.minecraft.entity.mob.Monster;
-import net.minecraft.entity.ai.RangedAttackMob;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.Hand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.monster.RangedAttackMob;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.InteractionHand;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -108,7 +108,7 @@ public class SwarmGuard extends Module {
     public boolean active = false;
     public int workerId = 0;
 
-    private PlayerEntity retaliationTarget = null;
+    private Player retaliationTarget = null;
     private int retaliationTicks = 0;
     private static final int RETALIATION_MAX_TICKS = 300;
 
@@ -147,7 +147,7 @@ public class SwarmGuard extends Module {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
             if (mc.getConnection() != null) {
-                mc.player.networkHandler.sendChatMessage("#cancel");
+                mc.player.connection.sendChat("#cancel");
             }
             if (PathManagers.get().isPathing()) {
                 PathManagers.get().stop();
@@ -248,7 +248,7 @@ public class SwarmGuard extends Module {
 
         tickCounter++;
 
-        PlayerEntity host = findHost(mc);
+        Player host = findHost(mc);
         if (host == null) return;
 
         detectAndSetRetaliation(mc, host);
@@ -275,7 +275,7 @@ public class SwarmGuard extends Module {
         } else if (hostFightTarget != null) {
             lastFollowedHostName = null;
             attackTarget(mc, hostFightTarget, host);
-        } else if (threat != null && threat instanceof LivingEntity livingThreat && !livingThreat.isDead()) {
+        } else if (threat != null && threat instanceof LivingEntity livingThreat && !livingThreat.isRemoved()) {
             lastFollowedHostName = null;
             attackTarget(mc, threat, host);
         } else {
@@ -283,16 +283,16 @@ public class SwarmGuard extends Module {
         }
     }
 
-    private Entity detectHostFightTarget(Minecraft mc, PlayerEntity host) {
+    private Entity detectHostFightTarget(Minecraft mc, Player host) {
         Entity best = null;
         double closestDist = 4.0;
 
-        for (Entity entity : mc.level.getEntities()) {
+        for (Entity entity : mc.level.players()) {
             if (entity == host || entity == mc.player) continue;
-            if (!(entity instanceof LivingEntity living) || living.isDead() || !living.isAlive()) continue;
+            if (!(entity instanceof LivingEntity living) || living.isRemoved() || !living.isAlive()) continue;
             if (living.hurtTime <= 0) continue;
 
-            if (entity instanceof PlayerEntity p) {
+            if (entity instanceof Player p) {
                 if (Friends.get().isFriend(p)) continue;
             }
 
@@ -306,20 +306,20 @@ public class SwarmGuard extends Module {
         return best;
     }
 
-    private void attackTarget(Minecraft mc, Entity target, PlayerEntity host) {
+    private void attackTarget(Minecraft mc, Entity target, Player host) {
         if (target == host) return;
         if (PathManagers.get().isPathing() && tickCounter % 10 != 0) return;
 
         double distToTarget = mc.player.distanceTo(target);
 
         if (distToTarget <= 3.5) {
-            if (mc.player.getAttackCooldownProgress(0.5f) >= 1.0f) {
+            if (mc.player.getAttackStrengthScale(0.5f) >= 1.0f) {
                 Rotations.rotate(
                     Rotations.getYaw(target),
                     Rotations.getPitch(target, Target.Body)
                 );
-                mc.gameMode.attackEntity(mc.player, target);
-                mc.player.swingHand(Hand.MAIN_HAND);
+                mc.gameMode.attack(mc.player, target);
+                mc.player.swing(InteractionHand.MAIN_HAND);
             }
         } else {
             if (tickCounter % 10 == 0) {
@@ -328,8 +328,8 @@ public class SwarmGuard extends Module {
         }
     }
 
-    private void detectAndSetRetaliation(Minecraft mc, PlayerEntity host) {
-        PlayerEntity attacker = detectAttacker(mc, mc.player);
+    private void detectAndSetRetaliation(Minecraft mc, Player host) {
+        Player attacker = detectAttacker(mc, mc.player);
         if (attacker != null && !Friends.get().isFriend(attacker) && attacker != host) {
             setRetaliationTarget(attacker);
             return;
@@ -341,14 +341,14 @@ public class SwarmGuard extends Module {
         }
     }
 
-    private PlayerEntity detectAttacker(Minecraft mc, PlayerEntity target) {
+    private Player detectAttacker(Minecraft mc, Player target) {
         if (target.hurtTime > 0) {
-            LivingEntity lastAttacker = target.getAttacker();
-            if (lastAttacker instanceof PlayerEntity player) return player;
+            LivingEntity lastAttacker = target.getLastAttacker();
+            if (lastAttacker instanceof Player player) return player;
 
             double closestDist = Double.MAX_VALUE;
-            PlayerEntity closest = null;
-            for (PlayerEntity p : mc.level.getPlayers()) {
+            Player closest = null;
+            for (Player p : mc.level.players()) {
                 if (p == target || p == mc.player) continue;
                 double dist = p.distanceTo(target);
                 if (dist < 3.5 && dist < closestDist) {
@@ -356,12 +356,12 @@ public class SwarmGuard extends Module {
                     closest = p;
                 }
             }
-            if (closest != null && closest.getAttackCooldownProgress(0.5f) < 0.3f) return closest;
+            if (closest != null && closest.getAttackStrengthScale(0.5f) < 0.3f) return closest;
         }
         return null;
     }
 
-    private void setRetaliationTarget(PlayerEntity player) {
+    private void setRetaliationTarget(Player player) {
         retaliationTarget = player;
         retaliationTicks = 0;
     }
@@ -369,7 +369,7 @@ public class SwarmGuard extends Module {
     public void applyRetaliation(String attackerName) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
-        for (PlayerEntity p : mc.level.getPlayers()) {
+        for (Player p : mc.level.players()) {
             if (p.getName().getString().equalsIgnoreCase(attackerName)) {
                 setRetaliationTarget(p);
                 return;
@@ -378,11 +378,11 @@ public class SwarmGuard extends Module {
         retaliationTicks = 0;
     }
 
-    private PlayerEntity findHost(Minecraft mc) {
+    private Player findHost(Minecraft mc) {
         if (hostPlayerName == null || hostPlayerName.isEmpty()) return null;
         String safe = hostPlayerName.replaceAll("\u00a7.", "");
 
-        for (PlayerEntity player : mc.level.getPlayers()) {
+        for (Player player : mc.level.players()) {
             if (player == mc.player) continue;
             if (player.getName().getString().replaceAll("\u00a7.", "").equalsIgnoreCase(safe)) return player;
         }
@@ -395,7 +395,7 @@ public class SwarmGuard extends Module {
 
     private double getThreatScore(Entity entity, double distFromHost) {
         double base;
-        if (entity instanceof CreeperEntity) {
+        if (entity instanceof Creeper) {
             base = 95;
         } else if (isRangedThreat(entity)) {
             base = distFromHost <= 16.0 ? 110 : 85;
@@ -408,14 +408,14 @@ public class SwarmGuard extends Module {
         return base / Math.max(distFromHost, 0.5);
     }
 
-    private Entity findHighestThreat(Minecraft mc, PlayerEntity host) {
+    private Entity findHighestThreat(Minecraft mc, Player host) {
         Entity best = null;
         double bestScore = Double.NEGATIVE_INFINITY;
 
-        for (Entity entity : mc.level.getEntities()) {
+        for (Entity entity : mc.level.players()) {
             if (entity == mc.player) continue;
             if (entity == host) continue;
-            if (!(entity instanceof LivingEntity living) || living.isDead() || !living.isAlive()) continue;
+            if (!(entity instanceof LivingEntity living) || living.isRemoved() || !living.isAlive()) continue;
             if (!(entity instanceof Monster) && !isRangedThreat(entity)) continue;
 
             boolean ranged = isRangedThreat(entity);
@@ -440,11 +440,11 @@ public class SwarmGuard extends Module {
 
     private String lastFollowedHostName = null;
 
-    private void followHost(Minecraft mc, PlayerEntity host) {
+    private void followHost(Minecraft mc, Player host) {
         String hostName = host.getName().getString();
         if (!hostName.equals(lastFollowedHostName)) {
             if (mc.player != null && mc.getConnection() != null) {
-                mc.player.networkHandler.sendChatMessage("#follow player " + hostName);
+                mc.player.connection.sendChat("#follow player " + hostName);
             }
             lastFollowedHostName = hostName;
         }

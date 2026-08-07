@@ -45,7 +45,7 @@ public class KeybindsHud extends HudElement {
 
     private final Setting<Boolean> shadow = sgGeneral.add(new BoolSetting.Builder()
             .name("shadow")
-            .description("Renders shadow behind text.")
+            .description("Renders shadow behind Component.")
             .defaultValue(true)
             .build()
     );
@@ -100,14 +100,14 @@ public class KeybindsHud extends HudElement {
 
     private final Setting<Boolean> colorKeybind = sgColors.add(new BoolSetting.Builder()
             .name("color-keybind")
-            .description("Color the keybind text separately.")
+            .description("Color the keybind Component separately.")
             .defaultValue(false)
             .build()
     );
 
     private final Setting<SettingColor> keybindColor = sgColors.add(new ColorSetting.Builder()
             .name("keybind-color")
-            .description("Color for keybind text when color-keybind is enabled.")
+            .description("Color for keybind Component when color-keybind is enabled.")
             .defaultValue(new SettingColor(175, 175, 175))
             .visible(colorKeybind::get)
             .build()

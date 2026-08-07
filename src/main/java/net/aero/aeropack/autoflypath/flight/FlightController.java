@@ -30,49 +30,50 @@ import net.minecraft.client.multiplayer.ClientChunkCache;
 
 import net.minecraft.client.multiplayer.ClientLevel;
 
-import net.minecraft.client.network.ServerInfo;
+import net.minecraft.client.multiplayer.ServerData;
 
 import net.minecraft.client.player.LocalPlayer;
 
-import net.minecraft.server.integrated.IntegratedServer;
+import net.minecraft.client.server.IntegratedServer;
 
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
-import net.minecraft.util.math.Vec3i;
+import net.minecraft.core.Vec3i;
 
-import net.minecraft.registry.Registries;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
-import net.minecraft.registry.RegistryKey;
+import net.minecraft.resources.ResourceKey;
 
 import net.minecraft.server.level.ServerLevel;
 
-import net.minecraft.entity.Entity;
+import net.minecraft.world.entity.Entity;
 
 import net.minecraft.world.entity.player.Abilities;
 
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.level.ChunkPos;
 
-import net.minecraft.world.RaycastContext;
+import net.minecraft.world.level.ClipContext;
 
-import net.minecraft.world.World;
+import net.minecraft.world.level.Level;
 
-import net.minecraft.world.biome.Biome;
+import net.minecraft.world.level.biome.Biome;
 
-import net.minecraft.block.Blocks;
+import net.minecraft.world.level.block.Blocks;
 
-import net.minecraft.block.BlockState;
+import net.minecraft.world.level.block.state.BlockState;
 
 import net.minecraft.world.level.chunk.LevelChunk;
 
-import net.minecraft.world.Heightmap;
+import net.minecraft.world.level.levelgen.Heightmap;
 
-import net.minecraft.util.math.Box;
+import net.minecraft.world.phys.AABB;
 
-import net.minecraft.util.hit.HitResult;
+import net.minecraft.world.phys.HitResult;
 
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.phys.Vec3;
 
 public final class FlightController
 
@@ -136,9 +137,9 @@ public final class FlightController
 
 	private final PathFlightConfig config;
 
-	private final BlockPos.Mutable scratch =
+	private final BlockPos.MutableBlockPos scratch =
 
-		new BlockPos.Mutable();
+		new BlockPos.MutableBlockPos();
 
 
 	private static long longHash(int x, int z) {
@@ -169,7 +170,7 @@ public final class FlightController
 
 	private List<BetterBlockPos> visiblePath = Collections.emptyList();
 
-	private Vec3d lastPos;
+	private Vec3 lastPos;
 
 	private int ticksSinceProgress;
 
@@ -205,7 +206,7 @@ public final class FlightController
 
 	private int hardRecoveryTicks;
 
-	private Vec3d recoveryDir = new Vec3d(0.0, 1.0, 0.0);
+	private Vec3 recoveryDir = new Vec3(0.0, 1.0, 0.0);
 
 	private boolean recoveryHover;
 
@@ -245,7 +246,7 @@ public final class FlightController
 
 	private double lastYForFall = Double.NaN;
 
-	private Vec3d lastCommandedVel = Vec3d.ZERO;
+	private Vec3 lastCommandedVel = Vec3.ZERO;
 
 	private boolean debugWasOnFire;
 
@@ -257,7 +258,7 @@ public final class FlightController
 
 	private boolean commandedThisTick;
 
-	private Vec3d freezeProbePos;
+	private Vec3 freezeProbePos;
 
 	private int freezeTicks;
 
@@ -281,7 +282,7 @@ public final class FlightController
 
 	private double detourStartBest;
 
-	private Vec3d lastEscapeDir;
+	private Vec3 lastEscapeDir;
 
 	private int governorBlockedTicks;
 
@@ -297,7 +298,7 @@ public final class FlightController
 
 	private final ArrayList<double[]> noGoZones = new ArrayList();
 
-	private RegistryKey<World> noGoDimension;
+	private ResourceKey<Level> noGoDimension;
 
 	private final ArrayDeque<String> debugTrail = new ArrayDeque();
 
@@ -309,7 +310,7 @@ public final class FlightController
 
 	private double debugGovScale = 1.0;
 
-	private Vec3d debugPrevPos = null;
+	private Vec3 debugPrevPos = null;
 
 	private static final double[] AIM_LATERAL_MARGINS = new double[]{0.15, 0.0};
 
@@ -357,21 +358,21 @@ public final class FlightController
 
 	
 
-	private Vec3d feetVec()
+	private Vec3 feetVec()
 
 	{
 
-		return this.player().getEntityPos();
+		return this.player().position();
 
 	}
 
 	
 
-	private Vec3d head()
+	private Vec3 head()
 
 	{
 
-		return this.player().getEyePos();
+		return this.player().getEyePosition();
 
 	}
 
@@ -399,9 +400,9 @@ public final class FlightController
 
 		{
 
-			this.player().sendMessage(
+			this.player().sendSystemMessage(
 
-				Text.literal((String)message), false);
+				Component.literal((String)message));
 
 		}
 
@@ -413,9 +414,9 @@ public final class FlightController
 
 	{
 
-		return state.isOf(Blocks.LAVA) || state.isOf(Blocks.FIRE)
+		return state.is(Blocks.LAVA) || state.is(Blocks.FIRE)
 
-			|| state.isOf(Blocks.SOUL_FIRE);
+			|| state.is(Blocks.SOUL_FIRE);
 
 	}
 
@@ -459,7 +460,7 @@ public final class FlightController
 
 			Abilities abilities = p.getAbilities();
 
-			return abilities.allowFlying || abilities.flying;
+			return abilities.mayfly || abilities.flying;
 
 		}
 
@@ -562,7 +563,7 @@ public final class FlightController
 
 		boolean bl = overworld =
 
-			this.level() != null && this.level().dimension() == World.OVERWORLD;
+			this.level() != null && this.level().dimension() == Level.OVERWORLD;
 
 		if(!overworld)
 
@@ -628,9 +629,9 @@ public final class FlightController
 
 		}
 
-		int min = this.level().getMinBuildHeight() + 2;
+		int min = this.level().getMinY() + 2;
 
-		int max = this.level().getMinBuildHeight() + this.level().getHeight() - 2;
+		int max = this.level().getMinY() + this.level().getHeight() - 2;
 
 		return Math.max(min, Math.min(max, base));
 
@@ -642,9 +643,9 @@ public final class FlightController
 
 	{
 
-		return this.level() != null && this.level().getChunkManager()
+		return this.level() != null && this.level().getChunkSource()
 
-			.getChunk(blockX >> 4, blockZ >> 4) != null;
+			.getChunk(blockX >> 4, blockZ >> 4, false) != null;
 
 	}
 
@@ -662,7 +663,7 @@ public final class FlightController
 
 		}
 
-		return Math.max(VOID_FLOOR, this.level().getTopY(Heightmap.Type.MOTION_BLOCKING, x, z));
+		return Math.max(VOID_FLOOR, this.level().getHeight(Heightmap.Types.MOTION_BLOCKING, x, z));
 
 	}
 
@@ -764,7 +765,7 @@ public final class FlightController
 
 	
 
-	private double progressDistance(Vec3d playerPos)
+	private double progressDistance(Vec3 playerPos)
 
 	{
 
@@ -780,7 +781,7 @@ public final class FlightController
 
 		}
 
-		return playerPos.distanceTo(Vec3d.ofCenter((Vec3i)this.destination));
+		return playerPos.distanceTo(Vec3.atCenterOf((Vec3i)this.destination));
 
 	}
 
@@ -802,7 +803,7 @@ public final class FlightController
 
 	
 
-	public Vec3d validateMoveTime(Vec3d movement)
+	public Vec3 validateMoveTime(Vec3 movement)
 
 	{
 
@@ -856,7 +857,7 @@ public final class FlightController
 
 		this.lastMoveNote = "clamped";
 
-		Vec3d clamped = movement.multiply(Math.max(0.0, hit) / len);
+		Vec3 clamped = movement.scale(Math.max(0.0, hit) / len);
 
 		if(this.config.flightDebug && this.moveClampLogCooldown == 0)
 
@@ -864,7 +865,7 @@ public final class FlightController
 
 			this.moveClampLogCooldown = 20;
 
-			Vec3d cmd = this.lastCommandedVel;
+			Vec3 cmd = this.lastCommandedVel;
 
 			this.log(String.format(Locale.ROOT,
 
@@ -942,9 +943,9 @@ public final class FlightController
 
 			{
 
-				this.player().setDeltaMovement(Vec3d.ZERO);
+				this.player().setDeltaMovement(Vec3.ZERO);
 
-				this.lastCommandedVel = Vec3d.ZERO;
+				this.lastCommandedVel = Vec3.ZERO;
 
 			}
 
@@ -964,7 +965,7 @@ public final class FlightController
 
 			if(this.player() != null)
 
-				this.player().setDeltaMovement(Vec3d.ZERO);
+				this.player().setDeltaMovement(Vec3.ZERO);
 
 		}
 
@@ -1072,7 +1073,7 @@ public final class FlightController
 
 	
 
-	private void escalateDetour(Vec3d playerPos)
+	private void escalateDetour(Vec3 playerPos)
 
 	{
 
@@ -1084,7 +1085,7 @@ public final class FlightController
 
 		}
 
-		Vec3d destC = Vec3d.ofCenter((Vec3i)this.destination);
+		Vec3 destC = Vec3.atCenterOf((Vec3i)this.destination);
 
 		double dx = destC.x - playerPos.x;
 
@@ -1108,13 +1109,13 @@ public final class FlightController
 
 			this.detourStartBest = this.globalBestDist;
 
-			Vec3d right = new Vec3d(-dz / h, 0.0, dx / h);
+			Vec3 right = new Vec3(-dz / h, 0.0, dx / h);
 
-			double rClear = this.sweptCollisionDistance(right.multiply(8.0), 8.0);
+			double rClear = this.sweptCollisionDistance(right.scale(8.0), 8.0);
 
 			this.detourSide = rClear >= (lClear =
 
-				this.sweptCollisionDistance(right.multiply(-8.0), 8.0)) ? 1 : -1;
+				this.sweptCollisionDistance(right.scale(-8.0), 8.0)) ? 1 : -1;
 
 			this.detourMag = 48.0;
 
@@ -1240,7 +1241,7 @@ public final class FlightController
 
 		return this.player() != null
 
-			&& this.player().level().dimension() == World.NETHER;
+			&& this.player().level().dimension() == Level.NETHER;
 
 	}
 
@@ -1252,19 +1253,29 @@ public final class FlightController
 
 		Long stored;
 
-		ServerLevel serverLevel;
+		try {
 
-		IntegratedServer server = this.mc.getServer();
+		IntegratedServer server = this.mc.getSingleplayerServer();
 
-		if(server != null && this.level() != null && (serverLevel =
-
-			server.getWorld(this.level().dimension())) != null)
+		if(server != null && this.level() != null)
 
 		{
 
-			return serverLevel.getSeed();
+			// TODO: DataResourceStore class not found in Fabric API; reimplement when resolved
+			// var levels = (Iterable<?>) (Iterable<?>) server.getAllLevels();
+			//
+			// for(Object obj : levels)
+			// {
+			// 	net.minecraft.server.level.ServerLevel sl = (net.minecraft.server.level.ServerLevel) obj;
+			// 	if(sl.dimension().equals(this.level().dimension()))
+			// 	{
+			// 		return sl.getSeed();
+			// 	}
+			// }
 
 		}
+
+		} catch(Exception ignored) {}
 
 		String addr = FlightController.serverAddress();
 
@@ -1288,11 +1299,11 @@ public final class FlightController
 
 	{
 
-		ServerInfo data = Minecraft.getInstance().getCurrentServer();
+		ServerData data = Minecraft.getInstance().getCurrentServer();
 
-		return data == null || data.address == null ? null
+		return data == null || data.ip == null ? null
 
-			: data.address.toLowerCase(Locale.ROOT);
+			: data.ip.toLowerCase(Locale.ROOT);
 
 	}
 
@@ -1324,7 +1335,7 @@ public final class FlightController
 
 			boolean stored;
 
-			boolean local = this.mc.getServer() != null;
+			boolean local = this.mc.getSingleplayerServer() != null;
 
 			String addr = FlightController.serverAddress();
 
@@ -1360,11 +1371,11 @@ public final class FlightController
 
 		}
 
-		this.context = new FlightPathfinder(seed, this.level().getMinBuildHeight(),
+		this.context = new FlightPathfinder(seed, this.level().getMinY(),
 
 			this.level().getHeight(), predict);
 
-		RegistryKey dim = this.level().dimension();
+		ResourceKey dim = this.level().dimension();
 
 		if(!dim.equals(this.noGoDimension))
 
@@ -1379,7 +1390,7 @@ public final class FlightController
 		this.context.setNoGoZones(this.noGoZones);
 
 		this.context.setChunkSource(() -> this.level() != null
-			? this.level().getChunkManager() : null);
+			? this.level().getChunkSource() : null);
 
 		this.repackChunks();
 
@@ -1493,7 +1504,7 @@ public final class FlightController
 
 		}
 
-		ClientChunkCache chunkSource = this.level().getChunkManager();
+		ClientChunkCache chunkSource = this.level().getChunkSource();
 
 		int pcx = this.feet().getX() >> 4;
 
@@ -1507,7 +1518,7 @@ public final class FlightController
 
 			{
 
-				LevelChunk chunk = (LevelChunk) chunkSource.getChunk(x, z);
+				LevelChunk chunk = (LevelChunk) chunkSource.getChunk(x, z, false);
 
 				if(chunk == null || chunk.isEmpty())
 
@@ -1719,13 +1730,13 @@ public final class FlightController
 
 			this.debugBiomeCheckTicks = 0;
 
-			RegistryKey<Biome> predicted = this.context.getBiomeRisk()
+			ResourceKey<Biome> predicted = this.context.getBiomeRisk()
 
 				.biomeAt(this.feet().getX(), this.feet().getZ());
 
-			RegistryKey actual =
+			ResourceKey actual =
 
-				this.level().getBiome(this.feet()).getKey().orElse(null);
+				this.level().getBiome(this.feet()).unwrapKey().orElse(null);
 
 			if(actual != null && !actual.equals(predicted))
 
@@ -1733,9 +1744,9 @@ public final class FlightController
 
 				this.log("[AutoFly] biome predictor MISMATCH: predicted "
 
-					+ String.valueOf(predicted.getValue().getPath()) + " actual "
+					+ String.valueOf(predicted.identifier().getPath()) + " actual "
 
-					+ String.valueOf(actual.getValue().getPath()) + " at "
+					+ String.valueOf(actual.identifier().getPath()) + " at "
 
 					+ this.feet().getX() + "," + this.feet().getZ() + " seed="
 
@@ -1767,7 +1778,7 @@ public final class FlightController
 
 		boolean overworld;
 
-		Vec3d target;
+		Vec3 target;
 
 		if(this.destination == null || this.reachedGoal)
 
@@ -1787,13 +1798,13 @@ public final class FlightController
 
 		}
 
-		Vec3d playerPos = player.getEntityPos();
+		Vec3 playerPos = player.position();
 
 		if(this.freezeProbePos != null
 
-			&& this.lastCommandedVel.lengthSquared() > 1.0
+			&& this.lastCommandedVel.lengthSqr() > 1.0
 
-			&& playerPos.squaredDistanceTo(this.freezeProbePos) < 0.0025)
+			&& playerPos.distanceToSqr(this.freezeProbePos) < 0.0025)
 
 		{
 
@@ -1813,7 +1824,7 @@ public final class FlightController
 
 					this.player().getDeltaMovement().length(),
 
-					this.level().getChunkManager().getChunk(pcx, pcz) != null,
+					this.level().getChunkSource().getChunk(pcx, pcz, false) != null,
 
 					this.mc.getConnection() != null
 
@@ -1828,7 +1839,7 @@ public final class FlightController
 			{
 				double[] clear = new double[1];
 				boolean ow = this.level() != null
-					&& this.level().dimension() == World.OVERWORLD;
+					&& this.level().dimension() == Level.OVERWORLD;
 				if(ow)
 				{
 					this.recoveryDir = this.mostOpenDirectionToward(clear, null);
@@ -1867,7 +1878,7 @@ public final class FlightController
 			{
 				double[] clear = new double[1];
 				boolean ow = this.level() != null
-					&& this.level().dimension() == World.OVERWORLD;
+					&& this.level().dimension() == Level.OVERWORLD;
 				if(ow)
 				{
 					this.recoveryDir = this.mostOpenDirectionToward(clear, null);
@@ -1906,7 +1917,7 @@ public final class FlightController
 
 		}
 
-		Vec3d destCenter = Vec3d.ofCenter((Vec3i)this.destination);
+		Vec3 destCenter = Vec3.atCenterOf((Vec3i)this.destination);
 
 		double distToDest0 = playerPos.distanceTo(destCenter);
 
@@ -2038,7 +2049,7 @@ public final class FlightController
 
 		}
 
-		if(!this.level().isSpaceEmpty((Entity)this.player(),
+		if(!this.level().noCollision((Entity)this.player(),
 
 			this.player().getBoundingBox().contract(1.0E-6, 1.0E-6, 1.0E-6)))
 
@@ -2050,7 +2061,7 @@ public final class FlightController
 
 		}
 
-		if(!this.config.waitChunks && this.level().getChunkManager().getChunk(this.feet().getX() >> 4, this.feet().getZ() >> 4) == null)
+		if(!this.config.waitChunks && this.level().getChunkSource().getChunk(this.feet().getX() >> 4, this.feet().getZ() >> 4, false) == null)
 
 		{
 
@@ -2078,7 +2089,7 @@ public final class FlightController
 
 				this.log(
 
-					"[AutoFly] pushing through unloaded-chunk frontier for "
+					"[AutoFly] pushing through unloaded-LevelChunk frontier for "
 
 						+ this.frontierHoldTicks + " ticks");
 
@@ -2151,9 +2162,9 @@ public final class FlightController
 		{
 			target = this.followTarget(playerPos, path, nearIndex);
 
-			if(target.squaredDistanceTo(playerPos) < 4.0
+			if(target.distanceToSqr(playerPos) < 4.0
 
-				&& playerPos.squaredDistanceTo(destCenter) > 9.0
+				&& playerPos.distanceToSqr(destCenter) > 9.0
 
 				&& nearIndex >= path.size() - 3)
 			{
@@ -2172,15 +2183,15 @@ public final class FlightController
 
 		{
 
-			Vec3d toDest = destCenter.subtract(playerPos);
+			Vec3 toDest = destCenter.subtract(playerPos);
 
-			Vec3d horiz = new Vec3d(toDest.x, 0.0, toDest.z);
+			Vec3 horiz = new Vec3(toDest.x, 0.0, toDest.z);
 
-			if(horiz.lengthSquared() > 1.0E-6)
+			if(horiz.lengthSqr() > 1.0E-6)
 
 			{
 
-				target = playerPos.add(horiz.normalize().multiply(24.0));
+				target = playerPos.add(horiz.normalize().scale(24.0));
 
 			}
 
@@ -2208,7 +2219,7 @@ public final class FlightController
 
 		boolean bl = overworld =
 
-			this.level() != null && this.level().dimension() == World.OVERWORLD;
+			this.level() != null && this.level().dimension() == Level.OVERWORLD;
 
 		if(!this.aimTight && this.hardRecoveryTicks == 0
 
@@ -2222,20 +2233,20 @@ public final class FlightController
 
 			double upClear =
 
-				this.sweptCollisionDistance(new Vec3d(0.0, sp, 0.0), sp + 0.75);
+				this.sweptCollisionDistance(new Vec3(0.0, sp, 0.0), sp + 0.75);
 
 			if(bl)
 			{
 				if(this.player().isInWater())
 				{
-					this.recoveryDir = new Vec3d(0.0, 1.0, 0.0);
+					this.recoveryDir = new Vec3(0.0, 1.0, 0.0);
 					this.recoveryHover = false;
 				}
 				else
 				{
-					Vec3d toDest = destCenter.subtract(playerPos);
-					Vec3d horizToDest = toDest.lengthSquared() > 1.0E-6
-						? new Vec3d(toDest.x, 0.0, toDest.z).normalize() : null;
+					Vec3 toDest = destCenter.subtract(playerPos);
+					Vec3 horizToDest = toDest.lengthSqr() > 1.0E-6
+						? new Vec3(toDest.x, 0.0, toDest.z).normalize() : null;
 					double[] clear = new double[1];
 					this.recoveryDir = this.mostOpenDirectionToward(clear, horizToDest);
 					this.recoveryHover = clear[0] < 6.0;
@@ -2244,7 +2255,7 @@ public final class FlightController
 
 			{
 
-				this.recoveryDir = new Vec3d(0.0, 1.0, 0.0);
+				this.recoveryDir = new Vec3(0.0, 1.0, 0.0);
 
 				this.recoveryHover = false;
 
@@ -2252,9 +2263,9 @@ public final class FlightController
 
 			{
 
-				Vec3d toDest = destCenter.subtract(playerPos);
-				Vec3d horizToDest = toDest.lengthSquared() > 1.0E-6
-					? new Vec3d(toDest.x, 0.0, toDest.z).normalize() : null;
+				Vec3 toDest = destCenter.subtract(playerPos);
+				Vec3 horizToDest = toDest.lengthSqr() > 1.0E-6
+					? new Vec3(toDest.x, 0.0, toDest.z).normalize() : null;
 				double[] clear = new double[1];
 
 				this.recoveryDir = this.mostOpenDirectionToward(clear, horizToDest);
@@ -2305,9 +2316,9 @@ public final class FlightController
 
 				this.commandedThisTick = true;
 
-				this.lastCommandedVel = Vec3d.ZERO;
+				this.lastCommandedVel = Vec3.ZERO;
 
-				this.player().setDeltaMovement(Vec3d.ZERO);
+				this.player().setDeltaMovement(Vec3.ZERO);
 
 				this.player().fallDistance = 0;
 
@@ -2319,7 +2330,7 @@ public final class FlightController
 
 		double sp = Math.max(0.5, this.config.flightHorizontalSpeed);
 
-		double hit = this.sweptCollisionDistance(this.recoveryDir.multiply(sp),
+		double hit = this.sweptCollisionDistance(this.recoveryDir.scale(sp),
 
 			sp + 0.75);
 
@@ -2343,7 +2354,7 @@ public final class FlightController
 
 			{
 
-				Vec3d v = this.recoveryDir.multiply(Math.min(sp, allowed));
+				Vec3 v = this.recoveryDir.scale(Math.min(sp, allowed));
 
 				this.commandedThisTick = true;
 
@@ -2415,9 +2426,9 @@ public final class FlightController
 
 						8.0);
 
-					Vec3d oscToDest = destCenter.subtract(playerPos);
-					Vec3d oscHorizToDest = oscToDest.lengthSquared() > 1.0E-6
-						? new Vec3d(oscToDest.x, 0.0, oscToDest.z).normalize() : null;
+					Vec3 oscToDest = destCenter.subtract(playerPos);
+					Vec3 oscHorizToDest = oscToDest.lengthSqr() > 1.0E-6
+						? new Vec3(oscToDest.x, 0.0, oscToDest.z).normalize() : null;
 					double[] clear = new double[1];
 
 					this.recoveryDir = this.mostOpenDirectionToward(clear, oscHorizToDest);
@@ -2472,7 +2483,7 @@ public final class FlightController
 
 	
 
-	private void beginAbort(Vec3d playerPos, String reason)
+	private void beginAbort(Vec3 playerPos, String reason)
 
 	{
 
@@ -2670,47 +2681,47 @@ public final class FlightController
 
 	
 
-	private void performExtraction(Vec3d playerPos)
+	private void performExtraction(Vec3 playerPos)
 
 	{
 
-		ArrayList<Vec3d> dirs = new ArrayList<Vec3d>();
+		ArrayList<Vec3> dirs = new ArrayList<Vec3>();
 
-		if(this.lastCommandedVel.lengthSquared() > 1.0E-6)
+		if(this.lastCommandedVel.lengthSqr() > 1.0E-6)
 
 		{
 
-			dirs.add(this.lastCommandedVel.normalize().multiply(-1.0));
+			dirs.add(this.lastCommandedVel.normalize().scale(-1.0));
 
 		}
 
-		dirs.add(new Vec3d(0.0, 1.0, 0.0));
+		dirs.add(new Vec3(0.0, 1.0, 0.0));
 
-		dirs.add(new Vec3d(0.0, -1.0, 0.0));
+		dirs.add(new Vec3(0.0, -1.0, 0.0));
 
-		dirs.add(new Vec3d(1.0, 0.0, 0.0));
+		dirs.add(new Vec3(1.0, 0.0, 0.0));
 
-		dirs.add(new Vec3d(-1.0, 0.0, 0.0));
+		dirs.add(new Vec3(-1.0, 0.0, 0.0));
 
-		dirs.add(new Vec3d(0.0, 0.0, 1.0));
+		dirs.add(new Vec3(0.0, 0.0, 1.0));
 
-		dirs.add(new Vec3d(0.0, 0.0, -1.0));
+		dirs.add(new Vec3(0.0, 0.0, -1.0));
 
-		Box box = this.player().getBoundingBox().contract(1.0E-6, 1.0E-6, 1.0E-6);
+		AABB AABB = this.player().getBoundingBox().contract(1.0E-6, 1.0E-6, 1.0E-6);
 
 		for(double mag = 0.1; mag <= 0.85; mag += 0.15)
 
 		{
 
-			for(Vec3d d : dirs)
+			for(Vec3 d : dirs)
 
 			{
 
-				Vec3d off = d.multiply(mag);
+				Vec3 off = d.scale(mag);
 
-				if(!this.level().isSpaceEmpty((Entity)this.player(),
+				if(!this.level().noCollision((Entity)this.player(),
 
-					box.offset(off.x, off.y, off.z)))
+					AABB.move(off.x, off.y, off.z)))
 
 					continue;
 
@@ -2718,7 +2729,7 @@ public final class FlightController
 
 					playerPos.z + off.z);
 
-				this.player().setDeltaMovement(Vec3d.ZERO);
+				this.player().setDeltaMovement(Vec3.ZERO);
 
 				if(this.config.flightDebug)
 
@@ -2762,7 +2773,7 @@ public final class FlightController
 
 		int dcz = this.destination.getZ() >> 4;
 
-		if(this.level().getChunkManager().getChunk(dcx, dcz) == null)
+		if(this.level().getChunkSource().getChunk(dcx, dcz, false) == null)
 
 		{
 
@@ -2926,7 +2937,7 @@ public final class FlightController
 
 	
 
-	private boolean lineClearOfHazard(Vec3d from, Vec3d to)
+	private boolean lineClearOfHazard(Vec3 from, Vec3 to)
 
 	{
 
@@ -2938,7 +2949,7 @@ public final class FlightController
 
 		}
 
-		Vec3d d = to.subtract(from);
+		Vec3 d = to.subtract(from);
 
 		double len = d.length();
 
@@ -2950,13 +2961,13 @@ public final class FlightController
 
 		}
 
-		Vec3d dir = d.multiply(1.0 / len);
+		Vec3 dir = d.scale(1.0 / len);
 
 		block0: for(double t = 0.0; t <= len + 1.0E-9; t += 0.5)
 
 		{
 
-			Vec3d p = from.add(dir.multiply(Math.min(t, len)));
+			Vec3 p = from.add(dir.scale(Math.min(t, len)));
 
 			int cx = (int)Math.floor(p.x);
 
@@ -3020,37 +3031,37 @@ public final class FlightController
 
 	
 
-	private Vec3d mostOpenDirection(double[] outClear)
+	private Vec3 mostOpenDirection(double[] outClear)
 
 	{
 
 		double s = 1.0 / Math.sqrt(2.0);
 
-		Vec3d[] dirs = new Vec3d[]{new Vec3d(0.0, 1.0, 0.0),
+		Vec3[] dirs = new Vec3[]{new Vec3(0.0, 1.0, 0.0),
 
-			new Vec3d(0.0, -1.0, 0.0), new Vec3d(1.0, 0.0, 0.0),
+			new Vec3(0.0, -1.0, 0.0), new Vec3(1.0, 0.0, 0.0),
 
-			new Vec3d(-1.0, 0.0, 0.0), new Vec3d(0.0, 0.0, 1.0),
+			new Vec3(-1.0, 0.0, 0.0), new Vec3(0.0, 0.0, 1.0),
 
-			new Vec3d(0.0, 0.0, -1.0), new Vec3d(s, 0.0, s), new Vec3d(s, 0.0, -s),
+			new Vec3(0.0, 0.0, -1.0), new Vec3(s, 0.0, s), new Vec3(s, 0.0, -s),
 
-			new Vec3d(-s, 0.0, s), new Vec3d(-s, 0.0, -s), new Vec3d(s, s, 0.0),
+			new Vec3(-s, 0.0, s), new Vec3(-s, 0.0, -s), new Vec3(s, s, 0.0),
 
-			new Vec3d(s, -s, 0.0), new Vec3d(-s, s, 0.0), new Vec3d(-s, -s, 0.0),
+			new Vec3(s, -s, 0.0), new Vec3(-s, s, 0.0), new Vec3(-s, -s, 0.0),
 
-			new Vec3d(0.0, s, s), new Vec3d(0.0, s, -s), new Vec3d(0.0, -s, s),
+			new Vec3(0.0, s, s), new Vec3(0.0, s, -s), new Vec3(0.0, -s, s),
 
-			new Vec3d(0.0, -s, -s)};
+			new Vec3(0.0, -s, -s)};
 
-		Vec3d best = dirs[0];
+		Vec3 best = dirs[0];
 
 		double bestClear = -1.0;
 
-		for(Vec3d d : dirs)
+		for(Vec3 d : dirs)
 
 		{
 
-			double c = this.sweptCollisionDistance(d.multiply(8.0), 8.0);
+			double c = this.sweptCollisionDistance(d.scale(8.0), 8.0);
 
 			if(!(c > bestClear))
 
@@ -3068,29 +3079,29 @@ public final class FlightController
 
 	}
 
-	private Vec3d mostOpenDirectionHorizontal(double[] outClear)
+	private Vec3 mostOpenDirectionHorizontal(double[] outClear)
 
 	{
 
 		double s = 1.0 / Math.sqrt(2.0);
 
-		Vec3d[] dirs = new Vec3d[]{new Vec3d(1.0, 0.0, 0.0),
+		Vec3[] dirs = new Vec3[]{new Vec3(1.0, 0.0, 0.0),
 
-			new Vec3d(-1.0, 0.0, 0.0), new Vec3d(0.0, 0.0, 1.0),
+			new Vec3(-1.0, 0.0, 0.0), new Vec3(0.0, 0.0, 1.0),
 
-			new Vec3d(0.0, 0.0, -1.0), new Vec3d(s, 0.0, s), new Vec3d(s, 0.0, -s),
+			new Vec3(0.0, 0.0, -1.0), new Vec3(s, 0.0, s), new Vec3(s, 0.0, -s),
 
-			new Vec3d(-s, 0.0, s), new Vec3d(-s, 0.0, -s)};
+			new Vec3(-s, 0.0, s), new Vec3(-s, 0.0, -s)};
 
-		Vec3d best = dirs[0];
+		Vec3 best = dirs[0];
 
 		double bestClear = -1.0;
 
-		for(Vec3d d : dirs)
+		for(Vec3 d : dirs)
 
 		{
 
-			double c = this.sweptCollisionDistance(d.multiply(8.0), 8.0);
+			double c = this.sweptCollisionDistance(d.scale(8.0), 8.0);
 
 			if(!(c > bestClear))
 
@@ -3108,31 +3119,31 @@ public final class FlightController
 
 	}
 
-	private Vec3d mostOpenDirectionToward(double[] outClear, Vec3d horizToDest)
+	private Vec3 mostOpenDirectionToward(double[] outClear, Vec3 horizToDest)
 
 	{
 
 		double s = 1.0 / Math.sqrt(2.0);
 
-		Vec3d[] dirs = new Vec3d[]{new Vec3d(1.0, 0.0, 0.0),
+		Vec3[] dirs = new Vec3[]{new Vec3(1.0, 0.0, 0.0),
 
-			new Vec3d(-1.0, 0.0, 0.0), new Vec3d(0.0, 0.0, 1.0),
+			new Vec3(-1.0, 0.0, 0.0), new Vec3(0.0, 0.0, 1.0),
 
-			new Vec3d(0.0, 0.0, -1.0), new Vec3d(s, 0.0, s), new Vec3d(s, 0.0, -s),
+			new Vec3(0.0, 0.0, -1.0), new Vec3(s, 0.0, s), new Vec3(s, 0.0, -s),
 
-			new Vec3d(-s, 0.0, s), new Vec3d(-s, 0.0, -s)};
+			new Vec3(-s, 0.0, s), new Vec3(-s, 0.0, -s)};
 
-		Vec3d best = dirs[0];
+		Vec3 best = dirs[0];
 
 		double bestClear = -1.0;
 
 		double bestScore = Double.NEGATIVE_INFINITY;
 
-		for(Vec3d d : dirs)
+		for(Vec3 d : dirs)
 
 		{
 
-			double c = this.sweptCollisionDistance(d.multiply(8.0), 8.0);
+			double c = this.sweptCollisionDistance(d.scale(8.0), 8.0);
 
 			double score;
 
@@ -3174,27 +3185,27 @@ public final class FlightController
 
 	
 
-	private void performEscape(Vec3d playerPos, Vec3d travelDir)
+	private void performEscape(Vec3 playerPos, Vec3 travelDir)
 
 	{
 
 		boolean ow = this.level() != null
 
-			&& this.level().dimension() == World.OVERWORLD;
+			&& this.level().dimension() == Level.OVERWORLD;
 
-		Vec3d[] dirs = new Vec3d[]{new Vec3d(0.0, 1.0, 0.0),
+		Vec3[] dirs = new Vec3[]{new Vec3(0.0, 1.0, 0.0),
 
-			new Vec3d(0.0, -1.0, 0.0), new Vec3d(1.0, 0.0, 0.0),
+			new Vec3(0.0, -1.0, 0.0), new Vec3(1.0, 0.0, 0.0),
 
-			new Vec3d(-1.0, 0.0, 0.0), new Vec3d(0.0, 0.0, 1.0),
+			new Vec3(-1.0, 0.0, 0.0), new Vec3(0.0, 0.0, 1.0),
 
-			new Vec3d(0.0, 0.0, -1.0), new Vec3d(1.0, 0.0, 1.0).normalize(),
+			new Vec3(0.0, 0.0, -1.0), new Vec3(1.0, 0.0, 1.0).normalize(),
 
-			new Vec3d(1.0, 0.0, -1.0).normalize(),
+			new Vec3(1.0, 0.0, -1.0).normalize(),
 
-			new Vec3d(-1.0, 0.0, 1.0).normalize(),
+			new Vec3(-1.0, 0.0, 1.0).normalize(),
 
-			new Vec3d(-1.0, 0.0, -1.0).normalize()};
+			new Vec3(-1.0, 0.0, -1.0).normalize()};
 
 		double[] clears = new double[dirs.length];
 
@@ -3208,7 +3219,7 @@ public final class FlightController
 
 				continue;
 
-			clears[i] = this.sweptCollisionDistance(dirs[i].multiply(4.0), 4.0);
+			clears[i] = this.sweptCollisionDistance(dirs[i].scale(4.0), 4.0);
 
 			bestClear = Math.max(bestClear, clears[i]);
 
@@ -3216,9 +3227,9 @@ public final class FlightController
 
 		double threshold = Math.min(Math.max(1.0, bestClear * 0.9), bestClear);
 
-		Vec3d tn = travelDir.lengthSquared() > 1.0E-6 ? travelDir.normalize() : null;
+		Vec3 tn = travelDir.lengthSqr() > 1.0E-6 ? travelDir.normalize() : null;
 
-		Vec3d best = null;
+		Vec3 best = null;
 
 		double bestChosenClear = 0.0;
 
@@ -3238,11 +3249,11 @@ public final class FlightController
 
 				continue;
 
-			double d = score = tn == null ? clears[i] : dirs[i].dotProduct(tn);
+			double d = score = tn == null ? clears[i] : dirs[i].dot(tn);
 
 			if(this.lastEscapeDir != null
 
-				&& dirs[i].dotProduct(this.lastEscapeDir) < -0.5)
+				&& dirs[i].dot(this.lastEscapeDir) < -0.5)
 
 			{
 
@@ -3276,7 +3287,7 @@ public final class FlightController
 
 			this.commandedThisTick = true;
 
-			this.player().setDeltaMovement(this.waterEscapeBoost(best.multiply(escSpeed)));
+			this.player().setDeltaMovement(this.waterEscapeBoost(best.scale(escSpeed)));
 
 			this.prevCmdSpeed = escSpeed;
 
@@ -3306,7 +3317,7 @@ public final class FlightController
 
 	
 
-	private Vec3d followTarget(Vec3d playerPos, List<BetterBlockPos> path,
+	private Vec3 followTarget(Vec3 playerPos, List<BetterBlockPos> path,
 
 		int near)
 
@@ -3316,9 +3327,9 @@ public final class FlightController
 
 		int bestSeg = Math.max(0, Math.min(near, path.size() - 1));
 
-		Vec3d bestPoint = Vec3d.ofCenter((Vec3i)((Vec3i)path.get(bestSeg)));
+		Vec3 bestPoint = Vec3.atCenterOf((Vec3i)((Vec3i)path.get(bestSeg)));
 
-		double bestDistSq = playerPos.squaredDistanceTo(bestPoint);
+		double bestDistSq = playerPos.distanceToSqr(bestPoint);
 
 		int lo = near;
 
@@ -3328,21 +3339,21 @@ public final class FlightController
 
 		{
 
-			Vec3d a = Vec3d.ofCenter((Vec3i)path.get(i));
+			Vec3 a = Vec3.atCenterOf((Vec3i)path.get(i));
 
-			Vec3d b = Vec3d.ofCenter((Vec3i)path.get(i + 1));
+			Vec3 b = Vec3.atCenterOf((Vec3i)path.get(i + 1));
 
-			Vec3d ab = b.subtract(a);
+			Vec3 ab = b.subtract(a);
 
-			double abLenSq = ab.lengthSquared();
+			double abLenSq = ab.lengthSqr();
 
 			double t = abLenSq < 1.0E-9 ? 0.0 : Math.max(0.0,
 
-				Math.min(1.0, playerPos.subtract(a).dotProduct(ab) / abLenSq));
+				Math.min(1.0, playerPos.subtract(a).dot(ab) / abLenSq));
 
-			Vec3d proj = a.add(ab.multiply(t));
+			Vec3 proj = a.add(ab.scale(t));
 
-			double dsq = playerPos.squaredDistanceTo(proj);
+			double dsq = playerPos.distanceToSqr(proj);
 
 			if(!(dsq < bestDistSq))
 
@@ -3362,15 +3373,15 @@ public final class FlightController
 
 		{
 
-			arc += Vec3d.ofCenter((Vec3i)((Vec3i)path.get(k)))
+			arc += Vec3.atCenterOf((Vec3i)((Vec3i)path.get(k)))
 
-				.distanceTo(Vec3d.ofCenter((Vec3i)((Vec3i)path.get(k + 1))));
+				.distanceTo(Vec3.atCenterOf((Vec3i)((Vec3i)path.get(k + 1))));
 
 		}
 
 		this.currentArcPos =
 
-			arc + Vec3d.ofCenter((Vec3i)((Vec3i)path.get(bestSeg)))
+			arc + Vec3.atCenterOf((Vec3i)((Vec3i)path.get(bestSeg)))
 
 				.distanceTo(bestPoint);
 
@@ -3388,7 +3399,7 @@ public final class FlightController
 
 			{
 
-				Vec3d cand = this.advanceAlongPath(path, bestSeg, bestPoint, d);
+				Vec3 cand = this.advanceAlongPath(path, bestSeg, bestPoint, d);
 
 				if(this.aimClear(playerPos, cand, extra))
 
@@ -3398,7 +3409,7 @@ public final class FlightController
 
 				}
 
-				Vec3d low = cand.add(0.0, -0.4, 0.0);
+				Vec3 low = cand.add(0.0, -0.4, 0.0);
 
 				if(!this.aimClear(playerPos, low, extra))
 
@@ -3418,9 +3429,9 @@ public final class FlightController
 
 		{
 
-			Vec3d vertex = Vec3d.ofCenter((Vec3i)((Vec3i)path.get(j)));
+			Vec3 vertex = Vec3.atCenterOf((Vec3i)((Vec3i)path.get(j)));
 
-			if(!(vertex.squaredDistanceTo(playerPos) > 0.12249999999999998)
+			if(!(vertex.distanceToSqr(playerPos) > 0.12249999999999998)
 
 				|| !this.aimClear(playerPos, vertex, 0.0))
 
@@ -3432,9 +3443,9 @@ public final class FlightController
 
 		for(next = Math.min(bestSeg + 1, lastIdx); next < lastIdx
 
-			&& Vec3d.ofCenter((Vec3i)((Vec3i)path.get(next)))
+			&& Vec3.atCenterOf((Vec3i)((Vec3i)path.get(next)))
 
-				.squaredDistanceTo(playerPos) < 0.12249999999999998; ++next)
+				.distanceToSqr(playerPos) < 0.12249999999999998; ++next)
 
 		{}
 
@@ -3450,7 +3461,7 @@ public final class FlightController
 
 				continue;
 
-			return Vec3d.ofCenter((Vec3i)node);
+			return Vec3.atCenterOf((Vec3i)node);
 
 		}
 
@@ -3462,11 +3473,11 @@ public final class FlightController
 
 	
 
-	private boolean aimClear(Vec3d from, Vec3d to, double extraMargin)
+	private boolean aimClear(Vec3 from, Vec3 to, double extraMargin)
 
 	{
 
-		Vec3d delta = to.subtract(from);
+		Vec3 delta = to.subtract(from);
 
 		double len = delta.length();
 
@@ -3486,7 +3497,7 @@ public final class FlightController
 
 	
 
-	private boolean octreeClear(Vec3d from, Vec3d to, double offset)
+	private boolean octreeClear(Vec3 from, Vec3 to, double offset)
 
 	{
 
@@ -3506,13 +3517,13 @@ public final class FlightController
 
 	
 
-	private Vec3d advanceAlongPath(List<BetterBlockPos> path, int seg, Vec3d from,
+	private Vec3 advanceAlongPath(List<BetterBlockPos> path, int seg, Vec3 from,
 
 		double dist)
 
 	{
 
-		Vec3d prev = from;
+		Vec3 prev = from;
 
 		double remaining = dist;
 
@@ -3520,7 +3531,7 @@ public final class FlightController
 
 		{
 
-			Vec3d cur = Vec3d.ofCenter((Vec3i)((Vec3i)path.get(j)));
+			Vec3 cur = Vec3.atCenterOf((Vec3i)((Vec3i)path.get(j)));
 
 			double s = prev.distanceTo(cur);
 
@@ -3528,7 +3539,7 @@ public final class FlightController
 
 			{
 
-				return prev.add(cur.subtract(prev).multiply(remaining / s));
+				return prev.add(cur.subtract(prev).scale(remaining / s));
 
 			}
 
@@ -3544,7 +3555,7 @@ public final class FlightController
 
 	
 
-	private void driveToward(Vec3d playerPos, Vec3d target, Vec3d destCenter)
+	private void driveToward(Vec3 playerPos, Vec3 target, Vec3 destCenter)
 
 	{
 
@@ -3552,11 +3563,11 @@ public final class FlightController
 
 		double hazardBelow;
 
-		Vec3d vel;
+		Vec3 vel;
 
 		ArrayList<String> limiters;
 
-		Vec3d delta = target.subtract(playerPos);
+		Vec3 delta = target.subtract(playerPos);
 
 		double dist = delta.length();
 
@@ -3584,7 +3595,7 @@ public final class FlightController
 
 		{
 
-			vel = Vec3d.ZERO;
+			vel = Vec3.ZERO;
 
 		}else
 
@@ -3602,7 +3613,7 @@ public final class FlightController
 
 			double speed = Math.min(Math.min(maxSpeed, dist), arrivalCap);
 
-			vel = delta.multiply(speed / dist);
+			vel = delta.scale(speed / dist);
 
 			if(limiters != null && speed < maxSpeed - 0.01)
 
@@ -3620,7 +3631,7 @@ public final class FlightController
 
 			{
 
-				vel = vel.multiply(vCap / Math.abs(vel.y));
+				vel = vel.scale(vCap / Math.abs(vel.y));
 
 			}
 
@@ -3658,7 +3669,7 @@ public final class FlightController
 
 				{
 
-					vel = new Vec3d(vel.x, 0.0, vel.z);
+					vel = new Vec3(vel.x, 0.0, vel.z);
 
 				}
 
@@ -3672,7 +3683,7 @@ public final class FlightController
 
 				{
 
-					vel = new Vec3d(vel.x, -maxDescent, vel.z);
+					vel = new Vec3(vel.x, -maxDescent, vel.z);
 
 				}
 
@@ -3692,7 +3703,7 @@ public final class FlightController
 
 				{
 
-					vel = vel.multiply(cap / s);
+					vel = vel.scale(cap / s);
 
 					if(hazardBelow < 2.5)
 
@@ -3734,7 +3745,7 @@ public final class FlightController
 
 		{
 
-			vel = new Vec3d(vel.x, 0.08, vel.z);
+			vel = new Vec3(vel.x, 0.08, vel.z);
 
 		}
 
@@ -3764,13 +3775,13 @@ public final class FlightController
 
 				{
 
-					Vec3d scaled = vel.multiply(allowed / sp);
+					Vec3 scaled = vel.scale(allowed / sp);
 
-					Vec3d slide = this.axisSlide(vel);
+					Vec3 slide = this.axisSlide(vel);
 
 					vel =
 
-						slide.lengthSquared() > scaled.lengthSquared() ? slide : scaled;
+						slide.lengthSqr() > scaled.lengthSqr() ? slide : scaled;
 
 					this.debugGovScale = vel.length() / sp;
 
@@ -3798,7 +3809,7 @@ public final class FlightController
 
 			{
 
-				vel = vel.multiply(0.6 / spT);
+				vel = vel.scale(0.6 / spT);
 
 				if(limiters != null)
 
@@ -3830,7 +3841,7 @@ public final class FlightController
 
 				{
 
-					vel = vel.multiply(allowedT / spT2);
+					vel = vel.scale(allowedT / spT2);
 
 					if(limiters != null)
 
@@ -3860,13 +3871,13 @@ public final class FlightController
 
 			double probe = sp2 + this.governorMargin(sp2);
 
-			Vec3d dir = vel.multiply(1.0 / sp2);
+			Vec3 dir = vel.scale(1.0 / sp2);
 
-			Vec3d feetVec = playerPos.add(0.0, 0.1, 0.0);
+			Vec3 feetVec = playerPos.add(0.0, 0.1, 0.0);
 
 			double octHit = this.context.raytraceDistance(feetVec,
 
-				feetVec.add(dir.multiply(probe)));
+				feetVec.add(dir.scale(probe)));
 
 			if(octHit != Double.POSITIVE_INFINITY && (octAllowed =
 
@@ -3874,7 +3885,7 @@ public final class FlightController
 
 			{
 
-				vel = vel.multiply(octAllowed / sp2);
+				vel = vel.scale(octAllowed / sp2);
 
 				if(limiters != null)
 
@@ -3894,7 +3905,7 @@ public final class FlightController
 
 		{
 
-			vel = vel.multiply(0.1 / spS);
+			vel = vel.scale(0.1 / spS);
 
 			if(limiters != null)
 
@@ -3918,7 +3929,7 @@ public final class FlightController
 
 			{
 
-				vel = vel.multiply(cap / spC);
+				vel = vel.scale(cap / spC);
 
 				if(limiters != null)
 
@@ -3946,7 +3957,7 @@ public final class FlightController
 
 			{
 
-				vel = this.sweepClamped(new Vec3d(vel.x, 0.0, vel.z));
+				vel = this.sweepClamped(new Vec3(vel.x, 0.0, vel.z));
 
 			}
 
@@ -4012,7 +4023,7 @@ public final class FlightController
 
 			{
 
-				vel = vel.multiply(Math.max(0.0, finalHit - 0.3) / finalSp);
+				vel = vel.scale(Math.max(0.0, finalHit - 0.3) / finalSp);
 
 			}
 
@@ -4024,14 +4035,14 @@ public final class FlightController
 
 		if(playerPos.y < VOID_FLOOR)
 		{
-			vel = new Vec3d(vel.x, Math.max(vel.y, 1.0), vel.z);
+			vel = new Vec3(vel.x, Math.max(vel.y, 1.0), vel.z);
 		}else if(playerPos.y < VOID_FLOOR + 16.0 && vel.y < 0.0)
 		{
 			double rampUp = Math.max(0.0, (playerPos.y - VOID_FLOOR) / 16.0);
 			double maxDescent = rampUp * 1.0;
 			if(vel.y < -maxDescent)
 			{
-				vel = new Vec3d(vel.x, -maxDescent, vel.z);
+				vel = new Vec3(vel.x, -maxDescent, vel.z);
 			}
 		}
 
@@ -4041,7 +4052,7 @@ public final class FlightController
 
 		{
 
-			vel = new Vec3d(vel.x, Math.min(vel.y, -0.2), vel.z);
+			vel = new Vec3(vel.x, Math.min(vel.y, -0.2), vel.z);
 
 			if(++this.ceilingClampTicks % 20 == 0
 
@@ -4057,7 +4068,7 @@ public final class FlightController
 
 		{
 
-			vel = new Vec3d(vel.x, Math.min(vel.y, ceilY - playerPos.y), vel.z);
+			vel = new Vec3(vel.x, Math.min(vel.y, ceilY - playerPos.y), vel.z);
 
 			if(++this.ceilingClampTicks % 20 == 0
 
@@ -4085,7 +4096,7 @@ public final class FlightController
 
 	
 
-	private Vec3d sweepClamped(Vec3d vel)
+	private Vec3 sweepClamped(Vec3 vel)
 
 	{
 
@@ -4103,21 +4114,21 @@ public final class FlightController
 
 		double allowed = Math.max(0.0, hit - 0.25);
 
-		return allowed < len ? vel.multiply(allowed / len) : vel;
+		return allowed < len ? vel.scale(allowed / len) : vel;
 
 	}
 
 	
 
-	private Vec3d waterEscapeBoost(Vec3d vel)
+	private Vec3 waterEscapeBoost(Vec3 vel)
 	{
 		LocalPlayer p = this.player();
 		if(p == null || p.isInLava() || !p.isInWater() || vel.y >= 0.6)
 			return vel;
-		return vel.y > 0.0 ? new Vec3d(vel.x, 0.6, vel.z) : vel;
+		return vel.y > 0.0 ? new Vec3(vel.x, 0.6, vel.z) : vel;
 	}
 
-	private Vec3d liftClamped(Vec3d vel, double lift)
+	private Vec3 liftClamped(Vec3 vel, double lift)
 
 	{
 
@@ -4129,7 +4140,7 @@ public final class FlightController
 
 		double upClear =
 
-			this.sweptCollisionDistance(new Vec3d(0.0, probe, 0.0), probe);
+			this.sweptCollisionDistance(new Vec3(0.0, probe, 0.0), probe);
 
 		double liftY = Math.min(lift, Math.max(0.0, upClear - 0.3));
 
@@ -4141,7 +4152,7 @@ public final class FlightController
 
 		}
 
-		Vec3d lifted = new Vec3d(vel.x, liftY, vel.z);
+		Vec3 lifted = new Vec3(vel.x, liftY, vel.z);
 
 		double len = lifted.length();
 
@@ -4153,7 +4164,7 @@ public final class FlightController
 
 		{
 
-			lifted = lifted.multiply(allowed / len);
+			lifted = lifted.scale(allowed / len);
 
 		}
 
@@ -4163,7 +4174,7 @@ public final class FlightController
 
 	
 
-	private double lavaClearanceAhead(Vec3d playerPos, Vec3d vel, double maxDist)
+	private double lavaClearanceAhead(Vec3 playerPos, Vec3 vel, double maxDist)
 
 	{
 
@@ -4175,7 +4186,7 @@ public final class FlightController
 
 		{
 
-			Vec3d dir = vel.multiply(1.0 / sp);
+			Vec3 dir = vel.scale(1.0 / sp);
 
 			for(int k = 1; k <= 3; ++k)
 
@@ -4183,7 +4194,7 @@ public final class FlightController
 
 				double d = Math.min((double)k * sp, maxDist);
 
-				double c = this.lavaClearanceBelow(playerPos.add(dir.multiply(d)));
+				double c = this.lavaClearanceBelow(playerPos.add(dir.scale(d)));
 
 				if(!Double.isNaN(c) && (Double.isNaN(best) || c < best))
 
@@ -4207,13 +4218,13 @@ public final class FlightController
 
 	
 
-	private void faceToward(Vec3d playerPos, Vec3d target)
+	private void faceToward(Vec3 playerPos, Vec3 target)
 
 	{
 
-		Vec3d eye =
+		Vec3 eye =
 
-			playerPos.add(0.0, (double)this.player().getEyeHeight(net.minecraft.entity.EntityPose.STANDING), 0.0);
+			playerPos.add(0.0, (double)this.player().getEyeHeight(net.minecraft.world.entity.Pose.STANDING), 0.0);
 
 		double dx = target.x - eye.x;
 
@@ -4235,7 +4246,7 @@ public final class FlightController
 
 	
 
-	private Vec3d applyUnloadedChunkBarrier(Vec3d playerPos, Vec3d vel)
+	private Vec3 applyUnloadedChunkBarrier(Vec3 playerPos, Vec3 vel)
 
 	{
 
@@ -4257,9 +4268,9 @@ public final class FlightController
 
 		}
 
-		ClientChunkCache chunkSource = this.level().getChunkManager();
+		ClientChunkCache chunkSource = this.level().getChunkSource();
 
-		Vec3d dir = vel.multiply(1.0 / sp);
+		Vec3 dir = vel.scale(1.0 / sp);
 
 		double probe = 2.0 * sp + 8.0;
 
@@ -4271,13 +4282,13 @@ public final class FlightController
 
 			boolean packed;
 
-			Vec3d p = playerPos.add(dir.multiply(d));
+			Vec3 p = playerPos.add(dir.scale(d));
 
 			int cx = (int)Math.floor(p.x) >> 4;
 
 			int cz = (int)Math.floor(p.z) >> 4;
 
-			LevelChunk chunk = (LevelChunk) chunkSource.getChunk(cx, cz);
+			LevelChunk chunk = (LevelChunk) chunkSource.getChunk(cx, cz, false);
 
 			boolean bl = packed =
 
@@ -4309,7 +4320,7 @@ public final class FlightController
 
 				}
 
-				return vel.multiply(allowed / sp);
+				return vel.scale(allowed / sp);
 
 			}
 
@@ -4323,7 +4334,7 @@ public final class FlightController
 
 	
 
-	private Vec3d axisSlide(Vec3d vel)
+	private Vec3 axisSlide(Vec3 vel)
 
 	{
 
@@ -4337,17 +4348,17 @@ public final class FlightController
 
 		double x =
 
-			this.slideComponent(vel.x, new Vec3d(Math.signum(vel.x), 0.0, 0.0));
+			this.slideComponent(vel.x, new Vec3(Math.signum(vel.x), 0.0, 0.0));
 
-		Vec3d slide = new Vec3d(x,
+		Vec3 slide = new Vec3(x,
 
 			y = this.slideComponent(vel.y,
 
-				new Vec3d(0.0, Math.signum(vel.y), 0.0)),
+				new Vec3(0.0, Math.signum(vel.y), 0.0)),
 
 			z = this.slideComponent(vel.z,
 
-				new Vec3d(0.0, 0.0, Math.signum(vel.z))));
+				new Vec3(0.0, 0.0, Math.signum(vel.z))));
 
 		double len = slide.length();
 
@@ -4359,7 +4370,7 @@ public final class FlightController
 
 		{
 
-			slide = slide.multiply(allowed / len);
+			slide = slide.scale(allowed / len);
 
 		}
 
@@ -4369,7 +4380,7 @@ public final class FlightController
 
 	
 
-	private double slideComponent(double v, Vec3d unit)
+	private double slideComponent(double v, Vec3 unit)
 
 	{
 
@@ -4385,7 +4396,7 @@ public final class FlightController
 
 		double margin = this.governorMargin(mag);
 
-		double hit = this.sweptCollisionDistance(unit.multiply(mag), mag + margin);
+		double hit = this.sweptCollisionDistance(unit.scale(mag), mag + margin);
 
 		double allowed = Math.max(0.0, hit - margin);
 
@@ -4407,7 +4418,7 @@ public final class FlightController
 
 	
 
-	private double sweptCollisionDistance(Vec3d move, double probe)
+	private double sweptCollisionDistance(Vec3 move, double probe)
 
 	{
 
@@ -4421,9 +4432,9 @@ public final class FlightController
 
 		}
 
-		Vec3d dir = move.multiply(1.0 / len);
+		Vec3 dir = move.scale(1.0 / len);
 
-		Box box = this.player().getBoundingBox();
+		AABB AABB = this.player().getBoundingBox();
 
 		double step = 0.1;
 
@@ -4431,13 +4442,13 @@ public final class FlightController
 
 		{
 
-			Vec3d off = dir.multiply(d);
+			Vec3 off = dir.scale(d);
 
-			Box moved = box.offset(off.x, off.y, off.z).expand(0.05);
+			AABB moved = AABB.move(off.x, off.y, off.z).inflate(0.05);
 
-			if(this.level().isSpaceEmpty((Entity)this.player(), moved)
+			if(this.level().noCollision((Entity)this.player(), moved)
 
-				&& !this.boxIntersectsBurnHazard(moved.expand(0.05)))
+				&& !this.boxIntersectsBurnHazard(moved.inflate(0.05)))
 
 				continue;
 
@@ -4451,7 +4462,7 @@ public final class FlightController
 
 	
 
-	private boolean boxIntersectsBurnHazard(Box box)
+	private boolean boxIntersectsBurnHazard(AABB AABB)
 
 	{
 
@@ -4463,17 +4474,17 @@ public final class FlightController
 
 		}
 
-		int minX = (int)Math.floor(box.minX);
+		int minX = (int)Math.floor(AABB.minX);
 
-		int maxX = (int)Math.floor(box.maxX);
+		int maxX = (int)Math.floor(AABB.maxX);
 
-		int minY = (int)Math.floor(box.minY);
+		int minY = (int)Math.floor(AABB.minY);
 
-		int maxY = (int)Math.floor(box.maxY);
+		int maxY = (int)Math.floor(AABB.maxY);
 
-		int minZ = (int)Math.floor(box.minZ);
+		int minZ = (int)Math.floor(AABB.minZ);
 
-		int maxZ = (int)Math.floor(box.maxZ);
+		int maxZ = (int)Math.floor(AABB.maxZ);
 
 		for(int x = minX; x <= maxX; ++x)
 
@@ -4505,7 +4516,7 @@ public final class FlightController
 
 	
 
-	private Vec3d applyLavaAvoidance(Vec3d playerPos, Vec3d vel, double maxSpeed)
+	private Vec3 applyLavaAvoidance(Vec3 playerPos, Vec3 vel, double maxSpeed)
 
 	{
 
@@ -4517,11 +4528,11 @@ public final class FlightController
 
 		}
 
-		Vec3d center =
+		Vec3 center =
 
-			playerPos.add(0.0, (double)this.player().getHeight() * 0.5, 0.0);
+			playerPos.add(0.0, (double)this.player().getBbHeight() * 0.5, 0.0);
 
-		Vec3d segEnd = center.add(vel);
+		Vec3 segEnd = center.add(vel);
 
 		int r = (int)Math.ceil(3.5);
 
@@ -4537,7 +4548,7 @@ public final class FlightController
 
 		int maxZ = (int)Math.floor(Math.max(center.z, segEnd.z)) + r;
 
-		Vec3d away = Vec3d.ZERO;
+		Vec3 away = Vec3.ZERO;
 
 		double nearest = Double.MAX_VALUE;
 
@@ -4553,7 +4564,7 @@ public final class FlightController
 
 				{
 
-					Vec3d cell;
+					Vec3 cell;
 
 					double d;
 
@@ -4563,7 +4574,7 @@ public final class FlightController
 
 							FlightController.distToSegment(
 
-								cell = new Vec3d((double)x + 0.5,
+								cell = new Vec3((double)x + 0.5,
 
 									(double)y + 0.5, (double)z + 0.5),
 
@@ -4575,11 +4586,11 @@ public final class FlightController
 
 					nearest = Math.min(nearest, d);
 
-					Vec3d diff = center.subtract(cell);
+					Vec3 diff = center.subtract(cell);
 
 					double dp = Math.max(diff.length(), 0.5);
 
-					away = away.add(diff.multiply(1.0 / (dp * dp * dp)));
+					away = away.add(diff.scale(1.0 / (dp * dp * dp)));
 
 				}
 
@@ -4595,11 +4606,11 @@ public final class FlightController
 
 		}
 
-		if(away.lengthSquared() > 1.0E-6)
+		if(away.lengthSqr() > 1.0E-6)
 
 		{
 
-			vel = vel.add(away.normalize().multiply(0.6));
+			vel = vel.add(away.normalize().scale(0.6));
 
 		}
 
@@ -4613,7 +4624,7 @@ public final class FlightController
 
 		{
 
-			vel = vel.multiply(cap / s);
+			vel = vel.scale(cap / s);
 
 		}
 
@@ -4623,13 +4634,13 @@ public final class FlightController
 
 	
 
-	private static double distToSegment(Vec3d p, Vec3d a, Vec3d b)
+	private static double distToSegment(Vec3 p, Vec3 a, Vec3 b)
 
 	{
 
-		Vec3d ab = b.subtract(a);
+		Vec3 ab = b.subtract(a);
 
-		double lenSq = ab.lengthSquared();
+		double lenSq = ab.lengthSqr();
 
 		if(lenSq < 1.0E-9)
 
@@ -4639,15 +4650,15 @@ public final class FlightController
 
 		}
 
-		double t = Math.max(0.0, Math.min(1.0, p.subtract(a).dotProduct(ab) / lenSq));
+		double t = Math.max(0.0, Math.min(1.0, p.subtract(a).dot(ab) / lenSq));
 
-		return p.distanceTo(a.add(ab.multiply(t)));
+		return p.distanceTo(a.add(ab.scale(t)));
 
 	}
 
 	
 
-	private double lavaClearanceBelow(Vec3d playerPos)
+	private double lavaClearanceBelow(Vec3 playerPos)
 
 	{
 
@@ -4723,9 +4734,9 @@ public final class FlightController
 
 		{
 
-			p.setDeltaMovement(Vec3d.ZERO);
+			p.setDeltaMovement(Vec3.ZERO);
 
-			this.lastCommandedVel = Vec3d.ZERO;
+			this.lastCommandedVel = Vec3.ZERO;
 
 		}
 
@@ -4753,7 +4764,7 @@ public final class FlightController
 
 	
 
-	private void trackProgress(Vec3d playerPos)
+	private void trackProgress(Vec3 playerPos)
 
 	{
 
@@ -4789,7 +4800,7 @@ public final class FlightController
 
 	
 
-	public boolean clearView(Vec3d start, Vec3d dest)
+	public boolean clearView(Vec3 start, Vec3 dest)
 
 	{
 
@@ -4803,9 +4814,9 @@ public final class FlightController
 
 		return this.level()
 
-			.raycast(new RaycastContext(start, dest, RaycastContext.ShapeType.COLLIDER,
+			.clipIncludingBorder(new ClipContext(start, dest, ClipContext.Block.COLLIDER,
 
-				RaycastContext.FluidHandling.NONE, (Entity)this.player()))
+				ClipContext.Fluid.NONE, (Entity)this.player()))
 
 			.getType() == HitResult.Type.MISS;
 
@@ -4813,7 +4824,7 @@ public final class FlightController
 
 	
 
-	private boolean clearViewForPlayer(Vec3d from, Vec3d to)
+	private boolean clearViewForPlayer(Vec3 from, Vec3 to)
 
 	{
 
@@ -4823,7 +4834,7 @@ public final class FlightController
 
 	
 
-	private boolean clearViewForPlayer(Vec3d from, Vec3d to, double extraMargin)
+	private boolean clearViewForPlayer(Vec3 from, Vec3 to, double extraMargin)
 
 	{
 
@@ -4831,9 +4842,9 @@ public final class FlightController
 
 		double halfWidth =
 
-			(double)this.player().getWidth() / 2.0 + extraMargin;
+			(double)this.player().getBbWidth() / 2.0 + extraMargin;
 
-		double height = this.player().getHeight();
+		double height = this.player().getBbHeight();
 
 		for(double[] o : offsets = new double[][]{{0.0, 0.0},
 
@@ -4889,7 +4900,7 @@ public final class FlightController
 
 	
 
-	private void flightDebugTick(Vec3d playerPos, Vec3d aim)
+	private void flightDebugTick(Vec3 playerPos, Vec3 aim)
 
 	{
 
@@ -5007,9 +5018,9 @@ public final class FlightController
 
 		this.log("  feet=" + this.classifyAt(f) + " head="
 
-			+ this.classifyAt(f.up()) + " above2="
+			+ this.classifyAt(f.above()) + " above2="
 
-			+ this.classifyAt(f.up(2)));
+			+ this.classifyAt(f.above(2)));
 
 		if(stuck || inLava)
 
@@ -5055,7 +5066,7 @@ public final class FlightController
 
 		BlockState s = this.blockAt(pos.getX(), pos.getY(), pos.getZ());
 
-		if(s.isOf(Blocks.LAVA))
+		if(s.is(Blocks.LAVA))
 
 		{
 
@@ -5063,7 +5074,7 @@ public final class FlightController
 
 		}
 
-		if(s.isOf(Blocks.WATER))
+		if(s.is(Blocks.WATER))
 
 		{
 
@@ -5087,7 +5098,7 @@ public final class FlightController
 
 		}
 
-		return Registries.BLOCK.getId(s.getBlock()).getPath();
+		return BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath();
 
 	}
 
@@ -5223,9 +5234,9 @@ public final class FlightController
 
 				BetterBlockPos b = this.path.get(i + 1);
 
-				Vec3d ac = Vec3d.ofCenter((Vec3i)a);
+				Vec3 ac = Vec3.atCenterOf((Vec3i)a);
 
-				Vec3d bc = Vec3d.ofCenter((Vec3i)b);
+				Vec3 bc = Vec3.atCenterOf((Vec3i)b);
 
 				if(!this.this$0.clearView(ac, bc)
 
@@ -5425,9 +5436,9 @@ public final class FlightController
 
 					{
 
-						if(this.this$0.player().squaredDistanceTo(
+						if(this.this$0.player().distanceToSqr(
 
-							Vec3d.ofCenter((Vec3i)pathStart)) < 256.0)
+							Vec3.atCenterOf((Vec3i)pathStart)) < 256.0)
 
 						{
 
@@ -5579,7 +5590,7 @@ public final class FlightController
 
 			for(rangeEndExcl = this.playerNear; rangeEndExcl < this.path.size()
 
-				&& context.hasChunk(new ChunkPos(
+				&& context.hasChunk(ChunkPos.containing(
 
 					(BlockPos)this.path.get(rangeEndExcl))); ++rangeEndExcl)
 
@@ -5625,9 +5636,9 @@ public final class FlightController
 
 			{
 
-				Vec3d a = Vec3d.ofCenter((Vec3i)((Vec3i)this.path.get(i)));
+				Vec3 a = Vec3.atCenterOf((Vec3i)((Vec3i)this.path.get(i)));
 
-				Vec3d b = Vec3d.ofCenter((Vec3i)((Vec3i)this.path.get(i + 1)));
+				Vec3 b = Vec3.atCenterOf((Vec3i)((Vec3i)this.path.get(i + 1)));
 
 				if(this.this$0.clearView(this.this$0.feetVec(), a)
 
@@ -5715,7 +5726,7 @@ public final class FlightController
 
 				&& this.path.get(last).distanceSq(this.this$0.feet()) < 65536.0;
 
-			if(this.this$0.level().isPosLoaded((BlockPos)this.path.get(last))
+			if(this.this$0.level().isLoaded((BlockPos)this.path.get(last))
 
 				|| predictedReach)
 

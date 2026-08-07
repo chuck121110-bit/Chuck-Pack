@@ -21,8 +21,8 @@ import meteordevelopment.meteorclient.utils.render.SimpleBlockRenderer;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.meteorclient.utils.render.postprocess.PostProcessShaders;
-import net.minecraft.block.BlockState;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.core.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -67,13 +67,13 @@ public abstract class NukerMixin implements AeroShaderSource {
     private void aeropack$addShaderSettings() {
         aeropack$renderMode = sgRender.add(new EnumSetting.Builder<AeroRenderMode>()
             .name("aeropack-render-mode")
-            .description("Box ESP draws a normal box outline. Shader uses the same post-process outline shader as Storage ESP.")
+            .description("AABB ESP draws a normal AABB outline. Shader uses the same post-process outline shader as Storage ESP.")
             .defaultValue(AeroRenderMode.BoxESP)
             .build()
         );
     }
 
-    // ── Redirect the box-mode "ticking block" render call ──────────────────
+    // ── Redirect the AABB-mode "ticking block" render call ──────────────────
     // In Shader mode we don't call the real renderTickingBlock at all -
     // instead we track the position ourselves and draw it via the shared
     // outline shader in aeropack$renderShaderBlocks below.
@@ -86,7 +86,7 @@ public abstract class NukerMixin implements AeroShaderSource {
     )
     private void aeropack$redirectTickingBlock(BlockPos pos, Color side, Color line, ShapeMode shapeMode, int startFade, int endFade, boolean bool1, boolean bool2) {
         if (aeropack$renderMode.get() == AeroRenderMode.Shader) {
-            aeropack$shaderBlocks.put(pos.toImmutable(), 8);
+            aeropack$shaderBlocks.put(pos.immutable(), 8);
         } else {
             RenderUtils.renderTickingBlock(pos, side, line, shapeMode, startFade, endFade, bool1, bool2);
         }

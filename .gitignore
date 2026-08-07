@@ -13,3 +13,6 @@ out/
 AGENTS.md
 Source References/
 meteor-client-*/
+build-log.txt
+gradle-*-bin.zip
+*.log

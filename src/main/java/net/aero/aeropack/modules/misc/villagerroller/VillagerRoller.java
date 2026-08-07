@@ -41,43 +41,43 @@ import meteordevelopment.meteorclient.utils.player.FindItemResult;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
 import meteordevelopment.meteorclient.utils.world.BlockUtils;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.ItemEnchantmentsComponent;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnchantmentLevelEntry;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.entity.projectile.ProjectileUtil;
-import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.EnchantmentInstance;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.item.Items;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.s2c.play.SetTradeOffersS2CPacket;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.tag.EnchantmentTags;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.village.VillagerProfession;
-import net.minecraft.village.TradeOffer;
-import net.minecraft.village.TradeOfferList;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundMerchantOffersPacket;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.Holder;
+import net.minecraft.tags.EnchantmentTags;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.entity.npc.villager.VillagerProfession;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.trading.MerchantOffers;
 import it.unimi.dsi.fastutil.objects.Object2IntMap.Entry;
 import org.apache.commons.io.FilenameUtils;
 
@@ -104,7 +104,7 @@ public class VillagerRoller extends Module {
         .defaultValue(true).build());
     private final Setting<List<SoundEvent>> sound = sgSound.add(new SoundEventListSetting.Builder()
         .name("sound-to-play").description("Sound to play on desired trade")
-        .defaultValue(Collections.singletonList(SoundEvents.ENTITY_PLAYER_LEVELUP)).build());
+        .defaultValue(Collections.singletonList(SoundEvents.PLAYER_LEVELUP)).build());
     private final Setting<Double> soundPitch = sgSound.add(new DoubleSetting.Builder()
         .name("sound-pitch").description("Sound pitch")
         .defaultValue(1.0).min(0.0).sliderRange(0.0, 8.0).build());
@@ -170,7 +170,7 @@ public class VillagerRoller extends Module {
         .defaultValue(true).build());
 
     private State currentState = State.DISABLED;
-    private VillagerEntity rollingVillager;
+    private Villager rollingVillager;
     private BlockPos rollingBlockPos;
     private Block rollingBlock;
     private final List<RollingEnchantment> searchingEnchants = new ArrayList<>();
@@ -208,10 +208,10 @@ public class VillagerRoller extends Module {
     }
 
     @Override
-    public NbtCompound toTag() {
-        NbtCompound tag = super.toTag();
+    public CompoundTag toTag() {
+        CompoundTag tag = super.toTag();
         if (saveListToConfig.get()) {
-            NbtList l = new NbtList();
+            ListTag l = new ListTag();
             for (RollingEnchantment e : searchingEnchants) l.add(e.toTag());
             tag.put("rolling", l);
         }
@@ -219,14 +219,14 @@ public class VillagerRoller extends Module {
     }
 
     @Override
-    public Module fromTag(NbtCompound tag) {
+    public Module fromTag(CompoundTag tag) {
         super.fromTag(tag);
         if (saveListToConfig.get()) {
-            NbtList l = tag.getList("rolling").orElse(new NbtList());
+            ListTag l = tag.getList("rolling").orElse(new ListTag());
             searchingEnchants.clear();
-            for (NbtElement e : l) {
-                if (e.getType() != 10) info("Invalid list element");
-                else searchingEnchants.add(new RollingEnchantment().fromTag((NbtCompound) e));
+            for (Tag e : l) {
+                if (e.getId() != 10) info("Invalid list element");
+                else searchingEnchants.add(new RollingEnchantment().fromTag((CompoundTag) e));
             }
         }
         return this;
@@ -234,23 +234,23 @@ public class VillagerRoller extends Module {
 
     private boolean loadSearchingFromFile(File f) {
         if (!f.exists() || !f.canRead()) { error("File does not exist or cannot be read"); return false; }
-        NbtCompound r;
+        CompoundTag r;
         try { r = NbtIo.read(f.toPath()); }
         catch (IOException e) { e.printStackTrace(); error("Failed to load NBT from file"); return false; }
         if (r == null) { error("Failed to load NBT from file"); return false; }
-        NbtList l = r.getList("rolling").orElse(new NbtList());
+        ListTag l = r.getList("rolling").orElse(new ListTag());
         searchingEnchants.clear();
-        for (NbtElement e : l) {
-            if (e.getType() != 10) { error("Invalid list element"); return false; }
-            searchingEnchants.add(new RollingEnchantment().fromTag((NbtCompound) e));
+        for (Tag e : l) {
+            if (e.getId() != 10) { error("Invalid list element"); return false; }
+            searchingEnchants.add(new RollingEnchantment().fromTag((CompoundTag) e));
         }
         return true;
     }
 
     public boolean saveSearchingToFile(File f) {
-        NbtList l = new NbtList();
+        ListTag l = new ListTag();
         for (RollingEnchantment e : searchingEnchants) l.add(e.toTag());
-        NbtCompound c = new NbtCompound();
+        CompoundTag c = new CompoundTag();
         c.put("rolling", l);
         if (Files.notExists(f.getParentFile().toPath()) && !f.getParentFile().mkdirs()) {
             error("Failed to make directories"); return false;
@@ -299,7 +299,7 @@ public class VillagerRoller extends Module {
 
         WSection enchantments = list.add(theme.section("Enchantments")).expandX().widget();
         WTable table = enchantments.add(theme.table()).expandX().widget();
-        table.add(theme.item(Items.BOOK.getDefaultStack()));
+        table.add(theme.item(Items.BOOK.getDefaultInstance()));
         table.add(theme.label("Enchantment")).expandX();
         table.add(theme.label("Level")).minWidth(40.0F).expandX();
         table.add(theme.label("Cost")).minWidth(40.0F).expandX();
@@ -313,17 +313,17 @@ public class VillagerRoller extends Module {
         }
 
         Optional<Registry<Enchantment>> reg = mc.level != null
-            ? mc.level.getRegistryManager().getOptional(RegistryKeys.ENCHANTMENT)
+            ? mc.level.registryAccess().lookup(Registries.ENCHANTMENT)
             : Optional.empty();
 
         for (int i = 0; i < searchingEnchants.size(); i++) {
             RollingEnchantment e = searchingEnchants.get(i);
-            Optional<RegistryEntry.Reference<Enchantment>> en = reg.flatMap(r -> r.getEntry(e.getEnchantment()));
+            Optional<Holder.Reference<Enchantment>> en = reg.flatMap(r -> r.get(e.getEnchantment()));
 
-            net.minecraft.item.ItemStack book = Items.BOOK.getDefaultStack();
+            net.minecraft.world.item.ItemStack book = Items.BOOK.getDefaultInstance();
             int maxlevel = 255;
             if (en.isPresent()) {
-                book = EnchantmentHelper.getEnchantedBookWith(new EnchantmentLevelEntry(en.get(), en.get().value().getMaxLevel()));
+                book = EnchantmentHelper.createBook(new EnchantmentInstance(en.get(), en.get().value().getMaxLevel()));
                 maxlevel = en.get().value().getMaxLevel();
             }
 
@@ -368,8 +368,8 @@ public class VillagerRoller extends Module {
         addAll.action = () -> {
             list.clear(); searchingEnchants.clear();
             reg.ifPresent(r -> {
-                for (RegistryEntry<Enchantment> entry : getEnchants(onlyTradeable.get())) {
-                    Identifier id = entry.getKey().map(RegistryKey::getValue).orElse(null);
+                for (Holder<Enchantment> entry : getEnchants(onlyTradeable.get())) {
+                    Identifier id = entry.unwrapKey().map(ResourceKey::identifier).orElse(null);
                     if (id != null) searchingEnchants.add(new RollingEnchantment(id,
                         entry.value().getMaxLevel(), RollingEnchantment.getMinimumPrice(entry), true));
                 }
@@ -383,7 +383,7 @@ public class VillagerRoller extends Module {
             list.clear();
             reg.ifPresent(r -> {
                 for (RollingEnchantment e : searchingEnchants) {
-                    r.getEntry(e.getEnchantment()).ifPresent(en ->
+                    r.get(e.getEnchantment()).ifPresent(en ->
                         e.setMaxCost(RollingEnchantment.getMinimumPrice(en)));
                 }
             });
@@ -411,46 +411,46 @@ public class VillagerRoller extends Module {
         controls.row();
     }
 
-    private List<RegistryEntry<Enchantment>> getEnchants(boolean onlyTradeable) {
+    private List<Holder<Enchantment>> getEnchants(boolean onlyTradeable) {
         if (mc.level == null) return Collections.emptyList();
-        Registry<Enchantment> reg = mc.level.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
-        List<RegistryEntry<Enchantment>> available = new ArrayList<>();
-        for (RegistryEntry<Enchantment> e : reg.streamEntries().toList()) {
-            if (!onlyTradeable || e.isIn(EnchantmentTags.TRADEABLE)) available.add(e);
+        Registry<Enchantment> reg = mc.level.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+        List<Holder<Enchantment>> available = new ArrayList<>();
+        for (Holder<Enchantment> e : reg.listElements().toList()) {
+            if (!onlyTradeable || e.is(EnchantmentTags.TRADEABLE)) available.add(e);
         }
         return available;
     }
 
     public void triggerInteract() {
-        if (pauseOnScreen.get() && mc.currentScreen != null) {
+        if (pauseOnScreen.get() && mc.screen != null) {
             if (cfPausedOnScreen.get()) info("Rolling paused, interact with villager to continue");
             return;
         }
-        Vec3d playerPos = mc.player.getEyePos();
-        Vec3d villagerPos = rollingVillager.getEyePos();
+        Vec3 playerPos = mc.player.getEyePosition();
+        Vec3 villagerPos = rollingVillager.getEyePosition();
 
-        EntityHitResult entityHitResult = ProjectileUtil.raycast(
+        EntityHitResult entityHitResult = ProjectileUtil.getEntityHitResult(
             mc.player, playerPos, villagerPos,
-            mc.player.getBoundingBox().union(rollingVillager.getBoundingBox()).expand(1.0),
+            mc.player.getBoundingBox().minmax(rollingVillager.getBoundingBox()).inflate(1.0),
             entity -> entity.isAlive() && entity != mc.player,
             playerPos.distanceTo(villagerPos));
 
         if (entityHitResult == null) {
-            mc.gameMode.interactEntity(mc.player, rollingVillager, Hand.MAIN_HAND);
+            mc.gameMode.interact(mc.player, rollingVillager, new EntityHitResult(rollingVillager), InteractionHand.MAIN_HAND);
         } else {
-            ActionResult result = mc.gameMode.interactEntityAtLocation(mc.player, rollingVillager, entityHitResult, Hand.MAIN_HAND);
-            if (!result.isAccepted()) {
-                mc.gameMode.interactEntity(mc.player, rollingVillager, Hand.MAIN_HAND);
+            InteractionResult result = mc.gameMode.interact(mc.player, rollingVillager, entityHitResult, InteractionHand.MAIN_HAND);
+            if (!result.consumesAction()) {
+                mc.gameMode.interact(mc.player, rollingVillager, entityHitResult, InteractionHand.MAIN_HAND);
             }
         }
         waitingForTradesTicks = 0;
     }
 
-    private List<Pair<RegistryEntry<Enchantment>, Integer>> getEnchants(net.minecraft.item.ItemStack stack) {
-        List<Pair<RegistryEntry<Enchantment>, Integer>> ret = new ArrayList<>();
-        ItemEnchantmentsComponent component = stack.get(DataComponentTypes.STORED_ENCHANTMENTS);
+    private List<Pair<Holder<Enchantment>, Integer>> getEnchants(net.minecraft.world.item.ItemStack stack) {
+        List<Pair<Holder<Enchantment>, Integer>> ret = new ArrayList<>();
+        ItemEnchantments component = stack.get(DataComponents.STORED_ENCHANTMENTS);
         if (component != null) {
-            for (Object2IntMap.Entry<RegistryEntry<Enchantment>> e : component.getEnchantmentEntries()) {
+            for (Object2IntMap.Entry<Holder<Enchantment>> e : component.entrySet()) {
                 ret.add(ObjectIntImmutablePair.of(e.getKey(), e.getIntValue()));
             }
         }
@@ -461,20 +461,20 @@ public class VillagerRoller extends Module {
     private void onReceivePacket(PacketEvent.Receive event) {
         if (currentState == State.ROLLING_WAITING_FOR_VILLAGER_TRADES) {
             Packet<?> p = event.packet;
-            if (p instanceof SetTradeOffersS2CPacket tradePacket) {
+            if (p instanceof ClientboundMerchantOffersPacket tradePacket) {
                 mc.execute(() -> triggerTradeCheck(tradePacket.getOffers()));
             }
         }
     }
 
-    public void triggerTradeCheck(TradeOfferList offers) {
-        for (TradeOffer offer : offers) {
-            net.minecraft.item.ItemStack sellItem = offer.getSellItem();
-            if (sellItem.isOf(Items.ENCHANTED_BOOK) && sellItem.get(DataComponentTypes.STORED_ENCHANTMENTS) != null) {
-                for (Pair<RegistryEntry<Enchantment>, Integer> enchant : getEnchants(sellItem)) {
+    public void triggerTradeCheck(MerchantOffers offers) {
+        for (MerchantOffer offer : offers) {
+            net.minecraft.world.item.ItemStack sellItem = offer.getResult();
+            if (sellItem.getItem() == Items.ENCHANTED_BOOK && sellItem.get(DataComponents.STORED_ENCHANTMENTS) != null) {
+                for (Pair<Holder<Enchantment>, Integer> enchant : getEnchants(sellItem)) {
                     int enchantLevel = enchant.right();
-                    Registry<Enchantment> reg = mc.level.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
-                    String enchantIdString = enchant.left().getKey().map(k -> k.getValue().toString()).orElse("");
+                    Registry<Enchantment> reg = mc.level.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+                    String enchantIdString = enchant.left().unwrapKey().map(k -> k.identifier().toString()).orElse("");
                     String enchantName = Names.get(enchant.left());
                     boolean found = false;
                     RollingEnchantment matched = null;
@@ -495,31 +495,31 @@ public class VillagerRoller extends Module {
                             }
                         }
                     }
-                    if (found && matched != null && (matched.getMaxCost() <= 0 || offer.getFirstBuyItem().count() <= matched.getMaxCost())) {
+                    if (found && matched != null && (matched.getMaxCost() <= 0 || offer.getItemCostA().count() <= matched.getMaxCost())) {
                         if (disableIfFound.get()) matched.setEnabled(false);
                         toggle();
                         if (enablePlaySound.get() && !sound.get().isEmpty()) {
                             mc.getSoundManager().play(
-                                net.minecraft.client.sound.PositionedSoundInstance.master(
+                                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
                                     sound.get().get(0), soundPitch.get().floatValue(), soundVolume.get().floatValue()));
                         }
                         if (disconnectIfFound.get()) {
                             String levelText = enchantLevel <= 1 && enchant.left().value().getMaxLevel() <= 1 ? "" : " " + enchantLevel;
-                            mc.disconnect(Text.literal(String.format(
-                                "Found enchant %s%s for %d emeralds. Disconnecting.", enchantName, levelText, offer.getFirstBuyItem().count())));
+                            mc.disconnectFromWorld(Component.literal(String.format(
+                                "Found enchant %s%s for %d emeralds. Disconnecting.", enchantName, levelText, offer.getItemCostA().count())));
                         }
                         return;
                     }
                 }
             }
         }
-        mc.player.swingHand(Hand.MAIN_HAND);
+        mc.player.swing(InteractionHand.MAIN_HAND);
         currentState = State.ROLLING_BREAKING_BLOCK;
     }
 
     @EventHandler
     private void onInteractEntity(InteractEntityEvent event) {
-        if (currentState == State.WAITING_FOR_TARGET_VILLAGER && event.entity instanceof VillagerEntity villager) {
+        if (currentState == State.WAITING_FOR_TARGET_VILLAGER && event.entity instanceof Villager villager) {
             rollingVillager = villager;
             currentState = State.ROLLING_BREAKING_BLOCK;
             if (cfSetup.get()) info("Got your villager!");
@@ -534,8 +534,8 @@ public class VillagerRoller extends Module {
             rollingBlock = mc.level.getBlockState(rollingBlockPos).getBlock();
             currentState = State.WAITING_FOR_TARGET_VILLAGER;
             if (instantRebreak.get()) {
-                mc.getConnection().sendPacket(new net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket(
-                    net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK,
+                mc.getConnection().getConnection().send(new net.minecraft.network.protocol.game.ServerboundPlayerActionPacket(
+                    net.minecraft.network.protocol.game.ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK,
                     rollingBlockPos, Direction.DOWN));
             }
             if (cfSetup.get()) info("Block selected. Now interact with the villager.");
@@ -554,8 +554,8 @@ public class VillagerRoller extends Module {
         if (mc.level == null || mc.player == null) return null;
         double closestDist = 64.0;
         ItemEntity closest = null;
-        for (Entity entity : mc.level.getEntities()) {
-            if (entity instanceof ItemEntity itemEntity && itemEntity.getStack().isOf(Items.LECTERN)) {
+        for (Entity entity : mc.level.players()) {
+            if (entity instanceof ItemEntity itemEntity && itemEntity.getItem().getItem() == Items.LECTERN) {
                 double dist = mc.player.distanceTo(entity);
                 if (dist < closestDist) { closestDist = dist; closest = itemEntity; }
             }
@@ -574,14 +574,14 @@ public class VillagerRoller extends Module {
         switch (currentState) {
             case ROLLING_BREAKING_BLOCK -> {
                 if (instantRebreak.get()) {
-                    mc.getConnection().sendPacket(new net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket(
-                        net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket.Action.START_DESTROY_BLOCK,
+                    mc.getConnection().getConnection().send(new net.minecraft.network.protocol.game.ServerboundPlayerActionPacket(
+                        net.minecraft.network.protocol.game.ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK,
                         rollingBlockPos, Direction.DOWN));
-                    mc.getConnection().sendPacket(new net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket(
-                        net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK,
+                    mc.getConnection().getConnection().send(new net.minecraft.network.protocol.game.ServerboundPlayerActionPacket(
+                        net.minecraft.network.protocol.game.ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK,
                         rollingBlockPos, Direction.DOWN));
                 }
-                if (mc.level.getBlockState(rollingBlockPos).isOf(Blocks.AIR)) {
+                if (mc.level.getBlockState(rollingBlockPos).getBlock() == Blocks.AIR) {
                     currentState = State.ROLLING_WAITING_FOR_VILLAGER_PROFESSION_CLEAR;
                     professionClearWaitTicks = 0;
                 } else if (!instantRebreak.get() && !BlockUtils.breakBlock(rollingBlockPos, true)) {
@@ -592,7 +592,7 @@ public class VillagerRoller extends Module {
             case ROLLING_WAITING_FOR_VILLAGER_PROFESSION_CLEAR -> {
                 professionClearWaitTicks++;
                 if (professionClearWaitTicks < 5) return;
-                if (mc.level.getBlockState(rollingBlockPos).isOf(Blocks.LECTERN)) {
+                if (mc.level.getBlockState(rollingBlockPos).getBlock() == Blocks.LECTERN) {
                     if (cfDiscrepancy.get()) info("Block mining reverted?");
                     currentState = State.ROLLING_BREAKING_BLOCK;
                     return;
@@ -634,12 +634,12 @@ public class VillagerRoller extends Module {
                     currentState = State.ROLLING_BREAKING_BLOCK;
                     return;
                 }
-                if (mc.level.getBlockState(rollingBlockPos).isOf(Blocks.AIR)) {
+                if (mc.level.getBlockState(rollingBlockPos).getBlock() == Blocks.AIR) {
                     if (cfDiscrepancy.get()) info("Lectern placement reverted by server");
                     currentState = State.ROLLING_PLACING_BLOCK;
                     return;
                 }
-                if (!mc.level.getBlockState(rollingBlockPos).isOf(Blocks.LECTERN)) {
+                if (mc.level.getBlockState(rollingBlockPos).getBlock() != Blocks.LECTERN) {
                     if (cfDiscrepancy.get()) info("Placed wrong block?!");
                     currentState = State.ROLLING_BREAKING_BLOCK;
                     return;

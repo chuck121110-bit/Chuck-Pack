@@ -3,7 +3,6 @@ package net.aero.aeropack.modules.movement;
 import meteordevelopment.meteorclient.events.entity.player.PlayerMoveEvent;
 import meteordevelopment.meteorclient.events.meteor.MouseScrollEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
-import meteordevelopment.meteorclient.mixininterface.IVec3d;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
@@ -11,7 +10,7 @@ import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.render.Freecam;
 import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.phys.Vec3;
 
 public class JumpFlight extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
@@ -85,14 +84,15 @@ public class JumpFlight extends Module {
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
         if (modifyHorizontalSpeed.get()) {
-            Vec3d vel = PlayerUtils.getHorizontalVelocity(horizontalSpeed.get());
-            ((IVec3d) event.movement).meteor$set(vel.x, event.movement.y, vel.z);
+            Vec3 vel = PlayerUtils.getHorizontalVelocity(horizontalSpeed.get());
+            // TODO: IVec3d removed in Meteor 26.1 - verify event.movement assignment works
+            event.movement = new Vec3(vel.x, event.movement.y, vel.z);
         }
     }
 
     @EventHandler
     private void onMouseScroll(MouseScrollEvent event) {
-        if (!mc.options.sprintKey.isPressed()) return;
+        if (!mc.options.keySprint.isDown()) return;
         if (modifyHorizontalSpeed.get() && scrollControl.get()) {
             horizontalSpeed.set(horizontalSpeed.get() + event.value * scrollSensitivity.get());
         }
@@ -107,9 +107,9 @@ public class JumpFlight extends Module {
             targetYInitialized = true;
         }
 
-        if (!Modules.get().isActive(Freecam.class) && mc.currentScreen == null) {
-            jumpHeld = mc.options.jumpKey.isPressed();
-            sneakHeld = mc.options.sneakKey.isPressed();
+        if (!Modules.get().isActive(Freecam.class) && mc.screen == null) {
+            jumpHeld = mc.options.keyJump.isDown();
+            sneakHeld = mc.options.keyShift.isDown();
         }
 
         tickCounter++;
@@ -124,7 +124,7 @@ public class JumpFlight extends Module {
         }
 
         if (mc.player.blockPosition().getY() <= targetYLevel) {
-            mc.player.jump();
+            mc.player.jumpFromGround();
         }
     }
 

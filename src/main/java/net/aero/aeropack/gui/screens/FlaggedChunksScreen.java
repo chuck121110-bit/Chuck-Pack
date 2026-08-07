@@ -11,12 +11,12 @@ import meteordevelopment.meteorclient.gui.widgets.containers.WTable;
 import meteordevelopment.meteorclient.gui.widgets.containers.WVerticalList;
 import meteordevelopment.meteorclient.gui.widgets.pressable.WButton;
 import net.aero.aeropack.modules.world.BaseFinder;
-import net.minecraft.block.Block;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.world.level.ChunkPos;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -113,26 +113,26 @@ public class FlaggedChunksScreen extends WindowScreen {
 
         List<ChunkPos> sorted = new ArrayList<>();
         for (ChunkPos c : baseChunks) sorted.add(c);
-        sorted.sort(Comparator.comparingInt((ChunkPos c) -> c.x).thenComparingInt((ChunkPos c) -> c.z));
+        sorted.sort(Comparator.comparingInt((ChunkPos c) -> c.x()).thenComparingInt((ChunkPos c) -> c.z()));
 
-        for (ChunkPos chunk : sorted) {
-            table.add(theme.label(chunk.getCenterX() + ", " + chunk.getCenterZ())).expandX();
+        for (ChunkPos LevelChunk : sorted) {
+            table.add(theme.label(LevelChunk.getMiddleBlockX() + ", " + LevelChunk.getMiddleBlockZ())).expandX();
 
             WButton openBtn = table.add(theme.button("Open")).widget();
             openBtn.action = () -> {
-                selectedChunk = chunk;
+                selectedChunk = LevelChunk;
                 reload();
             };
 
             WButton pulseBtn = table.add(theme.button("Pulse")).widget();
-            pulseBtn.action = () -> module.pulseChunk(chunk);
+            pulseBtn.action = () -> module.pulseChunk(LevelChunk);
 
             table.row();
         }
     }
 
     private void buildChunkDetail() {
-        add(theme.label("Chunk: " + selectedChunk.getCenterX() + ", " + selectedChunk.getCenterZ())).expandX();
+        add(theme.label("LevelChunk: " + selectedChunk.getMiddleBlockX() + ", " + selectedChunk.getMiddleBlockZ())).expandX();
 
         WHorizontalList buttons = add(theme.horizontalList()).expandX().widget();
 
@@ -163,7 +163,7 @@ public class FlaggedChunksScreen extends WindowScreen {
     private void buildTriggersSection(WSection section) {
         Set<String> reasons = chunkTriggerReasons.get(selectedChunk);
         if (reasons == null || reasons.isEmpty()) {
-            section.add(theme.label("No trigger data for this chunk")).expandX();
+            section.add(theme.label("No trigger data for this LevelChunk")).expandX();
             return;
         }
 
@@ -176,7 +176,7 @@ public class FlaggedChunksScreen extends WindowScreen {
         filtered.sort(Comparator.naturalOrder());
 
         if (filtered.isEmpty()) {
-            section.add(theme.label("No trigger data for this chunk")).expandX();
+            section.add(theme.label("No trigger data for this LevelChunk")).expandX();
             return;
         }
 
@@ -201,7 +201,7 @@ public class FlaggedChunksScreen extends WindowScreen {
                 int count = entry.getValue();
 
                 ItemStack stack = new ItemStack(block.asItem());
-                if (stack.isOf(Items.AIR)) {
+                if (stack.isEmpty()) {
                     stack = new ItemStack(block);
                 }
 
@@ -210,7 +210,7 @@ public class FlaggedChunksScreen extends WindowScreen {
                 blockTable.row();
             }
         } else {
-            section.add(theme.label("No block data for this chunk")).expandX();
+            section.add(theme.label("No block data for this LevelChunk")).expandX();
         }
     }
 
@@ -232,7 +232,7 @@ public class FlaggedChunksScreen extends WindowScreen {
                 entityTable.row();
             }
         } else {
-            section.add(theme.label("No entity data for this chunk")).expandX();
+            section.add(theme.label("No entity data for this LevelChunk")).expandX();
         }
     }
 }

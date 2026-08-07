@@ -328,8 +328,8 @@ public final class LazyThetaStar
 	private double penalty(int x, int y, int z)
 	{
 		double p = CLEARANCE_PENALTY[this.lateralClearance(x, y, z)];
-		FlightGrid.GridChunk chunk = this.memoChunk(x, z);
-		if(p > 0.0 && (chunk == null || chunk.source != 1))
+		FlightGrid.GridChunk LevelChunk = this.memoChunk(x, z);
+		if(p > 0.0 && (LevelChunk == null || LevelChunk.source != 1))
 			p *= PREDICTED_CLEARANCE_SCALE;
 		if(this.solid(x, y + 3, z))
 			p += CEIL_NEAR_PENALTY;

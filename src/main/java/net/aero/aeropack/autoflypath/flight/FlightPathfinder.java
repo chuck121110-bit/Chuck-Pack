@@ -18,19 +18,19 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import net.minecraft.client.multiplayer.ClientChunkCache;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.BlockState;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.chunk.ChunkSection;
-import net.minecraft.world.chunk.PalettedContainer;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.phys.Vec3;
 
 public final class FlightPathfinder
 {
 	private static final BlockState AIR_BLOCK_STATE =
-		Blocks.AIR.getDefaultState();
+		Blocks.AIR.defaultBlockState();
 
 	private static final int SEARCH_MAX_POPS = 400000;
 	private static final long SEARCH_TIME_BUDGET_NANOS = 450000000L;
@@ -56,8 +56,8 @@ public final class FlightPathfinder
 
 	private static boolean isBurnHazard(BlockState state)
 	{
-		return state.isOf(Blocks.LAVA) || state.isOf(Blocks.FIRE)
-			|| state.isOf(Blocks.SOUL_FIRE);
+		return state.is(Blocks.LAVA) || state.is(Blocks.FIRE)
+			|| state.is(Blocks.SOUL_FIRE);
 	}
 
 	public FlightPathfinder(long seed, int worldMinY, int worldHeight,
@@ -118,7 +118,7 @@ public final class FlightPathfinder
 
 	public boolean hasChunk(ChunkPos pos)
 	{
-		return this.grid.hasRealChunk(pos.x, pos.z);
+		return this.grid.hasRealChunk(pos.x(), pos.z());
 	}
 
 	public boolean hasRealChunk(int chunkX, int chunkZ)
@@ -150,7 +150,7 @@ public final class FlightPathfinder
 
 	public void queueBlockUpdate(BlockPos pos, BlockState state)
 	{
-		BlockPos p = pos.toImmutable();
+		BlockPos p = pos.immutable();
 		boolean solid = state != AIR_BLOCK_STATE && !state.isAir();
 		boolean hazard = FlightPathfinder.isBurnHazard(state);
 		this.packExecutor.execute(() -> this.grid.setBlock(p.getX(), p.getY(),
@@ -171,19 +171,19 @@ public final class FlightPathfinder
 			long[] hazard = this.grid.newChunkBits();
 			int gridMinY = this.grid.minY();
 			int gridHeight = this.grid.height();
-			int chunkMinY = chunk.getMinBuildHeight();
-			ChunkSection[] sections = chunk.getSectionArray();
+			int chunkMinY = chunk.getMinY();
+			LevelChunkSection[] sections = chunk.getSections();
 
 			for(int i = 0; i < sections.length; ++i)
 			{
-				ChunkSection section;
+				LevelChunkSection section;
 				int sectionBottomY = chunkMinY + (i << 4);
 				if(sectionBottomY + 16 <= gridMinY
 					|| sectionBottomY >= gridMinY + gridHeight
-					|| (section = sections[i]) == null || section.isEmpty())
+					|| (section = sections[i]) == null || section.hasOnlyAir())
 					continue;
 
-				PalettedContainer states = section.getBlockStateContainer();
+				PalettedContainer states = section.getStates();
 				for(int ly = 0; ly < 16; ++ly)
 				{
 					int yIdx = sectionBottomY + ly - gridMinY;
@@ -212,7 +212,7 @@ public final class FlightPathfinder
 				}
 			}
 
-			this.grid.putChunk(chunk.getPos().x, chunk.getPos().z, bits,
+			this.grid.putChunk(chunk.getPos().x(), chunk.getPos().z(), bits,
 				hazard, 1);
 
 		}catch(Exception e)
@@ -237,19 +237,19 @@ public final class FlightPathfinder
 			long[] hazard = this.grid.newChunkBits();
 			int gridMinY = this.grid.minY();
 			int gridHeight = this.grid.height();
-			int chunkMinY = chunk.getMinBuildHeight();
-			ChunkSection[] sections = chunk.getSectionArray();
+			int chunkMinY = chunk.getMinY();
+			LevelChunkSection[] sections = chunk.getSections();
 
 			for(int i = 0; i < sections.length; ++i)
 			{
-				ChunkSection section;
+				LevelChunkSection section;
 				int sectionBottomY = chunkMinY + (i << 4);
 				if(sectionBottomY + 16 <= gridMinY
 					|| sectionBottomY >= gridMinY + gridHeight
-					|| (section = sections[i]) == null || section.isEmpty())
+					|| (section = sections[i]) == null || section.hasOnlyAir())
 					continue;
 
-				PalettedContainer states = section.getBlockStateContainer();
+				PalettedContainer states = section.getStates();
 				for(int ly = 0; ly < 16; ++ly)
 				{
 					int yIdx = sectionBottomY + ly - gridMinY;
@@ -278,7 +278,7 @@ public final class FlightPathfinder
 				}
 			}
 
-			this.grid.putChunk(chunk.getPos().x, chunk.getPos().z, bits,
+			this.grid.putChunk(chunk.getPos().x(), chunk.getPos().z(), bits,
 				hazard, 1);
 
 		}catch(Exception e)
@@ -301,7 +301,7 @@ public final class FlightPathfinder
 							ClientChunkCache mgr = chunkSrc.get();
 							if(mgr != null)
 							{
-								LevelChunk chunk = (LevelChunk)mgr.getChunk(cx, cz);
+								LevelChunk chunk = (LevelChunk)mgr.getChunk(cx, cz, false);
 								if(chunk != null && !chunk.isEmpty())
 								{
 									this.packRealChunkSync(chunk);
@@ -420,12 +420,12 @@ public final class FlightPathfinder
 		return false;
 	}
 
-	public boolean pathLineClear(Vec3d a, Vec3d b)
+	public boolean pathLineClear(Vec3 a, Vec3 b)
 	{
 		return GridRay.corridorClear(this.grid, a.x, a.y, a.z, b.x, b.y, b.z);
 	}
 
-	public boolean pathLineClear(Vec3d a, Vec3d b, double offset)
+	public boolean pathLineClear(Vec3 a, Vec3 b, double offset)
 	{
 		return GridRay.corridorClear(this.grid, a.x, a.y, a.z, b.x, b.y, b.z,
 			offset);
@@ -466,7 +466,7 @@ public final class FlightPathfinder
 		return true;
 	}
 
-	public double raytraceDistance(Vec3d from, Vec3d to)
+	public double raytraceDistance(Vec3 from, Vec3 to)
 	{
 		return GridRay.traceDistance(this.grid::isSolid, from.x, from.y, from.z,
 			to.x, to.y, to.z);

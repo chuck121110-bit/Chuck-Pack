@@ -16,11 +16,12 @@ import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import net.aero.aeropack.util.config.Seeds;
 import net.aero.aeropack.util.config.Seeds.Seed;
 import net.aero.aeropack.util.config.WorldGenUtils;
-import net.minecraft.command.CommandSource;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.multiplayer.ClientSuggestionProvider;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Arrays;
 import java.util.Locale;
@@ -28,12 +29,12 @@ import java.util.Locale;
 public class LocateCommand extends Command {
     private static final DynamicCommandExceptionType NOT_FOUND = new DynamicCommandExceptionType(o -> {
         if (o instanceof Cubiomes.StructureType type) {
-            return Text.literal(String.format("%s not found.", Utils.nameToTitle(type.toString().replace('_', '-'))));
+            return Component.literal(String.format("%s not found.", Utils.nameToTitle(type.toString().replace('_', '-'))));
         }
-        return Text.literal("Not found.");
+        return Component.literal("Not found.");
     });
     private static final DynamicCommandExceptionType INVALID_FEATURE = new DynamicCommandExceptionType(o ->
-        Text.literal(String.format("%s is not a valid feature.", o))
+        Component.literal(String.format("%s is not a valid feature.", o))
     );
 
     public LocateCommand() {
@@ -41,12 +42,12 @@ public class LocateCommand extends Command {
     }
 
     @Override
-    public void build(LiteralArgumentBuilder<CommandSource> builder) {
+    public void build(LiteralArgumentBuilder<ClientSuggestionProvider> builder) {
         builder.then(literal("feature")
             .then(argument("feature", StringArgumentType.word())
-                .suggests((ctx, builder1) -> CommandSource.suggestMatching(
+                .suggests((ctx, builder1) -> SharedSuggestionProvider.suggest(
                     Arrays.stream(Cubiomes.StructureType.values())
-                        .map(type -> type.name().toLowerCase(Locale.ROOT)),
+                        .map(type -> type.name().toLowerCase(Locale.ROOT)).toList(),
                     builder1
                 ))
                 .executes(ctx -> {
@@ -72,13 +73,13 @@ public class LocateCommand extends Command {
                 if (pos == null) throw NOT_FOUND.create(feature);
 
                 int distance = (int) Math.hypot(pos.x - playerPos.getX(), pos.z - playerPos.getZ());
-                MutableText text = Text.literal(String.format("%s located at ", Utils.nameToTitle(feature.toString().replace('_', '-'))));
-                text.append(ChatUtils.formatCoords(new Vec3d(pos.x, 0, pos.z)));
-                text.append(".");
+                MutableComponent component = Component.literal(String.format("%s located at ", Utils.nameToTitle(feature.toString().replace('_', '-'))));
+                component.append(ChatUtils.formatCoords(new Vec3(pos.x, 0, pos.z)));
+                component.append(".");
                 if (distance > 0) {
-                    text.append(String.format(" (%d blocks away)", distance));
+                    component.append(String.format(" (%d blocks away)", distance));
                 }
-                info(text);
+                info(component);
                 return SINGLE_SUCCESS;
             })));
     }

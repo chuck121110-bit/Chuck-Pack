@@ -11,9 +11,9 @@ import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.network.packet.s2c.play.ChatMessageS2CPacket;
-import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.network.protocol.game.ClientboundPlayerChatPacket;
+import net.minecraft.network.protocol.game.ClientboundDisguisedChatPacket;
 
 import meteordevelopment.meteorclient.gui.GuiTheme;
 import meteordevelopment.meteorclient.gui.widgets.WWidget;
@@ -285,8 +285,8 @@ public class AiChatConverse extends Module {
             loadLogFile();
         }
 
-        if (mc.getConnection() != null && mc.getConnection().getServerInfo() != null) {
-            lastServerAddress = mc.getConnection().getServerInfo().address;
+        if (mc.getConnection() != null && mc.getConnection().getServerData() != null) {
+            lastServerAddress = mc.getConnection().getServerData().ip;
         }
 
         if (apiKey.get().isBlank()) {
@@ -312,21 +312,20 @@ public class AiChatConverse extends Module {
         String message = null;
         String senderName = null;
 
-        if (event.packet instanceof GameMessageS2CPacket sysPacket) {
-            if (sysPacket.overlay()) return;
-            message = sysPacket.content().getString();
+        if (event.packet instanceof ClientboundDisguisedChatPacket sysPacket) {
+            message = sysPacket.message().getString();
             senderName = extractSenderFromMessage(message);
-        } else if (event.packet instanceof ChatMessageS2CPacket chatPacket) {
+        } else if (event.packet instanceof ClientboundPlayerChatPacket chatPacket) {
             message = chatPacket.unsignedContent() != null
                 ? chatPacket.unsignedContent().getString()
                 : chatPacket.body().content();
 
-            // Prefer the packet's real sender UUID over text-guessing — this is what
+            // Prefer the packet's real sender UUID over Component-guessing — this is what
             // was causing name mix-ups (someone else's message getting attributed to
-            // you/the wrong player). Only fall back to parsing the raw text if the
+            // you/the wrong player). Only fall back to parsing the raw Component if the
             // server didn't give us a sender UUID we can resolve.
             if (chatPacket.sender() != null && mc.getConnection() != null) {
-                PlayerListEntry entry = mc.getConnection().getPlayerListEntry(chatPacket.sender());
+                PlayerInfo entry = mc.getConnection().getPlayerInfo(chatPacket.sender());
                 if (entry != null) {
                     senderName = entry.getProfile().name();
                 }
@@ -402,8 +401,8 @@ public class AiChatConverse extends Module {
         if (mc.player == null) return;
 
         String currentServer = null;
-        if (mc.getConnection() != null && mc.getConnection().getServerInfo() != null) {
-            currentServer = mc.getConnection().getServerInfo().address;
+        if (mc.getConnection() != null && mc.getConnection().getServerData() != null) {
+            currentServer = mc.getConnection().getServerData().ip;
         }
 
         if (clearOnServerJoin.get() && lastServerAddress != null && currentServer != null
@@ -468,7 +467,7 @@ public class AiChatConverse extends Module {
             String encoded = java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8);
 
             // Try DuckDuckGo instant answers first. This is read-only: we only ever
-            // parse the JSON text fields below and hand plain text back to the AI —
+            // parse the JSON Component fields below and InteractionHand plain Component back to the AI —
             // nothing here executes, downloads, or fetches arbitrary linked content.
             HttpResponse<String> res;
             try {
@@ -510,11 +509,11 @@ public class AiChatConverse extends Module {
                     if (count >= 5) break;
                     if (!t.isJsonObject()) continue;
                     JsonObject topic = t.getAsJsonObject();
-                    if (topic.has("Text")) {
-                        String text = topic.get("Text").getAsString();
-                        if (!text.isBlank()) {
+                    if (topic.has("Component")) {
+                        String Component = topic.get("Component").getAsString();
+                        if (!Component.isBlank()) {
                             if (!result.isEmpty()) result.append("\n");
-                            result.append("- ").append(text);
+                            result.append("- ").append(Component);
                             count++;
                         }
                     }
@@ -597,7 +596,7 @@ public class AiChatConverse extends Module {
                 for (String part : parts) {
                     final String toSend = part;
                     mc.execute(() -> {
-                        mc.player.networkHandler.sendChatMessage(toSend);
+                        mc.player.connection.sendChat(toSend);
                     });
                     if (parts.indexOf(part) < parts.size() - 1) {
                         Thread.sleep(totalDelay);
@@ -659,14 +658,14 @@ public class AiChatConverse extends Module {
                 cutIndex--;
             }
 
-            String chunk = remaining.substring(0, cutIndex).trim();
-            int lastSpace = chunk.lastIndexOf(' ');
-            if (lastSpace > chunk.length() / 2 && cutIndex < remaining.length()) {
-                chunk = chunk.substring(0, lastSpace).trim();
+            String LevelChunk = remaining.substring(0, cutIndex).trim();
+            int lastSpace = LevelChunk.lastIndexOf(' ');
+            if (lastSpace > LevelChunk.length() / 2 && cutIndex < remaining.length()) {
+                LevelChunk = LevelChunk.substring(0, lastSpace).trim();
             }
 
-            messages.add(chunk);
-            remaining = remaining.substring(chunk.length()).trim();
+            messages.add(LevelChunk);
+            remaining = remaining.substring(LevelChunk.length()).trim();
         }
 
         return messages;
@@ -732,17 +731,17 @@ public class AiChatConverse extends Module {
         "If someone asks a stupid question, you call it a stupid question — then you answer it anyway.\n\n" +
 
         "RESPONSE FORMAT:\n" +
-        "Keep it natural. Swear when it fits. No markdown, no code blocks, no excessive formatting. " +
+        "Keep it natural. Swear when it fits. No markdown, no code blocks, no excessive ChatFormatting. " +
         "Just talk like a real person who gives zero fucks.";
 
     private String buildSystemPrompt() {
         String playerList = "Unknown";
         if (mc.getConnection() != null) {
-            java.util.Collection<PlayerListEntry> entries = mc.getConnection().getPlayerList();
+            java.util.Collection<PlayerInfo> entries = mc.getConnection().getOnlinePlayers();
             if (entries != null && !entries.isEmpty()) {
                 StringBuilder sb = new StringBuilder();
                 boolean first = true;
-                for (PlayerListEntry entry : entries) {
+                for (PlayerInfo entry : entries) {
                     if (!first) sb.append(", ");
                     sb.append(entry.getProfile().name());
                     first = false;
@@ -752,13 +751,13 @@ public class AiChatConverse extends Module {
         }
 
         if (useGeminiJailbreak.get()) {
-            String creator = mc.getSession().getUsername();
+            String creator = mc.getUser().getName();
             return GEMINI_JAILBREAK
                 .replace("{CREATOR}", creator)
                 .replace("{PLAYER_LIST}", playerList);
         }
 
-        String creator = mc.getSession().getUsername();
+        String creator = mc.getUser().getName();
         return systemPrompt.get()
             .replace("{PLAYER_LIST}", playerList)
             .replace("{CREATOR}", creator);
@@ -819,12 +818,12 @@ public class AiChatConverse extends Module {
 
         JsonObject json = JsonParser.parseString(res.body()).getAsJsonObject();
         if (json.has("error")) { log("Anthropic: " + json.getAsJsonObject("error").get("message").getAsString(), true); return null; }
-        return json.getAsJsonArray("content").get(0).getAsJsonObject().get("text").getAsString();
+        return json.getAsJsonArray("content").get(0).getAsJsonObject().get("Component").getAsString();
     }
 
     private String callGoogle(String system, String user, String key) throws Exception {
         String combined = system + "\n\n" + user;
-        JsonObject part = new JsonObject(); part.addProperty("text", combined);
+        JsonObject part = new JsonObject(); part.addProperty("Component", combined);
         JsonArray parts = new JsonArray(); parts.add(part);
         JsonObject contentObj = new JsonObject(); contentObj.add("parts", parts);
         JsonArray contents = new JsonArray(); contents.add(contentObj);
@@ -859,7 +858,7 @@ public class AiChatConverse extends Module {
         for (JsonElement p : partsEl.getAsJsonArray()) {
             if (!p.isJsonObject()) continue;
             JsonObject pObj = p.getAsJsonObject();
-            JsonElement textEl = pObj.get("text");
+            JsonElement textEl = pObj.get("Component");
             if (textEl == null || textEl.getAsString().isBlank()) continue;
             boolean isThought = pObj.has("thought") && pObj.get("thought").getAsBoolean();
             if (!isThought) return textEl.getAsString();

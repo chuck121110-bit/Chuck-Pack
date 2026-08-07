@@ -1,7 +1,7 @@
 package net.aero.aeropack.util;
 
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.Set;
 
@@ -12,59 +12,59 @@ public class SwarmDropHelper {
 
     private static final Set<Item> ORE_ITEMS = Set.of(
         // Coal
-        net.minecraft.item.Items.COAL_ORE,
-        net.minecraft.item.Items.DEEPSLATE_COAL_ORE,
-        net.minecraft.item.Items.COAL,
+        net.minecraft.world.item.Items.COAL_ORE,
+        net.minecraft.world.item.Items.DEEPSLATE_COAL_ORE,
+        net.minecraft.world.item.Items.COAL,
 
         // Iron
-        net.minecraft.item.Items.IRON_ORE,
-        net.minecraft.item.Items.DEEPSLATE_IRON_ORE,
-        net.minecraft.item.Items.RAW_IRON,
-        net.minecraft.item.Items.IRON_NUGGET,
-        net.minecraft.item.Items.IRON_INGOT,
+        net.minecraft.world.item.Items.IRON_ORE,
+        net.minecraft.world.item.Items.DEEPSLATE_IRON_ORE,
+        net.minecraft.world.item.Items.RAW_IRON,
+        net.minecraft.world.item.Items.IRON_NUGGET,
+        net.minecraft.world.item.Items.IRON_INGOT,
 
         // Gold
-        net.minecraft.item.Items.GOLD_ORE,
-        net.minecraft.item.Items.DEEPSLATE_GOLD_ORE,
-        net.minecraft.item.Items.NETHER_GOLD_ORE,
-        net.minecraft.item.Items.RAW_GOLD,
-        net.minecraft.item.Items.GOLD_NUGGET,
-        net.minecraft.item.Items.GOLD_INGOT,
+        net.minecraft.world.item.Items.GOLD_ORE,
+        net.minecraft.world.item.Items.DEEPSLATE_GOLD_ORE,
+        net.minecraft.world.item.Items.NETHER_GOLD_ORE,
+        net.minecraft.world.item.Items.RAW_GOLD,
+        net.minecraft.world.item.Items.GOLD_NUGGET,
+        net.minecraft.world.item.Items.GOLD_INGOT,
 
         // Copper
-        net.minecraft.item.Items.COPPER_ORE,
-        net.minecraft.item.Items.DEEPSLATE_COPPER_ORE,
-        net.minecraft.item.Items.RAW_COPPER,
-        net.minecraft.item.Items.COPPER_INGOT,
+        net.minecraft.world.item.Items.COPPER_ORE,
+        net.minecraft.world.item.Items.DEEPSLATE_COPPER_ORE,
+        net.minecraft.world.item.Items.RAW_COPPER,
+        net.minecraft.world.item.Items.COPPER_INGOT,
 
         // Diamond
-        net.minecraft.item.Items.DIAMOND_ORE,
-        net.minecraft.item.Items.DEEPSLATE_DIAMOND_ORE,
-        net.minecraft.item.Items.DIAMOND,
+        net.minecraft.world.item.Items.DIAMOND_ORE,
+        net.minecraft.world.item.Items.DEEPSLATE_DIAMOND_ORE,
+        net.minecraft.world.item.Items.DIAMOND,
 
         // Emerald
-        net.minecraft.item.Items.EMERALD_ORE,
-        net.minecraft.item.Items.DEEPSLATE_EMERALD_ORE,
-        net.minecraft.item.Items.EMERALD,
+        net.minecraft.world.item.Items.EMERALD_ORE,
+        net.minecraft.world.item.Items.DEEPSLATE_EMERALD_ORE,
+        net.minecraft.world.item.Items.EMERALD,
 
         // Lapis
-        net.minecraft.item.Items.LAPIS_ORE,
-        net.minecraft.item.Items.DEEPSLATE_LAPIS_ORE,
-        net.minecraft.item.Items.LAPIS_LAZULI,
+        net.minecraft.world.item.Items.LAPIS_ORE,
+        net.minecraft.world.item.Items.DEEPSLATE_LAPIS_ORE,
+        net.minecraft.world.item.Items.LAPIS_LAZULI,
 
         // Redstone
-        net.minecraft.item.Items.REDSTONE_ORE,
-        net.minecraft.item.Items.DEEPSLATE_REDSTONE_ORE,
-        net.minecraft.item.Items.REDSTONE,
+        net.minecraft.world.item.Items.REDSTONE_ORE,
+        net.minecraft.world.item.Items.DEEPSLATE_REDSTONE_ORE,
+        net.minecraft.world.item.Items.REDSTONE,
 
         // Quartz
-        net.minecraft.item.Items.NETHER_QUARTZ_ORE,
-        net.minecraft.item.Items.QUARTZ,
+        net.minecraft.world.item.Items.NETHER_QUARTZ_ORE,
+        net.minecraft.world.item.Items.QUARTZ,
 
         // Netherite
-        net.minecraft.item.Items.ANCIENT_DEBRIS,
-        net.minecraft.item.Items.NETHERITE_SCRAP,
-        net.minecraft.item.Items.NETHERITE_INGOT
+        net.minecraft.world.item.Items.ANCIENT_DEBRIS,
+        net.minecraft.world.item.Items.NETHERITE_SCRAP,
+        net.minecraft.world.item.Items.NETHERITE_INGOT
     );
 
     public static boolean isOre(ItemStack stack) {
@@ -76,39 +76,39 @@ public class SwarmDropHelper {
 
     private static final Set<Item> VALUABLE_ITEMS = Set.of(
         // Special valuables
-        net.minecraft.item.Items.GOLDEN_APPLE,
-        net.minecraft.item.Items.ENCHANTED_GOLDEN_APPLE,
-        net.minecraft.item.Items.ENDER_PEARL,
-        net.minecraft.item.Items.ENDER_EYE,
-        net.minecraft.item.Items.BLAZE_ROD,
-        net.minecraft.item.Items.NETHER_STAR,
-        net.minecraft.item.Items.HEART_OF_THE_SEA,
-        net.minecraft.item.Items.ECHO_SHARD,
-        net.minecraft.item.Items.AMETHYST_SHARD,
-        net.minecraft.item.Items.PRISMARINE_CRYSTALS,
-        net.minecraft.item.Items.PRISMARINE_SHARD,
-        net.minecraft.item.Items.SHULKER_SHELL,
-        net.minecraft.item.Items.NAUTILUS_SHELL,
-        net.minecraft.item.Items.ARMADILLO_SCUTE,
-        net.minecraft.item.Items.TURTLE_SCUTE,
-        net.minecraft.item.Items.SLIME_BALL,
-        net.minecraft.item.Items.GHAST_TEAR,
-        net.minecraft.item.Items.MAGMA_CREAM,
-        net.minecraft.item.Items.GLOWSTONE_DUST,
-        net.minecraft.item.Items.OBSIDIAN,
-        net.minecraft.item.Items.CRYING_OBSIDIAN,
-        net.minecraft.item.Items.REDSTONE_LAMP,
+        net.minecraft.world.item.Items.GOLDEN_APPLE,
+        net.minecraft.world.item.Items.ENCHANTED_GOLDEN_APPLE,
+        net.minecraft.world.item.Items.ENDER_PEARL,
+        net.minecraft.world.item.Items.ENDER_EYE,
+        net.minecraft.world.item.Items.BLAZE_ROD,
+        net.minecraft.world.item.Items.NETHER_STAR,
+        net.minecraft.world.item.Items.HEART_OF_THE_SEA,
+        net.minecraft.world.item.Items.ECHO_SHARD,
+        net.minecraft.world.item.Items.AMETHYST_SHARD,
+        net.minecraft.world.item.Items.PRISMARINE_CRYSTALS,
+        net.minecraft.world.item.Items.PRISMARINE_SHARD,
+        net.minecraft.world.item.Items.SHULKER_SHELL,
+        net.minecraft.world.item.Items.NAUTILUS_SHELL,
+        net.minecraft.world.item.Items.ARMADILLO_SCUTE,
+        net.minecraft.world.item.Items.TURTLE_SCUTE,
+        net.minecraft.world.item.Items.SLIME_BALL,
+        net.minecraft.world.item.Items.GHAST_TEAR,
+        net.minecraft.world.item.Items.MAGMA_CREAM,
+        net.minecraft.world.item.Items.GLOWSTONE_DUST,
+        net.minecraft.world.item.Items.OBSIDIAN,
+        net.minecraft.world.item.Items.CRYING_OBSIDIAN,
+        net.minecraft.world.item.Items.REDSTONE_LAMP,
 
         // Rare gear (not armor/tools, but worth keeping)
-        net.minecraft.item.Items.TOTEM_OF_UNDYING,
-        net.minecraft.item.Items.ELYTRA,
-        net.minecraft.item.Items.SPYGLASS,
-        net.minecraft.item.Items.COMPASS,
-        net.minecraft.item.Items.RECOVERY_COMPASS,
-        net.minecraft.item.Items.CLOCK,
-        net.minecraft.item.Items.MAP,
-        net.minecraft.item.Items.BUNDLE,
-        net.minecraft.item.Items.HEAVY_CORE
+        net.minecraft.world.item.Items.TOTEM_OF_UNDYING,
+        net.minecraft.world.item.Items.ELYTRA,
+        net.minecraft.world.item.Items.SPYGLASS,
+        net.minecraft.world.item.Items.COMPASS,
+        net.minecraft.world.item.Items.RECOVERY_COMPASS,
+        net.minecraft.world.item.Items.CLOCK,
+        net.minecraft.world.item.Items.MAP,
+        net.minecraft.world.item.Items.BUNDLE,
+        net.minecraft.world.item.Items.HEAVY_CORE
     );
 
     public static boolean isValuable(ItemStack stack) {
@@ -118,37 +118,37 @@ public class SwarmDropHelper {
     // ── Armor ─────────────────────────────────────────────────────────────
 
     public static boolean isArmor(ItemStack stack) {
-        if (!stack.contains(net.minecraft.component.DataComponentTypes.EQUIPPABLE)) return false;
-        net.minecraft.component.type.EquippableComponent equip = stack.get(net.minecraft.component.DataComponentTypes.EQUIPPABLE);
-        net.minecraft.entity.EquipmentSlot slot = equip.slot();
-        return slot == net.minecraft.entity.EquipmentSlot.HEAD
-            || slot == net.minecraft.entity.EquipmentSlot.CHEST
-            || slot == net.minecraft.entity.EquipmentSlot.LEGS
-            || slot == net.minecraft.entity.EquipmentSlot.FEET;
+        if (!stack.contains(net.minecraft.component.DataComponents.EQUIPPABLE)) return false;
+        net.minecraft.component.type.EquippableComponent equip = stack.get(net.minecraft.component.DataComponents.EQUIPPABLE);
+        net.minecraft.world.entity.EquipmentSlot slot = equip.slot();
+        return slot == net.minecraft.world.entity.EquipmentSlot.HEAD
+            || slot == net.minecraft.world.entity.EquipmentSlot.CHEST
+            || slot == net.minecraft.world.entity.EquipmentSlot.LEGS
+            || slot == net.minecraft.world.entity.EquipmentSlot.FEET;
     }
 
     // ── Tools & weapons ───────────────────────────────────────────────────
 
     public static boolean isTool(ItemStack stack) {
-        if (stack.contains(net.minecraft.component.DataComponentTypes.TOOL)) return true;
+        if (stack.contains(net.minecraft.component.DataComponents.TOOL)) return true;
         Item item = stack.getItem();
-        return item == net.minecraft.item.Items.BOW
-            || item == net.minecraft.item.Items.CROSSBOW
-            || item == net.minecraft.item.Items.TRIDENT
-            || item == net.minecraft.item.Items.SHIELD;
+        return item == net.minecraft.world.item.Items.BOW
+            || item == net.minecraft.world.item.Items.CROSSBOW
+            || item == net.minecraft.world.item.Items.TRIDENT
+            || item == net.minecraft.world.item.Items.SHIELD;
     }
 
     // ── Food ──────────────────────────────────────────────────────────────
 
     public static boolean isFood(ItemStack stack) {
-        return stack.contains(net.minecraft.component.DataComponentTypes.FOOD);
+        return stack.contains(net.minecraft.component.DataComponents.FOOD);
     }
 
     // ── Enchanted items ───────────────────────────────────────────────────
 
     public static boolean isEnchanted(ItemStack stack) {
         if (stack.hasEnchantments()) return true;
-        if (stack.getItem() == net.minecraft.item.Items.ENCHANTED_BOOK) return true;
+        if (stack.getItem() == net.minecraft.world.item.Items.ENCHANTED_BOOK) return true;
         return false;
     }
 
@@ -178,14 +178,14 @@ public class SwarmDropHelper {
 
     public static void dropByType(String type) {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-        if (mc.player == null || mc.gameMode == null) return;
+        if (mc.player == null || mc.GameType == null) return;
 
         if (mc.currentScreen != null) {
-            mc.player.closeHandledScreen();
+            mc.player.closeContainer();
             mc.setScreen(null);
         }
 
-        net.minecraft.entity.player.PlayerInventory inv = mc.player.getInventory();
+        net.minecraft.world.entity.player.Inventory inv = mc.player.getInventory();
         int dropped = 0;
 
         switch (type) {
@@ -194,8 +194,8 @@ public class SwarmDropHelper {
                     if (inv.getStack(i).isEmpty()) continue;
                     int slotId = invToScreenSlot(i);
                     if (slotId < 0) continue;
-                    mc.gameMode.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
-                        net.minecraft.screen.slot.SlotActionType.THROW, mc.player);
+                    mc.GameType.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
+                        net.minecraft.world.inventory.ClickAction.THROW, mc.player);
                     dropped++;
                 }
             }
@@ -205,8 +205,8 @@ public class SwarmDropHelper {
                     if (stack.isEmpty()) continue;
                     if (!isJunk(stack)) continue;
                     int slotId = i < 9 ? i + 36 : i;
-                    mc.gameMode.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
-                        net.minecraft.screen.slot.SlotActionType.THROW, mc.player);
+                    mc.GameType.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
+                        net.minecraft.world.inventory.ClickAction.THROW, mc.player);
                     dropped++;
                 }
             }
@@ -216,16 +216,16 @@ public class SwarmDropHelper {
                     if (stack.isEmpty()) continue;
                     if (!isOre(stack)) continue;
                     int slotId = i < 9 ? i + 36 : i;
-                    mc.gameMode.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
-                        net.minecraft.screen.slot.SlotActionType.THROW, mc.player);
+                    mc.GameType.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
+                        net.minecraft.world.inventory.ClickAction.THROW, mc.player);
                     dropped++;
                 }
             }
             case "hotbar" -> {
                 for (int i = 0; i < 9; i++) {
                     if (inv.getStack(i).isEmpty()) continue;
-                    mc.gameMode.clickSlot(mc.player.currentScreenHandler.syncId, i + 36, 1,
-                        net.minecraft.screen.slot.SlotActionType.THROW, mc.player);
+                    mc.GameType.clickSlot(mc.player.currentScreenHandler.syncId, i + 36, 1,
+                        net.minecraft.world.inventory.ClickAction.THROW, mc.player);
                     dropped++;
                 }
             }
@@ -235,8 +235,8 @@ public class SwarmDropHelper {
                     if (stack.isEmpty()) continue;
                     if (!isValuable(stack)) continue;
                     int slotId = i < 9 ? i + 36 : i;
-                    mc.gameMode.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
-                        net.minecraft.screen.slot.SlotActionType.THROW, mc.player);
+                    mc.GameType.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
+                        net.minecraft.world.inventory.ClickAction.THROW, mc.player);
                     dropped++;
                 }
             }

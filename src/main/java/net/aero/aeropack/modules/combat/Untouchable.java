@@ -12,27 +12,26 @@ import meteordevelopment.meteorclient.systems.friends.Friends;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.decoration.EndCrystalEntity;
-import net.minecraft.entity.mob.CreeperEntity;
-import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.PersistentProjectileEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
-import net.minecraft.network.packet.s2c.play.BundleS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityAnimationS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityDamageS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityPositionS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityPositionSyncS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityStatusS2CPacket;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.game.ClientboundBundlePacket;
+import net.minecraft.network.protocol.game.ClientboundAnimatePacket;
+import net.minecraft.network.protocol.game.ClientboundDamageEventPacket;
+import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEntityLinkPacket;
+import net.minecraft.network.protocol.game.ClientboundEntityEventPacket;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -259,7 +258,7 @@ public class Untouchable extends Module {
         .build()
     );
 
-    private final Map<Integer, Vec3d> previousPositions = new HashMap<>();
+    private final Map<Integer, Vec3> previousPositions = new HashMap<>();
     private final Map<Integer, MacePacketCue> macePacketCues = new ConcurrentHashMap<>();
     private final Map<Integer, Long> primedSpearCues = new ConcurrentHashMap<>();
     private final Map<Integer, Long> chargingCreeperCues = new ConcurrentHashMap<>();
@@ -305,45 +304,43 @@ public class Untouchable extends Module {
     }
 
     private void inspectPacket(Packet<?> packet) {
-        if (packet instanceof BundleS2CPacket bundle) {
-            for (Packet<?> subPacket : bundle.getPackets())
+        if (packet instanceof ClientboundBundlePacket bundle) {
+            for (Packet<?> subPacket : bundle.subPackets())
                 inspectPacket(subPacket);
             return;
         }
 
-        if (packet instanceof EntityAnimationS2CPacket animation
-            && (animation.getAnimationId() == EntityAnimationS2CPacket.SWING_MAIN_HAND
-            || animation.getAnimationId() == EntityAnimationS2CPacket.SWING_OFF_HAND)) {
-            handleSwingPacket(animation.getEntityId());
+        if (packet instanceof ClientboundAnimatePacket animation
+            && (animation.getAction() == ClientboundAnimatePacket.SWING_MAIN_HAND
+            || animation.getAction() == ClientboundAnimatePacket.SWING_OFF_HAND)) {
+            handleSwingPacket(animation.getId());
             return;
         }
 
-        if (packet instanceof EntityStatusS2CPacket entityEvent && entityEvent.getStatus() == 35) {
+        if (packet instanceof ClientboundEntityEventPacket entityEvent && entityEvent.getEventId() == 35) {
             handleEntityEvent(entityEvent);
             return;
         }
 
-        if (packet instanceof EntityDamageS2CPacket damage) {
+        if (packet instanceof ClientboundDamageEventPacket damage) {
             handleDamageEvent(damage);
             return;
         }
 
         int id;
-        Vec3d position;
-        if (packet instanceof EntityPositionS2CPacket teleport) {
-            id = teleport.entityId();
-            position = teleport.change().position();
-        } else if (packet instanceof EntityPositionSyncS2CPacket sync) {
-            id = sync.id();
-            position = sync.values().position();
-        } else if (packet instanceof EntityS2CPacket move && move.isPositionChanged() && mc.level != null) {
+        Vec3 position;
+        if (packet instanceof ClientboundSetEntityLinkPacket sync) {
+            id = sync.getSourceId();
+            Entity linkedEntity = mc.level != null ? mc.level.getEntity(sync.getDestId()) : null;
+            position = linkedEntity != null ? linkedEntity.position() : null;
+        } else if (packet instanceof ClientboundMoveEntityPacket move && move.hasPosition() && mc.level != null) {
             Entity movedEntity = move.getEntity(mc.level);
             if (movedEntity == null)
                 return;
             id = movedEntity.getId();
-            position = new Vec3d(movedEntity.getX() + move.getDeltaX() / 4096.0,
-                movedEntity.getY() + move.getDeltaY() / 4096.0,
-                movedEntity.getZ() + move.getDeltaZ() / 4096.0);
+            position = new Vec3(movedEntity.getX() + move.getXa() / 4096.0,
+                movedEntity.getY() + move.getYa() / 4096.0,
+                movedEntity.getZ() + move.getZa() / 4096.0);
         } else
             return;
 
@@ -352,40 +349,40 @@ public class Untouchable extends Module {
 
         handleIncomingPosition(id, position);
 
-        Entity entity = mc.level.getEntityById(id);
-        if (!(entity instanceof PlayerEntity player) || player == mc.player
+        Entity entity = mc.level.getEntity(id);
+        if (!(entity instanceof Player player) || player == mc.player
             || isIgnoredPlayer(player) || !isHoldingMace(player))
             return;
 
-        Vec3d oldPosition = entity.getEntityPos();
+        Vec3 oldPosition = entity.position();
         boolean suddenRise = position.y - oldPosition.y >= 1.25;
         boolean aboveUs = position.y - mc.player.getY() >= 1.25;
-        double horizontalSq = horizontalDistanceSqr(position, mc.player.getEntityPos());
+        double horizontalSq = horizontalDistanceSqr(position, mc.player.position());
         if (suddenRise && aboveUs && horizontalSq <= square(reachAllowance.get())) {
             macePacketCues.put(id, new MacePacketCue(position, System.currentTimeMillis()));
             tryImmediatePacketDodge();
         }
     }
 
-    private void handleEntityEvent(EntityStatusS2CPacket entityEvent) {
+    private void handleEntityEvent(ClientboundEntityEventPacket entityEvent) {
         if (!isActive() || mc.player == null || mc.level == null)
             return;
 
         Entity entity = entityEvent.getEntity(mc.level);
-        if (!(entity instanceof PlayerEntity player))
+        if (!(entity instanceof Player player))
             return;
 
         if (player == mc.player && autoDistanceOnTotemPop.get())
             setKeepDistanceAlways();
     }
 
-    private void handleDamageEvent(EntityDamageS2CPacket damage) {
+    private void handleDamageEvent(ClientboundDamageEventPacket damage) {
         if (!isActive() || mc.player == null || mc.level == null
             || !autoDistanceOnDamage.get() || damage.entityId() != mc.player.getId())
             return;
 
-        Entity source = mc.level.getEntityById(damage.sourceCauseId());
-        if (!(source instanceof PlayerEntity attacker) || attacker == mc.player
+        Entity source = mc.level.getEntity(damage.sourceCauseId());
+        if (!(source instanceof Player attacker) || attacker == mc.player
             || isIgnoredPlayer(attacker))
             return;
 
@@ -410,8 +407,8 @@ public class Untouchable extends Module {
         if (!isActive() || mc.player == null || mc.level == null
             || cooldownTicksLeft > 0)
             return;
-        Entity entity = mc.level.getEntityById(entityId);
-        if (!(entity instanceof PlayerEntity attacker) || attacker == mc.player
+        Entity entity = mc.level.getEntity(entityId);
+        if (!(entity instanceof Player attacker) || attacker == mc.player
             || isIgnoredPlayer(attacker))
             return;
 
@@ -442,11 +439,11 @@ public class Untouchable extends Module {
         teleportAway(threat);
     }
 
-    private void handleIncomingPosition(int entityId, Vec3d incomingPosition) {
+    private void handleIncomingPosition(int entityId, Vec3 incomingPosition) {
         if (!isActive() || mc.player == null || mc.level == null)
             return;
-        Entity entity = mc.level.getEntityById(entityId);
-        if (!(entity instanceof PlayerEntity attacker) || attacker == mc.player
+        Entity entity = mc.level.getEntity(entityId);
+        if (!(entity instanceof Player attacker) || attacker == mc.player
             || isIgnoredPlayer(attacker))
             return;
 
@@ -503,7 +500,7 @@ public class Untouchable extends Module {
 
     private Threat findMostUrgentThreat() {
         Threat best = null;
-        for (PlayerEntity attacker : mc.level.getPlayers()) {
+        for (Player attacker : mc.level.players()) {
             if (attacker == mc.player || !attacker.isAlive()
                 || isIgnoredPlayer(attacker) || attacker.isSpectator())
                 continue;
@@ -537,7 +534,7 @@ public class Untouchable extends Module {
             if (keepDistance.get()
                 && (keepDistanceMode.get() == KeepDistanceMode.ALWAYS
                 || weaponThreat != null)) {
-                threat = getSpacingThreat(attacker, attacker.getEntityPos());
+                threat = getSpacingThreat(attacker, attacker.position());
             }
             if (weaponThreat != null
                 && (threat == null || weaponThreat.urgency > threat.urgency))
@@ -547,11 +544,11 @@ public class Untouchable extends Module {
                 best = threat;
         }
         if (avoidHostileMobs.get()) {
-            for (Entity entity : mc.level.getEntities()) {
-                if (!(entity instanceof HostileEntity) || entity == mc.player
+            for (Entity entity : mc.level.players()) {
+                if (!(entity instanceof Enemy) || entity == mc.player
                     || !entity.isAlive())
                     continue;
-                if (shouldSuppressDodging(entity.getEntityPos()))
+                if (shouldSuppressDodging(entity.position()))
                     continue;
                 if (onlyChargingCreepers.get() && !isChargingCreeper(entity))
                     continue;
@@ -562,12 +559,12 @@ public class Untouchable extends Module {
             }
         }
         if (avoidArrows.get()) {
-            for (Entity entity : mc.level.getEntities()) {
-                if (!(entity instanceof PersistentProjectileEntity arrow) || !arrow.isAlive()
+            for (Entity entity : mc.level.players()) {
+                if (!(entity instanceof AbstractArrow arrow) || !arrow.isAlive()
                     || arrow.getOwner() == mc.player)
                     continue;
                 Entity owner = arrow.getOwner();
-                if (owner instanceof PlayerEntity player && isIgnoredPlayer(player))
+                if (owner instanceof Player player && isIgnoredPlayer(player))
                     continue;
 
                 Threat threat = getArrowThreat(arrow);
@@ -576,8 +573,8 @@ public class Untouchable extends Module {
             }
         }
         if (avoidCrystals.get()) {
-            for (Entity entity : mc.level.getEntities()) {
-                if (!(entity instanceof EndCrystalEntity crystal) || !crystal.isAlive())
+            for (Entity entity : mc.level.players()) {
+                if (!(entity instanceof EndCrystal crystal) || !crystal.isAlive())
                     continue;
                 Threat threat = getCrystalThreat(crystal);
                 if (threat != null && (best == null || threat.urgency > best.urgency))
@@ -601,7 +598,7 @@ public class Untouchable extends Module {
             return;
 
         Threat threat = null;
-        for (PlayerEntity attacker : mc.level.getPlayers()) {
+        for (Player attacker : mc.level.players()) {
             if (attacker == mc.player || !attacker.isAlive()
                 || isIgnoredPlayer(attacker))
                 continue;
@@ -613,19 +610,19 @@ public class Untouchable extends Module {
         }
 
         if (threat == null) {
-            Vec3d center = mc.player.getBoundingBox().getCenter();
+            Vec3 center = mc.player.getBoundingBox().getCenter();
             threat = new Threat(ThreatType.EMERGENCY, center, center.add(0, 0, 1), 1000);
         }
         activeThreat = ThreatType.EMERGENCY;
         teleportAway(threat, true);
     }
 
-    private Threat getSpacingThreat(PlayerEntity attacker, Vec3d attackerPosition) {
+    private Threat getSpacingThreat(Player attacker, Vec3 attackerPosition) {
         if (shouldSuppressDodging(attackerPosition))
             return null;
-        Vec3d centerOffset = attacker.getBoundingBox().getCenter().subtract(attacker.getEntityPos());
-        Vec3d attackerCenter = attackerPosition.add(centerOffset);
-        Vec3d playerCenter = mc.player.getBoundingBox().getCenter();
+        Vec3 centerOffset = attacker.getBoundingBox().getCenter().subtract(attacker.position());
+        Vec3 attackerCenter = attackerPosition.add(centerOffset);
+        Vec3 playerCenter = mc.player.getBoundingBox().getCenter();
         double distance = attackerCenter.distanceTo(playerCenter);
         if (distance >= playerDistance.get())
             return null;
@@ -633,52 +630,52 @@ public class Untouchable extends Module {
             300 + (playerDistance.get() - distance) * 10);
     }
 
-    private Threat getPacketSpearThreat(PlayerEntity attacker, Vec3d incomingPosition) {
+    private Threat getPacketSpearThreat(Player attacker, Vec3 incomingPosition) {
         ItemStack spear = attacker.getActiveItem();
         if (!isSpear(spear))
             spear = getHeldSpear(attacker);
         if (!isSpear(spear))
             return null;
         if (onlyPrimedSpears.get()
-            && !(attacker.isUsingItem() && attacker.getItemUseTime() >= getSpearReadyTicks(spear))
+            && !(attacker.isUsingItem() && attacker.getUseItemRemainingTicks() >= getSpearReadyTicks(spear))
             && !wasRecentlyPrimed(attacker))
             return null;
 
-        Vec3d centerOffset = attacker.getBoundingBox().getCenter().subtract(attacker.getEntityPos());
-        Vec3d start = incomingPosition.add(centerOffset);
-        Vec3d playerCenter = mc.player.getBoundingBox().getCenter();
-        Vec3d velocity = incomingPosition.subtract(attacker.getEntityPos());
+        Vec3 centerOffset = attacker.getBoundingBox().getCenter().subtract(attacker.position());
+        Vec3 start = incomingPosition.add(centerOffset);
+        Vec3 playerCenter = mc.player.getBoundingBox().getCenter();
+        Vec3 velocity = incomingPosition.subtract(attacker.position());
         boolean primed = wasRecentlyPrimed(attacker) || attacker.isUsingItem()
-            && attacker.getItemUseTime() >= getSpearReadyTicks(spear);
+            && attacker.getUseItemRemainingTicks() >= getSpearReadyTicks(spear);
         if (!primed && velocity.length() < 1)
             return null;
-        Vec3d toPlayer = playerCenter.subtract(start);
-        if (velocity.lengthSquared() < 0.01 || velocity.dotProduct(toPlayer) <= 0) {
-            Vec3d aim = attacker.getRotationVector();
-            if (aim.dotProduct(toPlayer.normalize()) < 0.7)
+        Vec3 toPlayer = playerCenter.subtract(start);
+        if (velocity.lengthSqr() < 0.01 || velocity.dot(toPlayer) <= 0) {
+            Vec3 aim = attacker.getLookAngle();
+            if (aim.dot(toPlayer.normalize()) < 0.7)
                 return null;
-            velocity = aim.multiply(Math.max(0.75, velocity.length()));
+            velocity = aim.scale(Math.max(0.75, velocity.length()));
         }
 
         double ticks = reactionTicks.get() + 2;
         double effectiveRange = Math.max(detectionRange.get(),
             velocity.length() * ticks + reachAllowance.get());
-        if (start.squaredDistanceTo(playerCenter) > square(effectiveRange))
+        if (start.distanceToSqr(playerCenter) > square(effectiveRange))
             return null;
-        Vec3d end = start.add(velocity.multiply(ticks));
+        Vec3 end = start.add(velocity.scale(ticks));
         if (distanceToSegment(playerCenter, start, end) > reachAllowance.get())
             return null;
         return new Threat(ThreatType.SPEAR, start, end, 500);
     }
 
-    private Threat getSpearThreat(PlayerEntity attacker) {
+    private Threat getSpearThreat(Player attacker) {
         return getSpearThreat(attacker, false);
     }
 
-    private Threat getSpearThreat(PlayerEntity attacker, boolean swingTriggered) {
+    private Threat getSpearThreat(Player attacker, boolean swingTriggered) {
         ItemStack spear = attacker.getActiveItem();
         boolean primedNow = attacker.isUsingItem() && isSpear(spear)
-            && attacker.getItemUseTime() >= getSpearReadyTicks(spear);
+            && attacker.getUseItemRemainingTicks() >= getSpearReadyTicks(spear);
         if (onlyPrimedSpears.get() && !primedNow && !wasRecentlyPrimed(attacker))
             return null;
         if (!primedNow && !swingTriggered)
@@ -688,32 +685,32 @@ public class Untouchable extends Module {
         if (!isSpear(spear))
             return null;
 
-        Vec3d start = attacker.getBoundingBox().getCenter();
-        Vec3d playerCenter = mc.player.getBoundingBox().getCenter();
-        Vec3d velocity = getObservedVelocity(attacker);
+        Vec3 start = attacker.getBoundingBox().getCenter();
+        Vec3 playerCenter = mc.player.getBoundingBox().getCenter();
+        Vec3 velocity = getObservedVelocity(attacker);
         double horizontalSpeed = horizontalLength(velocity);
-        Vec3d toPlayer = playerCenter.subtract(start);
+        Vec3 toPlayer = playerCenter.subtract(start);
         double ticks = reactionTicks.get();
         double speedScaledRange = velocity.length() * (ticks + 2) + reachAllowance.get();
         double effectiveRange = Math.max(detectionRange.get(), speedScaledRange);
-        if (start.squaredDistanceTo(playerCenter) > square(effectiveRange))
+        if (start.distanceToSqr(playerCenter) > square(effectiveRange))
             return null;
 
         boolean movingAtUs = horizontalSpeed >= 0.12 && horizontalDot(toPlayer, velocity) > 0;
-        Vec3d attackVelocity = velocity;
+        Vec3 attackVelocity = velocity;
         if (!movingAtUs) {
-            Vec3d aim = attacker.getRotationVector();
+            Vec3 aim = attacker.getLookAngle();
             double distance = toPlayer.length();
-            double aimDot = distance < 1.0E-6 ? 1 : aim.dotProduct(toPlayer.multiply(1 / distance));
+            double aimDot = distance < 1.0E-6 ? 1 : aim.dot(toPlayer.scale(1 / distance));
             double armedRange = reachAllowance.get() + ticks * 0.75;
             if (aimDot < 0.75 || distance > armedRange)
                 return null;
 
-            attackVelocity = aim.multiply(Math.max(0.75, velocity.length()));
+            attackVelocity = aim.scale(Math.max(0.75, velocity.length()));
             horizontalSpeed = Math.max(0.12, horizontalLength(attackVelocity));
         }
 
-        Vec3d end = start.add(attackVelocity.multiply(ticks));
+        Vec3 end = start.add(attackVelocity.scale(ticks));
         double missDistance = horizontalDistanceToSegment(playerCenter, start, end);
         double verticalMiss = verticalDistanceToSegment(playerCenter, start, end);
         if (missDistance > reachAllowance.get() || verticalMiss > 3)
@@ -727,17 +724,17 @@ public class Untouchable extends Module {
         return new Threat(ThreatType.SPEAR, start, end, urgency);
     }
 
-    private Threat getPacketMeleeThreat(PlayerEntity attacker, Vec3d incomingPosition,
+    private Threat getPacketMeleeThreat(Player attacker, Vec3 incomingPosition,
         WeaponType weaponType) {
         ItemStack weapon = weaponType.getWeapon(attacker);
         if (weapon.isEmpty())
             return null;
 
-        Vec3d centerOffset = attacker.getBoundingBox().getCenter().subtract(attacker.getEntityPos());
-        Vec3d start = incomingPosition.add(centerOffset);
-        Vec3d playerCenter = mc.player.getBoundingBox().getCenter();
-        Vec3d velocity = incomingPosition.subtract(attacker.getEntityPos());
-        Vec3d toPlayer = playerCenter.subtract(start);
+        Vec3 centerOffset = attacker.getBoundingBox().getCenter().subtract(attacker.position());
+        Vec3 start = incomingPosition.add(centerOffset);
+        Vec3 playerCenter = mc.player.getBoundingBox().getCenter();
+        Vec3 velocity = incomingPosition.subtract(attacker.position());
+        Vec3 toPlayer = playerCenter.subtract(start);
         double distance = toPlayer.length();
         double ticks = reactionTicks.get() + 2;
         double weaponReach = weaponType == WeaponType.AXE ? 4.0 : 3.5;
@@ -746,16 +743,16 @@ public class Untouchable extends Module {
         if (distance > effectiveRange)
             return null;
 
-        Vec3d attackVelocity = velocity;
-        if (attackVelocity.lengthSquared() < 0.01
-            || attackVelocity.dotProduct(toPlayer) <= 0) {
-            Vec3d aim = attacker.getRotationVector();
-            if (distance > 1.0E-6 && aim.dotProduct(toPlayer.normalize()) < 0.5)
+        Vec3 attackVelocity = velocity;
+        if (attackVelocity.lengthSqr() < 0.01
+            || attackVelocity.dot(toPlayer) <= 0) {
+            Vec3 aim = attacker.getLookAngle();
+            if (distance > 1.0E-6 && aim.dot(toPlayer.normalize()) < 0.5)
                 return null;
-            attackVelocity = aim.multiply(Math.max(0.5, velocity.length()));
+            attackVelocity = aim.scale(Math.max(0.5, velocity.length()));
         }
 
-        Vec3d end = start.add(attackVelocity.multiply(ticks));
+        Vec3 end = start.add(attackVelocity.scale(ticks));
         double missDistance = distanceToSegment(playerCenter, start, end);
         double closeRange = weaponReach + 0.75;
         if (missDistance > reachAllowance.get() && distance > closeRange)
@@ -767,15 +764,15 @@ public class Untouchable extends Module {
         return new Threat(weaponType.threatType, start, end, urgency);
     }
 
-    private Threat getMeleeThreat(PlayerEntity attacker, WeaponType weaponType,
+    private Threat getMeleeThreat(Player attacker, WeaponType weaponType,
         boolean swingTriggered) {
         ItemStack weapon = weaponType.getWeapon(attacker);
         if (weapon.isEmpty())
             return null;
 
-        Vec3d start = attacker.getBoundingBox().getCenter();
-        Vec3d playerCenter = mc.player.getBoundingBox().getCenter();
-        Vec3d toPlayer = playerCenter.subtract(start);
+        Vec3 start = attacker.getBoundingBox().getCenter();
+        Vec3 playerCenter = mc.player.getBoundingBox().getCenter();
+        Vec3 toPlayer = playerCenter.subtract(start);
         double distance = toPlayer.length();
         double horizontalDistance = horizontalLength(toPlayer);
         double weaponReach = weaponType == WeaponType.AXE ? 4.0 : 3.5;
@@ -786,20 +783,20 @@ public class Untouchable extends Module {
         if (distance > effectiveRange)
             return null;
 
-        Vec3d velocity = getObservedVelocity(attacker);
+        Vec3 velocity = getObservedVelocity(attacker);
         boolean movingAtUs = horizontalLength(velocity) >= 0.08
             && horizontalDot(toPlayer, velocity) > 0;
-        Vec3d aim = attacker.getRotationVector();
-        double aimDot = distance < 1.0E-6 ? 1 : aim.dotProduct(toPlayer.multiply(1 / distance));
+        Vec3 aim = attacker.getLookAngle();
+        double aimDot = distance < 1.0E-6 ? 1 : aim.dot(toPlayer.scale(1 / distance));
         boolean closeEnough = horizontalDistance <= weaponReach + 0.9;
         boolean armed = swingTriggered || movingAtUs || aimDot > 0.55 || closeEnough;
         if (!armed)
             return null;
 
-        Vec3d attackDirection = movingAtUs ? velocity : aim;
-        if (attackDirection.lengthSquared() < 1.0E-6)
+        Vec3 attackDirection = movingAtUs ? velocity : aim;
+        if (attackDirection.lengthSqr() < 1.0E-6)
             attackDirection = toPlayer.normalize();
-        Vec3d end = start.add(attackDirection.multiply(ticks + 1));
+        Vec3 end = start.add(attackDirection.scale(ticks + 1));
         double missDistance = distanceToSegment(playerCenter, start, end);
         if (missDistance > reachAllowance.get() && !closeEnough)
             return null;
@@ -812,12 +809,12 @@ public class Untouchable extends Module {
         return new Threat(weaponType.threatType, start, end, urgency);
     }
 
-    private Threat getMaceThreat(PlayerEntity attacker) {
+    private Threat getMaceThreat(Player attacker) {
         if (!isHoldingMace(attacker))
             return null;
 
-        Vec3d playerCenter = mc.player.getBoundingBox().getCenter();
-        Vec3d attackerCenter = attacker.getBoundingBox().getCenter();
+        Vec3 playerCenter = mc.player.getBoundingBox().getCenter();
+        Vec3 attackerCenter = attacker.getBoundingBox().getCenter();
         double horizontalDistance = horizontalLength(attackerCenter.subtract(playerCenter));
         double armedRadius = reachAllowance.get() + 2 + armedRadiusBonus.get();
         if (horizontalDistance > armedRadius)
@@ -826,20 +823,20 @@ public class Untouchable extends Module {
         MacePacketCue cue = macePacketCues.get(attacker.getId());
         boolean packetSpoof = cue != null
             && System.currentTimeMillis() - cue.timeMs <= MACE_PACKET_CUE_MS;
-        Vec3d velocity = getObservedVelocity(attacker);
+        Vec3 velocity = getObservedVelocity(attacker);
         boolean fallingAbove = attackerCenter.y - playerCenter.y >= 1.25
             && (velocity.y < -0.08 || attacker.fallDistance >= 1.25F);
-        Vec3d toPlayer = playerCenter.subtract(attackerCenter);
-        double aimDot = toPlayer.lengthSquared() < 1.0E-6 ? 1
-            : attacker.getRotationVector().dotProduct(toPlayer.normalize());
+        Vec3 toPlayer = playerCenter.subtract(attackerCenter);
+        double aimDot = toPlayer.lengthSqr() < 1.0E-6 ? 1
+            : attacker.getLookAngle().dot(toPlayer.normalize());
         boolean closing = horizontalDot(toPlayer, velocity) > 0.01;
         boolean inReach = horizontalDistance <= reachAllowance.get();
         boolean preparingAttack = inReach || aimDot > 0.55 || closing;
         if (!packetSpoof && !fallingAbove && !preparingAttack)
             return null;
 
-        Vec3d pathStart = packetSpoof ? cue.position : attackerCenter;
-        Vec3d pathEnd = new Vec3d(attackerCenter.x, playerCenter.y, attackerCenter.z);
+        Vec3 pathStart = packetSpoof ? cue.position : attackerCenter;
+        Vec3 pathEnd = new Vec3(attackerCenter.x, playerCenter.y, attackerCenter.z);
         double urgency = packetSpoof ? 200
             : fallingAbove
                 ? 150 + Math.max(0, -velocity.y * 20)
@@ -852,8 +849,8 @@ public class Untouchable extends Module {
         if (mc.player == null || mob == null)
             return null;
 
-        Vec3d playerCenter = mc.player.getBoundingBox().getCenter();
-        Vec3d mobCenter = mob.getBoundingBox().getCenter();
+        Vec3 playerCenter = mc.player.getBoundingBox().getCenter();
+        Vec3 mobCenter = mob.getBoundingBox().getCenter();
         double distance = mobCenter.distanceTo(playerCenter);
         if (distance >= playerDistance.get())
             return null;
@@ -862,28 +859,28 @@ public class Untouchable extends Module {
             250 + (playerDistance.get() - distance) * 10);
     }
 
-    private Threat getArrowThreat(PersistentProjectileEntity arrow) {
+    private Threat getArrowThreat(AbstractArrow arrow) {
         if (mc.player == null || mc.level == null)
             return null;
 
-        Vec3d playerCenter = mc.player.getBoundingBox().getCenter();
-        Vec3d arrowCenter = arrow.getBoundingBox().getCenter();
-        Vec3d velocity = getObservedVelocity(arrow);
-        if (velocity.lengthSquared() < 0.01)
+        Vec3 playerCenter = mc.player.getBoundingBox().getCenter();
+        Vec3 arrowCenter = arrow.getBoundingBox().getCenter();
+        Vec3 velocity = getObservedVelocity(arrow);
+        if (velocity.lengthSqr() < 0.01)
             velocity = arrow.getDeltaMovement();
-        if (velocity.lengthSquared() < 0.01)
+        if (velocity.lengthSqr() < 0.01)
             return null;
 
-        Vec3d toPlayer = playerCenter.subtract(arrowCenter);
-        if (velocity.dotProduct(toPlayer) <= 0)
+        Vec3 toPlayer = playerCenter.subtract(arrowCenter);
+        if (velocity.dot(toPlayer) <= 0)
             return null;
 
         double ticks = reactionTicks.get() + 2;
-        Vec3d end = arrowCenter.add(velocity.multiply(ticks));
+        Vec3 end = arrowCenter.add(velocity.scale(ticks));
         double missDistance = distanceToSegment(playerCenter, arrowCenter, end);
         double effectiveRange = Math.max(detectionRange.get(),
             velocity.length() * ticks + reachAllowance.get());
-        if (arrowCenter.squaredDistanceTo(playerCenter) > square(effectiveRange)
+        if (arrowCenter.distanceToSqr(playerCenter) > square(effectiveRange)
             || missDistance > reachAllowance.get() + 0.75)
             return null;
 
@@ -892,9 +889,9 @@ public class Untouchable extends Module {
         return new Threat(ThreatType.ARROW, arrowCenter, end, urgency);
     }
 
-    private Threat getCrystalThreat(EndCrystalEntity crystal) {
-        Vec3d playerCenter = mc.player.getBoundingBox().getCenter();
-        Vec3d crystalCenter = crystal.getBoundingBox().getCenter();
+    private Threat getCrystalThreat(EndCrystal crystal) {
+        Vec3 playerCenter = mc.player.getBoundingBox().getCenter();
+        Vec3 crystalCenter = crystal.getBoundingBox().getCenter();
         double distance = crystalCenter.distanceTo(playerCenter);
         double radius = Math.max(detectionRange.get(), 6);
         if (distance > radius)
@@ -905,29 +902,29 @@ public class Untouchable extends Module {
     }
 
     private boolean isChargingCreeper(Entity entity) {
-        return entity instanceof CreeperEntity creeper && isChargingCreeper(creeper);
+        return entity instanceof Creeper creeper && isChargingCreeper(creeper);
     }
 
-    private boolean isChargingCreeper(CreeperEntity creeper) {
+    private boolean isChargingCreeper(Creeper creeper) {
         if (creeper == null || !creeper.isAlive())
             return false;
 
-        if (creeper.getFuseSpeed() > 0 || creeper.isIgnited() || creeper.isCharged())
+        if (creeper.getSwellDir() > 0 || creeper.isIgnited() || creeper.isPowered())
             return true;
 
         Long expiry = chargingCreeperCues.get(creeper.getId());
         return expiry != null && expiry >= System.currentTimeMillis();
     }
 
-    private Vec3d chooseDodgeDestination(Threat threat) {
-        Vec3d playerPos = mc.player.getEntityPos();
-        Vec3d playerCenter = mc.player.getBoundingBox().getCenter();
-        Vec3d attackAxis = threat.pathEnd.subtract(threat.pathStart);
-        if (attackAxis.lengthSquared() > 1.0E-6)
+    private Vec3 chooseDodgeDestination(Threat threat) {
+        Vec3 playerPos = mc.player.position();
+        Vec3 playerCenter = mc.player.getBoundingBox().getCenter();
+        Vec3 attackAxis = threat.pathEnd.subtract(threat.pathStart);
+        if (attackAxis.lengthSqr() > 1.0E-6)
             attackAxis = attackAxis.normalize();
-        Vec3d currentVelocity = mc.player.getDeltaMovement();
-        Vec3d currentHorizontal = new Vec3d(currentVelocity.x, 0, currentVelocity.z);
-        if (currentHorizontal.lengthSquared() > 1.0E-6)
+        Vec3 currentVelocity = mc.player.getDeltaMovement();
+        Vec3 currentHorizontal = new Vec3(currentVelocity.x, 0, currentVelocity.z);
+        if (currentHorizontal.lengthSqr() > 1.0E-6)
             currentHorizontal = currentHorizontal.normalize();
 
         ArrayList<DodgeCandidate> candidates = new ArrayList<>();
@@ -940,13 +937,13 @@ public class Untouchable extends Module {
             for (double distance = maxHorizontal; distance >= minHorizontal; distance -= horizontalStep) {
                 for (int i = 0; i < DIRECTION_SAMPLES; i++) {
                     double angle = Math.PI * 2 * i / DIRECTION_SAMPLES;
-                    Vec3d offset = new Vec3d(Math.cos(angle) * distance, yOffset,
+                    Vec3 offset = new Vec3(Math.cos(angle) * distance, yOffset,
                         Math.sin(angle) * distance);
                     double score = scoreDestination(threat, playerCenter,
                         offset, attackAxis, currentHorizontal);
                     if (score == -Double.MAX_VALUE)
                         continue;
-                    Vec3d destination = playerPos.add(offset);
+                    Vec3 destination = playerPos.add(offset);
                     if (!isSafeDestination(offset))
                         continue;
                     candidates.add(new DodgeCandidate(destination, score));
@@ -954,7 +951,7 @@ public class Untouchable extends Module {
             }
 
             if (yOffset != 0) {
-                Vec3d offset = new Vec3d(0, yOffset, 0);
+                Vec3 offset = new Vec3(0, yOffset, 0);
                 double score = scoreDestination(threat, playerCenter, offset,
                     attackAxis, currentHorizontal);
                 if (score != -Double.MAX_VALUE && isSafeDestination(offset))
@@ -969,22 +966,22 @@ public class Untouchable extends Module {
         return candidates.get(ThreadLocalRandom.current().nextInt(randomPool)).destination;
     }
 
-    private double scoreDestination(Threat threat, Vec3d playerCenter,
-        Vec3d offset, Vec3d attackAxis, Vec3d currentHorizontal) {
-        Vec3d dodgeAxis = offset.normalize();
-        double alongAttack = attackAxis.lengthSquared() > 1.0E-6
-            ? Math.abs(dodgeAxis.dotProduct(attackAxis)) : 0;
+    private double scoreDestination(Threat threat, Vec3 playerCenter,
+        Vec3 offset, Vec3 attackAxis, Vec3 currentHorizontal) {
+        Vec3 dodgeAxis = offset.normalize();
+        double alongAttack = attackAxis.lengthSqr() > 1.0E-6
+            ? Math.abs(dodgeAxis.dot(attackAxis)) : 0;
         if (threat.type == ThreatType.SPEAR && alongAttack > 0.3)
             return -Double.MAX_VALUE;
 
-        Vec3d destinationCenter = playerCenter.add(offset);
+        Vec3 destinationCenter = playerCenter.add(offset);
         if ((threat.type == ThreatType.SPACING || threat.type == ThreatType.MOB)
             && destinationCenter.distanceTo(threat.pathStart) < playerDistance.get())
             return -Double.MAX_VALUE;
         double pathSeparation = distanceToLine(destinationCenter, threat.pathStart, threat.pathEnd);
         double attackerSeparation = destinationCenter.distanceTo(threat.pathStart);
-        double momentumBonus = currentHorizontal.lengthSquared() > 1.0E-6
-            ? dodgeAxis.dotProduct(currentHorizontal) * 0.25 : 0;
+        double momentumBonus = currentHorizontal.lengthSqr() > 1.0E-6
+            ? dodgeAxis.dot(currentHorizontal) * 0.25 : 0;
         double verticalCost = Math.abs(offset.y) * 0.15;
         double score = pathSeparation * 10 + offset.length() * 0.2
             + momentumBonus - verticalCost;
@@ -995,12 +992,12 @@ public class Untouchable extends Module {
         return score;
     }
 
-    private boolean isSafeDestination(Vec3d offset) {
-        Box moved = mc.player.getBoundingBox().offset(offset);
-        if (!mc.level.isSpaceEmpty(mc.player, moved))
+    private boolean isSafeDestination(Vec3 offset) {
+        AABB moved = mc.player.getBoundingBox().move(offset);
+        if (!mc.level.noCollision(mc.player, moved))
             return false;
-        return !avoidDrops.get() || !mc.player.isOnGround()
-            || !mc.level.isSpaceEmpty(mc.player, moved.offset(0, -0.65, 0));
+        return !avoidDrops.get() || !mc.player.onGround()
+            || !mc.level.noCollision(mc.player, moved.move(0, -0.65, 0));
     }
 
     private void teleportAway(Threat threat) {
@@ -1012,17 +1009,17 @@ public class Untouchable extends Module {
             return;
         if (!emergency && shouldSuppressDodging(threat.pathStart))
             return;
-        Vec3d destination = chooseDodgeDestination(threat);
+        Vec3 destination = chooseDodgeDestination(threat);
         if (destination == null)
             return;
 
-        mc.player.setPosition(destination.x, destination.y, destination.z);
-        mc.player.setDeltaMovement(Vec3d.ZERO);
-        mc.getConnection().sendPacket(new PlayerMoveC2SPacket.Full(
+        mc.player.setPos(destination.x, destination.y, destination.z);
+        mc.player.setDeltaMovement(Vec3.ZERO);
+        mc.getConnection().send(new ServerboundMovePlayerPacket.PosRot(
             destination.x, destination.y, destination.z,
             mc.player.getYRot(), mc.player.getXRot(), false, false));
         for (int i = 1; i < teleportPackets.get(); i++) {
-            mc.getConnection().sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(
+            mc.getConnection().send(new ServerboundMovePlayerPacket.Pos(
                 destination.x, destination.y, destination.z, false, false));
         }
         cooldownTicksLeft = teleportCooldown.get();
@@ -1031,18 +1028,18 @@ public class Untouchable extends Module {
 
     private void rememberPositions() {
         previousPositions.clear();
-        for (PlayerEntity player : mc.level.getPlayers())
+        for (Player player : mc.level.players())
             if (player != mc.player)
-                previousPositions.put(player.getId(), player.getEntityPos());
+                previousPositions.put(player.getId(), player.position());
     }
 
     private void rememberPrimedSpears() {
         long now = System.currentTimeMillis();
-        for (PlayerEntity player : mc.level.getPlayers()) {
+        for (Player player : mc.level.players()) {
             if (player == mc.player || isIgnoredPlayer(player) || !player.isUsingItem())
                 continue;
             ItemStack spear = player.getActiveItem();
-            if (isSpear(spear) && player.getItemUseTime() >= getSpearReadyTicks(spear))
+            if (isSpear(spear) && player.getUseItemRemainingTicks() >= getSpearReadyTicks(spear))
                 primedSpearCues.put(player.getId(), now + PRIMED_SPEAR_MEMORY_MS);
         }
         primedSpearCues.values().removeIf(expiry -> expiry < now);
@@ -1053,22 +1050,22 @@ public class Untouchable extends Module {
             return;
 
         long now = System.currentTimeMillis();
-        for (Entity entity : mc.level.getEntities()) {
-            if (!(entity instanceof CreeperEntity creeper) || !creeper.isAlive())
+        for (Entity entity : mc.level.players()) {
+            if (!(entity instanceof Creeper creeper) || !creeper.isAlive())
                 continue;
-            if (creeper.getFuseSpeed() > 0 || creeper.isIgnited() || creeper.isCharged())
+            if (creeper.getSwellDir() > 0 || creeper.isIgnited() || creeper.isPowered())
                 chargingCreeperCues.put(creeper.getId(), now + CHARGING_CREEPER_MEMORY_MS);
         }
         chargingCreeperCues.values().removeIf(expiry -> expiry < now);
     }
 
-    private boolean wasRecentlyPrimed(PlayerEntity player) {
+    private boolean wasRecentlyPrimed(Player player) {
         Long expiry = primedSpearCues.get(player.getId());
         if (expiry != null && expiry >= System.currentTimeMillis())
             return true;
         ItemStack spear = player.getActiveItem();
         return player.isUsingItem() && isSpear(spear)
-            && player.getItemUseTime() >= getSpearReadyTicks(spear);
+            && player.getUseItemRemainingTicks() >= getSpearReadyTicks(spear);
     }
 
     private void prunePacketCues() {
@@ -1076,59 +1073,59 @@ public class Untouchable extends Module {
         macePacketCues.values().removeIf(cue -> cue.timeMs < cutoff);
     }
 
-    private Vec3d getObservedVelocity(Entity entity) {
-        Vec3d networkVelocity = entity.getDeltaMovement();
-        Vec3d previous = previousPositions.get(entity.getId());
+    private Vec3 getObservedVelocity(Entity entity) {
+        Vec3 networkVelocity = entity.getDeltaMovement();
+        Vec3 previous = previousPositions.get(entity.getId());
         if (previous == null)
             return networkVelocity;
-        Vec3d observed = entity.getEntityPos().subtract(previous);
-        return observed.lengthSquared() > networkVelocity.lengthSquared() ? observed
+        Vec3 observed = entity.position().subtract(previous);
+        return observed.lengthSqr() > networkVelocity.lengthSqr() ? observed
             : networkVelocity;
     }
 
-    private boolean isWalkingToward(Vec3d targetPosition) {
+    private boolean isWalkingToward(Vec3 targetPosition) {
         if (mc.options == null || mc.player == null)
             return false;
         if (movePauseMode.get() == MovePauseMode.ANY_MOVEMENT_KEY)
-            return mc.options.forwardKey.isPressed() || mc.options.backKey.isPressed()
-                || mc.options.leftKey.isPressed() || mc.options.rightKey.isPressed();
-        float forward = (mc.options.forwardKey.isPressed() ? 1 : 0)
-            - (mc.options.backKey.isPressed() ? 1 : 0);
-        float strafe = (mc.options.leftKey.isPressed() ? 1 : 0)
-            - (mc.options.rightKey.isPressed() ? 1 : 0);
+            return mc.options.keyUp.isDown() || mc.options.keyDown.isDown()
+                || mc.options.keyLeft.isDown() || mc.options.keyRight.isDown();
+        float forward = (mc.options.keyUp.isDown() ? 1 : 0)
+            - (mc.options.keyDown.isDown() ? 1 : 0);
+        float strafe = (mc.options.keyLeft.isDown() ? 1 : 0)
+            - (mc.options.keyRight.isDown() ? 1 : 0);
         if (forward == 0 && strafe == 0)
             return false;
 
         double yaw = Math.toRadians(mc.player.getYRot());
         double sin = Math.sin(yaw);
         double cos = Math.cos(yaw);
-        Vec3d inputDirection = new Vec3d(-sin * forward + cos * strafe, 0,
+        Vec3 inputDirection = new Vec3(-sin * forward + cos * strafe, 0,
             cos * forward + sin * strafe).normalize();
-        Vec3d toPlayer = new Vec3d(targetPosition.x - mc.player.getX(), 0,
+        Vec3 toPlayer = new Vec3(targetPosition.x - mc.player.getX(), 0,
             targetPosition.z - mc.player.getZ());
-        return toPlayer.lengthSquared() > 1.0E-6
-            && inputDirection.dotProduct(toPlayer.normalize()) > 0.55;
+        return toPlayer.lengthSqr() > 1.0E-6
+            && inputDirection.dot(toPlayer.normalize()) > 0.55;
     }
 
-    private boolean shouldSuppressDodging(Vec3d targetPosition) {
+    private boolean shouldSuppressDodging(Vec3 targetPosition) {
         if (movePauseMode.get() == MovePauseMode.ANY_MOVEMENT_KEY)
-            return mc.options != null && (mc.options.forwardKey.isPressed()
-                || mc.options.backKey.isPressed() || mc.options.leftKey.isPressed()
-                || mc.options.rightKey.isPressed());
+            return mc.options != null && (mc.options.keyUp.isDown()
+                || mc.options.keyDown.isDown() || mc.options.keyLeft.isDown()
+                || mc.options.keyRight.isDown());
         return isWalkingToward(targetPosition);
     }
 
-    private boolean isIgnoredPlayer(PlayerEntity player) {
+    private boolean isIgnoredPlayer(Player player) {
         return player != null && Friends.get().isFriend(player);
     }
 
-    private boolean isHoldingMace(PlayerEntity player) {
-        return player.getMainItemStack().isOf(Items.MACE)
-            || player.getOffhandItem().isOf(Items.MACE);
+    private boolean isHoldingMace(Player player) {
+        return player.getMainHandItem().getItem() == Items.MACE
+            || player.getOffhandItem().getItem() == Items.MACE;
     }
 
-    private ItemStack getHeldSpear(PlayerEntity player) {
-        ItemStack mainHand = player.getMainItemStack();
+    private ItemStack getHeldSpear(Player player) {
+        ItemStack mainHand = player.getMainHandItem();
         if (isSpear(mainHand))
             return mainHand;
         ItemStack offHand = player.getOffhandItem();
@@ -1138,21 +1135,21 @@ public class Untouchable extends Module {
     private boolean isSpear(ItemStack stack) {
         if (stack == null || stack.isEmpty())
             return false;
-        Identifier id = Registries.ITEM.getId(stack.getItem());
+        Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         return id != null && id.getPath().toLowerCase(Locale.ROOT).contains("spear");
     }
 
     private static boolean isSword(ItemStack stack) {
         if (stack == null || stack.isEmpty())
             return false;
-        Identifier id = Registries.ITEM.getId(stack.getItem());
+        Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         return id != null && id.getPath().toLowerCase(Locale.ROOT).endsWith("_sword");
     }
 
     private static boolean isAxe(ItemStack stack) {
         if (stack == null || stack.isEmpty())
             return false;
-        Identifier id = Registries.ITEM.getId(stack.getItem());
+        Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         return id != null && id.getPath().toLowerCase(Locale.ROOT).endsWith("_axe");
     }
 
@@ -1171,52 +1168,52 @@ public class Untouchable extends Module {
         return 14;
     }
 
-    private static double distanceToLine(Vec3d point, Vec3d start, Vec3d end) {
-        Vec3d line = end.subtract(start);
-        double lengthSq = line.lengthSquared();
+    private static double distanceToLine(Vec3 point, Vec3 start, Vec3 end) {
+        Vec3 line = end.subtract(start);
+        double lengthSq = line.lengthSqr();
         if (lengthSq < 1.0E-8)
             return point.distanceTo(start);
-        double t = point.subtract(start).dotProduct(line) / lengthSq;
-        return point.distanceTo(start.add(line.multiply(t)));
+        double t = point.subtract(start).dot(line) / lengthSq;
+        return point.distanceTo(start.add(line.scale(t)));
     }
 
-    private static double distanceToSegment(Vec3d point, Vec3d start, Vec3d end) {
-        Vec3d segment = end.subtract(start);
-        double lengthSq = segment.lengthSquared();
+    private static double distanceToSegment(Vec3 point, Vec3 start, Vec3 end) {
+        Vec3 segment = end.subtract(start);
+        double lengthSq = segment.lengthSqr();
         double t = lengthSq < 1.0E-8 ? 0 : Math.max(0,
-            Math.min(1, point.subtract(start).dotProduct(segment) / lengthSq));
-        return point.distanceTo(start.add(segment.multiply(t)));
+            Math.min(1, point.subtract(start).dot(segment) / lengthSq));
+        return point.distanceTo(start.add(segment.scale(t)));
     }
 
-    private static double horizontalDistanceToSegment(Vec3d point, Vec3d start, Vec3d end) {
-        Vec3d segment = new Vec3d(end.x - start.x, 0, end.z - start.z);
-        Vec3d offset = new Vec3d(point.x - start.x, 0, point.z - start.z);
-        double lengthSq = segment.lengthSquared();
+    private static double horizontalDistanceToSegment(Vec3 point, Vec3 start, Vec3 end) {
+        Vec3 segment = new Vec3(end.x - start.x, 0, end.z - start.z);
+        Vec3 offset = new Vec3(point.x - start.x, 0, point.z - start.z);
+        double lengthSq = segment.lengthSqr();
         double t = lengthSq < 1.0E-8 ? 0
-            : Math.max(0, Math.min(1, offset.dotProduct(segment) / lengthSq));
-        Vec3d closest = start.add(segment.multiply(t));
+            : Math.max(0, Math.min(1, offset.dot(segment) / lengthSq));
+        Vec3 closest = start.add(segment.scale(t));
         return horizontalLength(point.subtract(closest));
     }
 
-    private static double verticalDistanceToSegment(Vec3d point, Vec3d start, Vec3d end) {
-        Vec3d segment = end.subtract(start);
-        double lengthSq = segment.lengthSquared();
+    private static double verticalDistanceToSegment(Vec3 point, Vec3 start, Vec3 end) {
+        Vec3 segment = end.subtract(start);
+        double lengthSq = segment.lengthSqr();
         double t = lengthSq < 1.0E-8 ? 0 : Math.max(0,
-            Math.min(1, point.subtract(start).dotProduct(segment) / lengthSq));
-        return Math.abs(point.y - start.add(segment.multiply(t)).y);
+            Math.min(1, point.subtract(start).dot(segment) / lengthSq));
+        return Math.abs(point.y - start.add(segment.scale(t)).y);
     }
 
-    private static double horizontalDistanceSqr(Vec3d first, Vec3d second) {
+    private static double horizontalDistanceSqr(Vec3 first, Vec3 second) {
         double x = first.x - second.x;
         double z = first.z - second.z;
         return x * x + z * z;
     }
 
-    private static double horizontalDot(Vec3d first, Vec3d second) {
+    private static double horizontalDot(Vec3 first, Vec3 second) {
         return first.x * second.x + first.z * second.z;
     }
 
-    private static double horizontalLength(Vec3d vector) {
+    private static double horizontalLength(Vec3 vector) {
         return Math.sqrt(vector.x * vector.x + vector.z * vector.z);
     }
 
@@ -1242,13 +1239,13 @@ public class Untouchable extends Module {
         }
     }
 
-    private record Threat(ThreatType type, Vec3d pathStart, Vec3d pathEnd, double urgency) {
+    private record Threat(ThreatType type, Vec3 pathStart, Vec3 pathEnd, double urgency) {
     }
 
-    private record MacePacketCue(Vec3d position, long timeMs) {
+    private record MacePacketCue(Vec3 position, long timeMs) {
     }
 
-    private record DodgeCandidate(Vec3d destination, double score) {
+    private record DodgeCandidate(Vec3 destination, double score) {
     }
 
     private enum WeaponType {
@@ -1261,8 +1258,8 @@ public class Untouchable extends Module {
             this.threatType = threatType;
         }
 
-        private ItemStack getWeapon(PlayerEntity player) {
-            ItemStack mainHand = player.getMainItemStack();
+        private ItemStack getWeapon(Player player) {
+            ItemStack mainHand = player.getMainHandItem();
             if (this == SWORD && isSword(mainHand) || this == AXE && isAxe(mainHand))
                 return mainHand;
             ItemStack offHand = player.getOffhandItem();

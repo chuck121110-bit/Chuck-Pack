@@ -62,7 +62,7 @@ public class SwarmWorkerMixin {
         if (lower.equals(DISCONNECT_ALL_CMD)) {
             mc.execute(() -> {
                 SwarmGuard.get().deactivate();
-                mc.disconnect(net.minecraft.text.Text.literal("Disconnected by host"));
+                mc.disconnectFromWorld(net.minecraft.network.chat.Component.literal("Disconnected by host"));
                 ChatUtils.infoPrefix("Swarm", "Disconnected from server by host.");
             });
             return;
@@ -121,7 +121,7 @@ public class SwarmWorkerMixin {
                     if (mc.player == null || mc.gameMode == null) return;
                     if (!workerName.equalsIgnoreCase(mc.player.getName().getString())) return;
                     if (fSlot < 0 || fSlot >= 41) return;
-                    if (mc.player.getInventory().getStack(fSlot).isEmpty()) return;
+                    if (mc.player.getInventory().getItem(fSlot).isEmpty()) return;
 
                     int screenSlot;
                     if (fSlot < 9) screenSlot = fSlot + 36;
@@ -130,11 +130,11 @@ public class SwarmWorkerMixin {
                     else if (fSlot == 40) screenSlot = 45;
                     else return;
 
-                    mc.gameMode.clickSlot(
-                        mc.player.currentScreenHandler.syncId,
-                        screenSlot,
+                    mc.gameMode.handleContainerInput(
+                        mc.player.containerMenu.containerId,
                         fDropAll ? 0 : 1,
-                        net.minecraft.screen.slot.SlotActionType.THROW,
+                        screenSlot,
+                        net.minecraft.world.inventory.ContainerInput.THROW,
                         mc.player
                     );
                 });
@@ -227,7 +227,7 @@ public class SwarmWorkerMixin {
             String hostName = null;
             if (mc.player != null && mc.level != null) {
                 double closest = Double.MAX_VALUE;
-                for (net.minecraft.entity.player.PlayerEntity p : mc.level.getPlayers()) {
+                for (net.minecraft.world.entity.player.Player p : mc.level.players()) {
                     if (p == mc.player) continue;
                     double dist = mc.player.distanceTo(p);
                     if (dist < closest) {
@@ -274,9 +274,9 @@ public class SwarmWorkerMixin {
                 if (fUseRandom) {
                     String randomName = net.aero.aeropack.util.SwarmUsernameManager.getOrCreateUsername(fEmbeddedId, fAddress);
                     meteordevelopment.meteorclient.systems.accounts.Account.setSession(
-                        new net.minecraft.client.session.Session(
+                        new net.minecraft.client.User(
                             randomName,
-                            net.minecraft.util.Uuids.getOfflinePlayerUuid(randomName),
+                            net.minecraft.core.UUIDUtil.createOfflinePlayerUUID(randomName),
                             "",
                             java.util.Optional.empty(),
                             java.util.Optional.empty()
@@ -308,10 +308,10 @@ public class SwarmWorkerMixin {
                 }
                 final String fHost = host;
                 final int fPort = port;
-                net.minecraft.client.network.ServerAddress sa = new net.minecraft.client.network.ServerAddress(fHost, fPort);
-                net.minecraft.client.network.ServerInfo si = new net.minecraft.client.network.ServerInfo(fHost, fHost + ":" + fPort, net.minecraft.client.network.ServerInfo.ServerType.OTHER);
-                net.minecraft.client.gui.screen.Screen rs = mc.currentScreen != null ? mc.currentScreen : new net.minecraft.client.gui.screen.TitleScreen();
-                net.minecraft.client.gui.screen.multiplayer.ConnectScreen.connect(rs, mc, sa, si, false, new net.minecraft.client.network.CookieStorage(java.util.Map.of(), java.util.Map.of(), false));
+                net.minecraft.client.multiplayer.resolver.ServerAddress sa = new net.minecraft.client.multiplayer.resolver.ServerAddress(fHost, fPort);
+                net.minecraft.client.multiplayer.ServerData si = new net.minecraft.client.multiplayer.ServerData(fHost, fHost + ":" + fPort, net.minecraft.client.multiplayer.ServerData.Type.OTHER);
+                net.minecraft.client.gui.screens.Screen rs = mc.screen != null ? mc.screen : new net.minecraft.client.gui.screens.TitleScreen();
+                net.minecraft.client.gui.screens.ConnectScreen.startConnecting(rs, mc, sa, si, false, new net.minecraft.client.multiplayer.TransferState(java.util.Map.of(), java.util.Map.of(), false));
                 ChatUtils.infoPrefix("Swarm", "Joining (highlight)%s:%d", fHost, fPort);
             } catch (Exception e) {
                 ChatUtils.error("Failed to join server: " + e.getMessage());
@@ -335,21 +335,21 @@ public class SwarmWorkerMixin {
             return;
         }
 
-        net.minecraft.client.network.ServerInfo serverInfo = mc.getCurrentServer();
-        String serverAddress = serverInfo.address;
+        net.minecraft.client.multiplayer.ServerData serverInfo = mc.getCurrentServer();
+        String serverAddress = serverInfo.ip;
 
         ChatUtils.infoPrefix("Swarm", "Impersonating (highlight)%s to get them kicked...", targetName);
 
-        mc.disconnect(net.minecraft.text.Text.literal("Impersonating target"));
+        mc.disconnectFromWorld(net.minecraft.network.chat.Component.literal("Impersonating target"));
 
         java.util.concurrent.ScheduledExecutorService executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
         executor.schedule(() -> {
             mc.execute(() -> {
                 try {
                     meteordevelopment.meteorclient.systems.accounts.Account.setSession(
-                        new net.minecraft.client.session.Session(
+                        new net.minecraft.client.User(
                             targetName,
-                            net.minecraft.util.Uuids.getOfflinePlayerUuid(targetName),
+                            net.minecraft.core.UUIDUtil.createOfflinePlayerUUID(targetName),
                             "",
                             java.util.Optional.empty(),
                             java.util.Optional.empty()
@@ -358,17 +358,17 @@ public class SwarmWorkerMixin {
 
                     ChatUtils.infoPrefix("Swarm", "Joined as (highlight)%s \u2014 waiting for original to get kicked...", targetName);
 
-                    net.minecraft.client.network.ServerAddress sa = net.minecraft.client.network.ServerAddress.parse(serverAddress);
-                    net.minecraft.client.gui.screen.Screen rs = new net.minecraft.client.gui.screen.TitleScreen();
-                    net.minecraft.client.gui.screen.multiplayer.ConnectScreen.connect(
+                    net.minecraft.client.multiplayer.resolver.ServerAddress sa = net.minecraft.client.multiplayer.resolver.ServerAddress.parseString(serverAddress);
+                    net.minecraft.client.gui.screens.Screen rs = new net.minecraft.client.gui.screens.TitleScreen();
+                    net.minecraft.client.gui.screens.ConnectScreen.startConnecting(
                         rs, mc, sa, serverInfo, false,
-                        new net.minecraft.client.network.CookieStorage(java.util.Map.of(), java.util.Map.of(), false)
+                        new net.minecraft.client.multiplayer.TransferState(java.util.Map.of(), java.util.Map.of(), false)
                     );
 
                     executor.schedule(() -> {
                         mc.execute(() -> {
                             ChatUtils.infoPrefix("Swarm", "Disconnecting impersonation session...");
-                            mc.disconnect(net.minecraft.text.Text.literal("Restoring session"));
+                            mc.disconnectFromWorld(net.minecraft.network.chat.Component.literal("Restoring session"));
 
                             executor.schedule(() -> {
                                 mc.execute(() -> {
@@ -380,11 +380,11 @@ public class SwarmWorkerMixin {
                                             aeropack$switchToNextCrackedAccount();
                                         }
 
-                                        net.minecraft.client.network.ServerAddress sa2 = net.minecraft.client.network.ServerAddress.parse(serverAddress);
-                                        net.minecraft.client.gui.screen.Screen rs2 = new net.minecraft.client.gui.screen.TitleScreen();
-                                        net.minecraft.client.gui.screen.multiplayer.ConnectScreen.connect(
+                                        net.minecraft.client.multiplayer.resolver.ServerAddress sa2 = net.minecraft.client.multiplayer.resolver.ServerAddress.parseString(serverAddress);
+                                        net.minecraft.client.gui.screens.Screen rs2 = new net.minecraft.client.gui.screens.TitleScreen();
+                                        net.minecraft.client.gui.screens.ConnectScreen.startConnecting(
                                             rs2, mc, sa2, serverInfo, false,
-                                            new net.minecraft.client.network.CookieStorage(java.util.Map.of(), java.util.Map.of(), false)
+                                            new net.minecraft.client.multiplayer.TransferState(java.util.Map.of(), java.util.Map.of(), false)
                                         );
                                         ChatUtils.infoPrefix("Swarm", "Restored original account and reconnected.");
                                     } catch (Exception e) {
@@ -480,20 +480,20 @@ public class SwarmWorkerMixin {
         String fileName = "inv-" + (workerId > 0 ? workerId : Math.abs(workerName.hashCode() % 10000)) + ".txt";
 
         try {
-            net.minecraft.entity.player.PlayerInventory inv = mc.player.getInventory();
+            net.minecraft.world.entity.player.Inventory inv = mc.player.getInventory();
             int emptyCount = 0;
 
             for (int i = 0; i < 36; i++) {
-                if (inv.getStack(i).isEmpty()) emptyCount++;
+                if (inv.getItem(i).isEmpty()) emptyCount++;
             }
 
             StringBuilder sb = new StringBuilder();
             sb.append("WORKER:").append(workerName).append("\n");
             sb.append("EMPTY:").append(emptyCount).append("\n");
 
-            net.minecraft.client.network.ServerInfo serverEntry = mc.getCurrentServer();
+            net.minecraft.client.multiplayer.ServerData serverEntry = mc.getCurrentServer();
             if (serverEntry != null) {
-                sb.append("SERVER:").append(serverEntry.address).append("\n");
+                sb.append("SERVER:").append(serverEntry.ip).append("\n");
             }
 
             java.nio.file.Files.writeString(SwarmGuard.INVENTORY_DIR.resolve(fileName), sb.toString());

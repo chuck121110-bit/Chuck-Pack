@@ -2,7 +2,7 @@ package net.aero.aeropack.uiutils;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.Packet;
 
 public class UiUtilsState {
     public static boolean enabled = false;

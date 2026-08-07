@@ -1,1 +1,4 @@
-accessWidener v2 named
+accessWidener v2 official
+accessible field net/minecraft/world/level/chunk/PalettedContainer data Lnet/minecraft/world/level/chunk/PalettedContainer$Data;
+accessible class net/minecraft/world/level/chunk/PalettedContainer$Data
+accessible method net/minecraft/world/level/block/state/BlockBehaviour getRenderShape (Lnet/minecraft/world/level/block/state/BlockState;)Lnet/minecraft/world/level/block/RenderShape;

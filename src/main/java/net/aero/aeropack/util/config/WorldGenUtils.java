@@ -8,16 +8,24 @@ import cubitect.Cubiomes;
 import cubitect.Cubiomes.Pos;
 import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import net.aero.aeropack.util.config.Seeds.Seed;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.MapDecorationsComponent;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.mob.*;
-import net.minecraft.entity.passive.IronGolemEntity;
-import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.entity.vehicle.ChestMinecartEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.MapDecorations;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.monster.Blaze;
+import net.minecraft.world.entity.monster.Guardian;
+import net.minecraft.world.entity.monster.ElderGuardian;
+import net.minecraft.world.entity.monster.skeleton.WitherSkeleton;
+import net.minecraft.world.entity.monster.Slime;
+import net.minecraft.world.entity.monster.Shulker;
+import net.minecraft.world.entity.monster.MagmaCube;
+import net.minecraft.world.entity.monster.piglin.PiglinBrute;
+import net.minecraft.world.entity.monster.illager.Evoker;
+import net.minecraft.world.entity.animal.golem.IronGolem;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.vehicle.minecart.MinecartChest;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.core.BlockPos;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -30,14 +38,14 @@ public class WorldGenUtils {
     private static final Logger LOG = LogManager.getLogger();
 
     private static final Map<Feature, List<Class<? extends Entity>>> FEATURE_ENTITIES = new HashMap<>() {{
-        put(Feature.ocean_monument, Arrays.asList(ElderGuardianEntity.class, GuardianEntity.class));
-        put(Feature.nether_fortress, Arrays.asList(BlazeEntity.class, WitherSkeletonEntity.class));
-        put(Feature.mansion, Collections.singletonList(EvokerEntity.class));
-        put(Feature.slime_chunk, Collections.singletonList(SlimeEntity.class));
-        put(Feature.bastion_remnant, Collections.singletonList(PiglinBruteEntity.class));
-        put(Feature.end_city, Collections.singletonList(ShulkerEntity.class));
-        put(Feature.village, Arrays.asList(VillagerEntity.class, IronGolemEntity.class));
-        put(Feature.mineshaft, Collections.singletonList(ChestMinecartEntity.class));
+        put(Feature.ocean_monument, Arrays.asList(ElderGuardian.class, Guardian.class));
+        put(Feature.nether_fortress, Arrays.asList(Blaze.class, WitherSkeleton.class));
+        put(Feature.mansion, Collections.singletonList(Evoker.class));
+        put(Feature.slime_LevelChunk, Collections.singletonList(Slime.class));
+        put(Feature.bastion_remnant, Collections.singletonList(PiglinBrute.class));
+        put(Feature.end_city, Collections.singletonList(Shulker.class));
+        put(Feature.village, Arrays.asList(Villager.class, IronGolem.class));
+        put(Feature.mineshaft, Collections.singletonList(MinecartChest.class));
     }};
 
     public enum Feature {
@@ -50,7 +58,7 @@ public class WorldGenUtils {
         end_city,
         village,
         mineshaft,
-        slime_chunk,
+        slime_LevelChunk,
         desert_pyramid
     }
 
@@ -84,9 +92,9 @@ public class WorldGenUtils {
         }
 
         if (mc.player != null) {
-            ItemStack stack = mc.player.getStackInHand(Hand.MAIN_HAND);
+            ItemStack stack = mc.player.getStackInHand(InteractionHand.MAIN_HAND);
             if (stack.isEmpty()) {
-                stack = mc.player.getStackInHand(Hand.OFF_HAND);
+                stack = mc.player.getStackInHand(InteractionHand.OFF_HAND);
             }
             if (!stack.isEmpty()) {
                 try {
@@ -117,7 +125,7 @@ public class WorldGenUtils {
         List<Class<? extends Entity>> entities = FEATURE_ENTITIES.get(feature);
         if (entities == null || mc.level == null) return null;
 
-        for (Entity entity : mc.level.getEntities()) {
+        for (Entity entity : mc.level.players()) {
             for (Class<? extends Entity> clazz : entities) {
                 if (clazz.isInstance(entity)) {
                     return entity.blockPosition();
@@ -138,7 +146,7 @@ public class WorldGenUtils {
             case end_city -> Cubiomes.StructureType.End_City;
             case village -> Cubiomes.StructureType.Village;
             case mineshaft -> Cubiomes.StructureType.Mineshaft;
-            case slime_chunk -> null;
+            case slime_LevelChunk -> null;
             case desert_pyramid -> Cubiomes.StructureType.Desert_Pyramid;
         };
         if (cType == null) return null;
@@ -161,8 +169,8 @@ public class WorldGenUtils {
 
     private static boolean isValidMap(Feature feature, ItemStack stack) {
         if (stack.isEmpty()) return false;
-        if (!stack.getComponents().contains(DataComponentTypes.MAP_DECORATIONS)) return false;
-        MapDecorationsComponent component = stack.get(DataComponentTypes.MAP_DECORATIONS);
+        if (!stack.getComponents().contains(DataComponents.MAP_DECORATIONS)) return false;
+        MapDecorations component = stack.get(DataComponents.MAP_DECORATIONS);
         if (component == null || component.decorations().isEmpty()) return false;
         String name = component.toString();
         if (!name.contains("translate")) return false;
@@ -175,10 +183,10 @@ public class WorldGenUtils {
     }
 
     private static BlockPos getMapMarker(ItemStack stack) {
-        if (!stack.getComponents().contains(DataComponentTypes.MAP_DECORATIONS)) return null;
-        MapDecorationsComponent component = stack.get(DataComponentTypes.MAP_DECORATIONS);
+        if (!stack.getComponents().contains(DataComponents.MAP_DECORATIONS)) return null;
+        MapDecorations component = stack.get(DataComponents.MAP_DECORATIONS);
         if (component == null || component.decorations().isEmpty()) return null;
-        MapDecorationsComponent.Decoration decoration = component.decorations().get(0);
+        MapDecorations.Decoration decoration = component.decorations().get(0);
         return new BlockPos((int) decoration.x(), 0, (int) decoration.z());
     }
 }

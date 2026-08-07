@@ -1,5 +1,5 @@
 plugins {
-    id 'net.fabricmc.fabric-loom' version '1.15-SNAPSHOT'
+    id 'net.fabricmc.fabric-loom' version '1.16-SNAPSHOT'
 }
 
 base {
@@ -29,14 +29,17 @@ dependencies {
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
     // Meteor
-    modImplementation "meteordevelopment:meteor-client:${project.minecraft_version}-SNAPSHOT"
+    implementation "meteordevelopment:meteor-client:${project.minecraft_version}-SNAPSHOT"
 
     // Baritone (required runtime dependency)
-    modImplementation files('libs/baritone-meteor-26.1.2.jar')
+    implementation files('libs/baritone-meteor-26.1.2.jar')
 
     // Xaero's World Map + Minimap (required for AutoFly "Fly Here" button)
-    modCompileOnly files('libs/xaeroworldmap-fabric-26.1.2-1.44.2.jar')
-    modCompileOnly files('libs/xaerominimap-fabric-26.1.2-26.4.2.jar')
+    compileOnly files('libs/xaeroworldmap-fabric-26.1.2-1.44.2.jar')
+    compileOnly files('libs/xaerominimap-fabric-26.1.2-26.4.2.jar')
+
+    // Fabric resource loader (needed for DataResourceStore used by ServerLevel)
+    compileOnly files('C:/Users/Areo/.gradle/caches/modules-2/files-2.1/net.fabricmc.fabric-api/fabric-resource-loader-v1/2.0.9+d871b99e4c/adc76cbab1a71ba7802c59fc44c18f3351f14b34/fabric-resource-loader-v1-2.0.9+d871b99e4c.jar')
 
     // Cubiomes native bindings (HawtJNI, natives auto-loaded from META-INF/native)
     extraLibs "dev.duti.acheong:cubiomes:1.22.5"
@@ -63,6 +66,13 @@ processResources {
     }
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
 tasks.withType(JavaCompile).configureEach {
     it.options.encoding("UTF-8")
+    it.options.release = 25
 }

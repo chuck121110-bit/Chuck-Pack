@@ -7,8 +7,8 @@ import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.network.packet.s2c.common.DisconnectS2CPacket;
-import net.minecraft.text.Text;
+import net.minecraft.network.protocol.common.ClientboundDisconnectPacket;
+import net.minecraft.network.chat.Component;
 
 import java.lang.reflect.Field;
 
@@ -188,8 +188,8 @@ public class CoordinateLogout extends Module {
 
         try {
             net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-            if (mc.player != null && mc.player.networkHandler != null) {
-                mc.player.networkHandler.onDisconnect(new DisconnectS2CPacket(Text.literal(reason)));
+            if (mc.player != null && mc.player.connection != null) {
+                mc.player.connection.handleDisconnect(new ClientboundDisconnectPacket(Component.literal(reason)));
             }
         } catch (Exception ignored) {}
 

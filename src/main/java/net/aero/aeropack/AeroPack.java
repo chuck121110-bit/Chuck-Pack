@@ -38,7 +38,7 @@ import net.aero.aeropack.modules.world.BaseFinder;
 import net.aero.aeropack.modules.world.OreSim;
 import net.aero.aeropack.util.config.AeroPackConfigModifier;
 import net.aero.aeropack.util.config.CategoryConfig;
-import net.minecraft.item.Items;
+import net.minecraft.world.item.Items;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +50,7 @@ import java.util.Map;
 public class AeroPack extends MeteorAddon {
     public static final Logger LOG = LoggerFactory.getLogger("AeroPack");
 
-    public static final Category AERO_CATEGORY = new Category("Aero Pack", Items.EMERALD.getDefaultStack());
+    public static final Category AERO_CATEGORY = new Category("Aero Pack", () -> Items.EMERALD.getDefaultInstance());
 
     private static final List<Module> aeroModules = new ArrayList<>();
     private static final Map<Module, Category> naturalCategories = new LinkedHashMap<>();

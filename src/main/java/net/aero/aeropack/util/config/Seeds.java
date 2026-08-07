@@ -8,13 +8,14 @@ import cubitect.Cubiomes;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.systems.System;
 import meteordevelopment.meteorclient.utils.Utils;
-import net.minecraft.client.network.ServerInfo;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.world.level.Level;
 
 import java.util.HashMap;
 
@@ -38,10 +39,17 @@ public class Seeds extends System<Seeds> {
     public Seed getSeed() {
         if (mc == null) return null;
 
-        if (mc.isIntegratedServerRunning()) {
-            if (mc.getServer() != null && mc.getServer().getOverworld() != null) {
-                return new Seed(mc.getServer().getOverworld().getSeed(), resolveCubiomesVersion());
-            }
+        if (mc.hasSingleplayerServer()) {
+            try {
+                if (mc.getSingleplayerServer() != null) {
+                    try {
+                        var level = mc.getSingleplayerServer().overworld();
+                        if (level != null) {
+                            return new Seed(level.getSeed(), resolveCubiomesVersion());
+                        }
+                    } catch (Exception ignored) {}
+                }
+            } catch (Throwable ignored) {}
             return null;
         }
 
@@ -54,15 +62,15 @@ public class Seeds extends System<Seeds> {
     }
 
     public void setSeed(String rawSeed) {
-        if (mc == null || mc.isIntegratedServerRunning()) return;
+        if (mc == null || mc.hasSingleplayerServer()) return;
 
-        ServerInfo server = mc.getCurrentServer();
+        ServerData server = mc.getCurrentServer();
         String verStr = server != null && server.version != null ? server.version.getString() : "unknown";
         setSeed(rawSeed, resolveCubiomesVersion(verStr));
     }
 
     public void setSeed(String rawSeed, Cubiomes.MCVersion version) {
-        if (mc == null || mc.isIntegratedServerRunning()) return;
+        if (mc == null || mc.hasSingleplayerServer()) return;
 
         String worldName = Utils.getWorldName();
         if (worldName == null) return;
@@ -81,8 +89,8 @@ public class Seeds extends System<Seeds> {
     }
 
     @Override
-    public NbtCompound toTag() {
-        NbtCompound tag = new NbtCompound();
+    public CompoundTag toTag() {
+        CompoundTag tag = new CompoundTag();
         seeds.forEach((key, seed) -> {
             if (seed != null) {
                 tag.put(key, seed.toTag());
@@ -92,8 +100,8 @@ public class Seeds extends System<Seeds> {
     }
 
     @Override
-    public Seeds fromTag(NbtCompound tag) {
-        for (String key : tag.getKeys()) {
+    public Seeds fromTag(CompoundTag tag) {
+        for (String key : tag.keySet()) {
             tag.getCompound(key).ifPresent(nbt -> seeds.put(key, Seed.fromTag(nbt)));
         }
         return this;
@@ -116,33 +124,33 @@ public class Seeds extends System<Seeds> {
             this.version = version == null ? resolveCubiomesVersion() : version;
         }
 
-        public NbtCompound toTag() {
-            NbtCompound tag = new NbtCompound();
+        public CompoundTag toTag() {
+            CompoundTag tag = new CompoundTag();
             tag.putLong("seed", seed);
             tag.putString("version", version.name());
             return tag;
         }
 
-        public static Seed fromTag(NbtCompound tag) {
+        public static Seed fromTag(CompoundTag tag) {
             long storedSeed = tag.getLong("seed").orElse(0L);
             String versionName = tag.getString("version").orElse("");
             Cubiomes.MCVersion storedVersion = parseCubiomesVersion(versionName);
             return new Seed(storedSeed, storedVersion);
         }
 
-        public Text toText() {
-            MutableText text = Text.literal(String.format("[%s%s%s] (%s)",
-                Formatting.GREEN,
+        public Component toText() {
+            MutableComponent component = Component.literal(String.format("[%s%s%s] (%s)",
+                ChatFormatting.GREEN,
                 Long.toString(seed),
-                Formatting.WHITE,
+                ChatFormatting.WHITE,
                 version.name()
             ));
 
-            text.setStyle(text.getStyle()
+            component.setStyle(component.getStyle()
                 .withClickEvent(new ClickEvent.CopyToClipboard(Long.toString(seed)))
-                .withHoverEvent(new HoverEvent.ShowText(Text.literal("Copy to clipboard"))));
+                .withHoverEvent(new HoverEvent.ShowText(Component.literal("Copy to clipboard"))));
 
-            return text;
+            return component;
         }
     }
 

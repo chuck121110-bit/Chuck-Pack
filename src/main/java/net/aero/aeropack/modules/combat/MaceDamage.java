@@ -5,9 +5,9 @@ import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
-import net.minecraft.util.hit.HitResult;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.world.phys.HitResult;
 
 public class MaceDamage extends Module {
 
@@ -33,8 +33,8 @@ public class MaceDamage extends Module {
     @EventHandler
     private void onAttackEntity(AttackEntityEvent event) {
         if (mc.player == null || mc.getConnection() == null) return;
-        if (mc.crosshairTarget == null || mc.crosshairTarget.getType() != HitResult.Type.ENTITY) return;
-        if (!mc.player.getMainItemStack().isOf(Items.MACE)) return;
+        if (mc.hitResult == null || mc.hitResult.getType() != HitResult.Type.ENTITY) return;
+        if (mc.player.getMainHandItem().getItem() != Items.MACE) return;
 
         for (int i = 0; i < 4; i++) sendFakeY(0.0);
         sendFakeY(Math.sqrt(fallHeight.get() * fallHeight.get()));
@@ -42,7 +42,7 @@ public class MaceDamage extends Module {
     }
 
     private void sendFakeY(double offset) {
-        mc.getConnection().sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(
+        mc.getConnection().getConnection().send(new ServerboundMovePlayerPacket.Pos(
             mc.player.getX(),
             mc.player.getY() + offset,
             mc.player.getZ(),

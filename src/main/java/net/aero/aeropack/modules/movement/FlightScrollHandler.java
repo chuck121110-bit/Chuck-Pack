@@ -16,8 +16,8 @@ import static meteordevelopment.meteorclient.MeteorClient.mc;
 public class FlightScrollHandler {
     @EventHandler
     private void onMouseScroll(MouseScrollEvent event) {
-        if (mc.currentScreen != null) return;
-        if (!mc.options.sprintKey.isPressed()) return;
+        if (mc.screen != null) return;
+        if (!mc.options.keySprint.isDown()) return;
 
         Module flight = Modules.get().get(Flight.class);
         if (flight == null || !flight.isActive()) return;

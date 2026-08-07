@@ -25,13 +25,12 @@ import meteordevelopment.orbit.EventHandler;
 import net.aero.aeropack.render.AeroRenderMode;
 import net.aero.aeropack.render.AeroShaderHelper;
 import net.aero.aeropack.render.AeroShaderSource;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.state.property.Properties;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.Heightmap;
-import net.minecraft.world.chunk.Chunk;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.*;
@@ -41,7 +40,7 @@ import java.util.concurrent.Executors;
 
 public class DeepslateESP extends Module implements AeroShaderSource {
 
-    // ── Box ESP settings ───────────────────────────────────────────────
+    // ── AABB ESP settings ───────────────────────────────────────────────
     private final Setting<SettingColor> espColor = settings.getDefaultGroup().add(new ColorSetting.Builder()
         .name("color")
         .description("ESP color (lines alpha used; fill alpha is softer).")
@@ -52,7 +51,7 @@ public class DeepslateESP extends Module implements AeroShaderSource {
     // ── Shader settings ────────────────────────────────────────────────
     private final Setting<AeroRenderMode> renderMode = settings.getDefaultGroup().add(new EnumSetting.Builder<AeroRenderMode>()
         .name("aeropack-render-mode")
-        .description("Box ESP draws normal boxes. Shader uses the same post-process outline shader as Storage ESP.")
+        .description("AABB ESP draws normal boxes. Shader uses the same post-process outline shader as Storage ESP.")
         .defaultValue(AeroRenderMode.BoxESP)
         .build()
     );
@@ -60,7 +59,7 @@ public class DeepslateESP extends Module implements AeroShaderSource {
     // ── State ──────────────────────────────────────────────────────────
     private final Map<Long, Map<BlockPos, Boolean>> chunkToFlaggedPositions = new ConcurrentHashMap<>();
     private final List<BlockPos> toRender = Collections.synchronizedList(new ArrayList<>());
-    private final BlockPos.Mutable scanPos = new BlockPos.Mutable();
+    private final BlockPos.MutableBlockPos scanPos = new BlockPos.MutableBlockPos();
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private volatile boolean renderListDirty = true;
 
@@ -78,7 +77,7 @@ public class DeepslateESP extends Module implements AeroShaderSource {
         toRender.clear();
         renderListDirty = true;
 
-        for (Chunk c : Utils.chunks()) {
+        for (var c : Utils.chunks()) {
             if (c instanceof LevelChunk wc) scanChunkAsync(wc);
         }
     }
@@ -102,7 +101,7 @@ public class DeepslateESP extends Module implements AeroShaderSource {
         int bx = event.pos.getX();
         int by = event.pos.getY();
         int bz = event.pos.getZ();
-        long key = ChunkPos.toLong(bx >> 4, bz >> 4);
+        long key = ChunkPos.pack(bx >> 4, bz >> 4);
 
         var oldState = event.oldState;
         var newState = event.newState;
@@ -132,23 +131,23 @@ public class DeepslateESP extends Module implements AeroShaderSource {
     private void scanChunk(LevelChunk chunk) {
         if (!isActive() || mc.level == null) return;
 
-        long key = chunk.getPos().toLong();
+        long key = chunk.getPos().pack();
         Map<BlockPos, Boolean> map = new ConcurrentHashMap<>();
 
-        int startX = chunk.getPos().getStartX();
-        int endX = chunk.getPos().getEndX();
-        int startZ = chunk.getPos().getStartZ();
-        int endZ = chunk.getPos().getEndZ();
+        int startX = chunk.getPos().getMinBlockX();
+        int endX = chunk.getPos().getMaxBlockX();
+        int startZ = chunk.getPos().getMinBlockZ();
+        int endZ = chunk.getPos().getMaxBlockZ();
 
         for (int x = startX; x <= endX; x++) {
             for (int z = startZ; z <= endZ; z++) {
-                int top = chunk.getHeightmap(Heightmap.Type.WORLD_SURFACE).get(x - startX, z - startZ);
-                for (int y = mc.level.getMinBuildHeight(); y < top; y++) {
+                int top = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, x - startX, z - startZ);
+                for (int y = mc.level.getMinY(); y < top; y++) {
                     scanPos.set(x, y, z);
                     BlockState state = chunk.getBlockState(scanPos);
                     if (state.getBlock() == Blocks.DEEPSLATE) {
                         Boolean flagged = isNonNaturalDeepslate(state);
-                        if (flagged != null && flagged) map.put(scanPos.toImmutable(), Boolean.TRUE);
+                        if (flagged != null && flagged) map.put(scanPos.immutable(), Boolean.TRUE);
                     }
                 }
             }
@@ -161,8 +160,8 @@ public class DeepslateESP extends Module implements AeroShaderSource {
     }
 
     private Boolean isNonNaturalDeepslate(BlockState state) {
-        if (!state.contains(Properties.AXIS)) return null;
-        return state.get(Properties.AXIS) != net.minecraft.util.math.Direction.Axis.Y;
+        if (!state.hasProperty(BlockStateProperties.AXIS)) return null;
+        return state.getValue(BlockStateProperties.AXIS) != net.minecraft.core.Direction.Axis.Y;
     }
 
     // ── Rendering ──────────────────────────────────────────────────────

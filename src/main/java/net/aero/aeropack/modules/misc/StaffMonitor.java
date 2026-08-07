@@ -15,15 +15,16 @@ import meteordevelopment.meteorclient.systems.modules.misc.AutoReconnect;
 import meteordevelopment.meteorclient.utils.entity.fakeplayer.FakePlayerManager;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.client.network.ServerInfo;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.registry.Registries;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.GameMode;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.GameType;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -66,7 +67,7 @@ public class StaffMonitor extends Module {
         }
 
         private SoundEvent resolve() {
-            return Registries.SOUND_EVENT.get(Identifier.of(id));
+            return BuiltInRegistries.SOUND_EVENT.getValue(Identifier.parse(id));
         }
 
         @Override
@@ -148,7 +149,7 @@ public class StaffMonitor extends Module {
         .build()
     );
 
-    private final Map<UUID, GameMode> gamemodeStates = new HashMap<>();
+    private final Map<UUID, GameType> gamemodeStates = new HashMap<>();
     private final Map<UUID, String> hiddenPlayers = new HashMap<>();
     private final Set<String> staffNames = new HashSet<>();
     private final Set<String> mojangStaffNames = new HashSet<>();
@@ -162,7 +163,7 @@ public class StaffMonitor extends Module {
     private String staffQuitReason;
 
     public StaffMonitor() {
-        super(Categories.Misc, "Staff Monitor", "Detects staff members, gamemode switches and hidden (off-tab) players, and can auto-quit when staff are present.");
+        super(Categories.Misc, "Staff Monitor", "Detects staff members, GameType switches and hidden (off-tab) players, and can auto-quit when staff are present.");
     }
 
     /** Used by safety-aware modules without invoking StaffMonitor's action. */
@@ -239,14 +240,14 @@ public class StaffMonitor extends Module {
 
         updateHiddenPlayers();
 
-        HashMap<UUID, GameMode> nextStates = new HashMap<>();
-        for (PlayerListEntry entry : mc.getConnection().getPlayerList()) {
+        HashMap<UUID, GameType> nextStates = new HashMap<>();
+        for (PlayerInfo entry : mc.getConnection().getOnlinePlayers()) {
             UUID id = entry.getProfile().id();
             String name = entry.getProfile().name();
             if (shouldIgnorePlayer(id, name))
                 continue;
 
-            GameMode currentMode = entry.getGameMode();
+            GameType currentMode = entry.getGameMode();
             nextStates.put(id, currentMode);
 
             // Hidden staff alert
@@ -255,7 +256,7 @@ public class StaffMonitor extends Module {
                 && alertedStaff.add(id))
                 alertStaff(entry);
 
-            GameMode previous = gamemodeStates.get(id);
+            GameType previous = gamemodeStates.get(id);
             if (previous == null) {
                 // First time seeing this player.
                 if (modeSwitching && isStaffMode(currentMode)) {
@@ -267,7 +268,7 @@ public class StaffMonitor extends Module {
                 continue;
             }
 
-            // Gamemode changed — alert on any transition
+            // GameType changed — alert on any transition
             if (modeSwitching && previous != currentMode) {
                 alert(entry, currentMode, true);
                 if (isStaffMode(previous) || isStaffMode(currentMode))
@@ -299,12 +300,12 @@ public class StaffMonitor extends Module {
         }
 
         HashMap<UUID, String> nextHiddenPlayers = new HashMap<>();
-        for (PlayerEntity player : mc.level.getPlayers()) {
+        for (Player player : mc.level.players()) {
             if (shouldIgnorePlayerEntity(player))
                 continue;
 
             UUID id = player.getUUID();
-            if (mc.getConnection().getPlayerListEntry(id) != null)
+            if (mc.getConnection().getPlayerInfo(id) != null)
                 continue;
 
             String playerName = player.getName().getString();
@@ -326,7 +327,7 @@ public class StaffMonitor extends Module {
         if (mc.getConnection() == null)
             return;
 
-        for (PlayerListEntry entry : mc.getConnection().getPlayerList()) {
+        for (PlayerInfo entry : mc.getConnection().getOnlinePlayers()) {
             UUID id = entry.getProfile().id();
             String name = entry.getProfile().name();
             if (shouldIgnorePlayer(id, name))
@@ -341,19 +342,19 @@ public class StaffMonitor extends Module {
         if (mc.getConnection() == null || mc.level == null)
             return;
 
-        for (PlayerEntity player : mc.level.getPlayers()) {
+        for (Player player : mc.level.players()) {
             if (shouldIgnorePlayerEntity(player))
                 continue;
 
             UUID id = player.getUUID();
-            if (mc.getConnection().getPlayerListEntry(id) != null)
+            if (mc.getConnection().getPlayerInfo(id) != null)
                 continue;
 
             hiddenPlayers.put(id, player.getName().getString());
         }
     }
 
-    private boolean shouldIgnorePlayerEntity(PlayerEntity player) {
+    private boolean shouldIgnorePlayerEntity(Player player) {
         if (player == null || FakePlayerManager.getFakePlayers().contains(player))
             return true;
 
@@ -382,12 +383,12 @@ public class StaffMonitor extends Module {
             || lower.endsWith("_bot");
     }
 
-    private void alert(PlayerListEntry entry, GameMode mode, boolean entered) {
+    private void alert(PlayerInfo entry, GameType mode, boolean entered) {
         String name = entry.getProfile().name();
-        String modeLabel = mode.asString(); // "survival", "creative", "spectator", "adventure"
+        String modeLabel = mode.getSerializedName(); // "survival", "creative", "spectator", "adventure"
         if (chatAlert.get()) {
             String action = entered ? "entered" : "left";
-            ChatUtils.sendMsg(Text.literal(String.format(Locale.ROOT,
+            ChatUtils.sendMsg(Component.literal(String.format(Locale.ROOT,
                 "[StaffMonitor] %s %s %s mode.", name, action, modeLabel)));
         }
 
@@ -403,18 +404,18 @@ public class StaffMonitor extends Module {
             double y = mc.player.getY();
             double z = mc.player.getZ();
             for (int i = 0; i < whole; i++)
-                mc.level.playSoundClient(x, y, z, event, SoundCategory.PLAYERS, 1F,
+                mc.level.playLocalSound(x, y, z, event, SoundSource.PLAYERS, 1F,
                     entered ? 1.2F : 0.85F, false);
             if (remainder > 0F)
-                mc.level.playSoundClient(x, y, z, event, SoundCategory.PLAYERS,
+                mc.level.playLocalSound(x, y, z, event, SoundSource.PLAYERS,
                     remainder, entered ? 1.2F : 0.85F, false);
         }
     }
 
-    private void alertStaff(PlayerListEntry entry) {
+    private void alertStaff(PlayerInfo entry) {
         String name = entry.getProfile().name();
         if (chatAlert.get())
-            ChatUtils.sendMsg(Text.literal(String.format(Locale.ROOT,
+            ChatUtils.sendMsg(Component.literal(String.format(Locale.ROOT,
                 "[StaffMonitor] Staff member %s is online.", name)));
 
         if (soundAlert.get() && mc.level != null && mc.player != null) {
@@ -423,8 +424,8 @@ public class StaffMonitor extends Module {
             if (event == null || target <= 0F)
                 return;
 
-            mc.level.playSoundClient(mc.player.getX(), mc.player.getY(),
-                mc.player.getZ(), event, SoundCategory.PLAYERS,
+            mc.level.playLocalSound(mc.player.getX(), mc.player.getY(),
+                mc.player.getZ(), event, SoundSource.PLAYERS,
                 Math.max(0.2F, target), 1.6F, false);
         }
     }
@@ -432,7 +433,7 @@ public class StaffMonitor extends Module {
     private void alertHiddenPlayer(String name, boolean appeared) {
         if (chatAlert.get()) {
             String action = appeared ? "appeared off-tab" : "disappeared";
-            ChatUtils.sendMsg(Text.literal(String.format(Locale.ROOT,
+            ChatUtils.sendMsg(Component.literal(String.format(Locale.ROOT,
                 "[StaffMonitor] %s %s.", name, action)));
         }
 
@@ -442,8 +443,8 @@ public class StaffMonitor extends Module {
             if (event == null || target <= 0F)
                 return;
 
-            mc.level.playSoundClient(mc.player.getX(), mc.player.getY(),
-                mc.player.getZ(), event, SoundCategory.PLAYERS,
+            mc.level.playLocalSound(mc.player.getX(), mc.player.getY(),
+                mc.player.getZ(), event, SoundSource.PLAYERS,
                 Math.max(0.2F, target), appeared ? 1.6F : 0.7F, false);
         }
     }
@@ -549,7 +550,7 @@ public class StaffMonitor extends Module {
         if (!quitOnStaffEnter.get() || mc.getConnection() == null)
             return;
 
-        for (PlayerListEntry entry : mc.getConnection().getPlayerList()) {
+        for (PlayerInfo entry : mc.getConnection().getOnlinePlayers()) {
             String name = entry.getProfile().name();
             if (shouldIgnorePlayer(entry.getProfile().id(), name))
                 continue;
@@ -572,15 +573,15 @@ public class StaffMonitor extends Module {
         staffQuitReason = staffName + " joined the server.";
 
         if (chatAlert.get())
-            ChatUtils.sendMsg(Text.literal(String.format(Locale.ROOT,
+            ChatUtils.sendMsg(Component.literal(String.format(Locale.ROOT,
                 "[StaffMonitor] Staff member %s is online.", staffName)));
 
         if (soundAlert.get() && mc.level != null && mc.player != null) {
             SoundEvent event = sound.get().resolve();
             float target = (float) (volume.get() / 100.0);
             if (event != null && target > 0F) {
-                mc.level.playSoundClient(mc.player.getX(), mc.player.getY(),
-                    mc.player.getZ(), event, SoundCategory.PLAYERS,
+                mc.level.playLocalSound(mc.player.getX(), mc.player.getY(),
+                    mc.player.getZ(), event, SoundSource.PLAYERS,
                     Math.max(0.2F, target), 1.6F, false);
             }
         }
@@ -589,7 +590,7 @@ public class StaffMonitor extends Module {
         if (autoReconnect != null && autoReconnect.isActive())
             autoReconnect.disable();
 
-        ChatUtils.sendMsg(Text.literal(String.format(Locale.ROOT,
+        ChatUtils.sendMsg(Component.literal(String.format(Locale.ROOT,
             "[StaffMonitor] Staff detected: %s. Quitting in %ds.", staffName,
             quitDelay.get())));
     }
@@ -621,7 +622,7 @@ public class StaffMonitor extends Module {
         if (autoReconnect != null && autoReconnect.isActive())
             autoReconnect.disable();
 
-        mc.level.disconnect(Text.literal("StaffMonitor quit: " + staffQuitReason));
+        mc.level.disconnect(Component.literal("StaffMonitor quit: " + staffQuitReason));
         cancelStaffQuit();
     }
 
@@ -635,8 +636,8 @@ public class StaffMonitor extends Module {
         return false;
     }
 
-    private static boolean isStaffMode(GameMode mode) {
-        return mode == GameMode.CREATIVE || mode == GameMode.SPECTATOR;
+    private static boolean isStaffMode(GameType mode) {
+        return mode == GameType.CREATIVE || mode == GameType.SPECTATOR;
     }
 
     private void loadStaffFile(Path file) {
@@ -666,8 +667,8 @@ public class StaffMonitor extends Module {
     }
 
     private boolean shouldIgnorePlayer(UUID id, String name) {
-        if (id != null && mc.getSession() != null
-            && id.equals(mc.getSession().getUuidOrNull()))
+        if (id != null && mc.getUser() != null
+            && id.equals(mc.getUser().getProfileId()))
             return true;
 
         if (mc.player != null && id != null && id.equals(mc.player.getUUID()))
@@ -676,24 +677,24 @@ public class StaffMonitor extends Module {
         if (name == null)
             return false;
 
-        if (mc.getSession() != null
-            && name.equalsIgnoreCase(mc.getSession().getUsername()))
+        if (mc.getUser() != null
+            && name.equalsIgnoreCase(mc.getUser().getName()))
             return true;
 
         return Friends.get() != null && Friends.get().get(name) != null;
     }
 
     private String resolveServerKey() {
-        ServerInfo info = mc.getCurrentServer();
+        ServerData info = mc.getCurrentServer();
         if (info != null) {
-            if (info.address != null && !info.address.isEmpty())
-                return info.address.replace(':', '_');
+            if (info.ip != null && !info.ip.isEmpty())
+                return info.ip.replace(':', '_');
             if (info.isRealm())
                 return "realms_" + (info.name == null ? "" : info.name);
             if (info.name != null && !info.name.isEmpty())
                 return "server_" + info.name;
         }
-        if (mc.isInSingleplayer())
+        if (mc.isSingleplayer())
             return "singleplayer";
         return "unknown";
     }

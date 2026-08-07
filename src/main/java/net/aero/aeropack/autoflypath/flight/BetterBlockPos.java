@@ -1,6 +1,6 @@
 package net.aero.aeropack.autoflypath.flight;
 
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 public final class BetterBlockPos extends BlockPos
 {

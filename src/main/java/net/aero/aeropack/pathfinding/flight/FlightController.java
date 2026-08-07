@@ -951,7 +951,7 @@ public final class FlightController
 			if(this.config.flightDebug && this.frontierHoldTicks % 100 == 0)
 			{
 				this.log(
-					"[AutoFly] pushing through unloaded-chunk frontier for "
+					"[AutoFly] pushing through unloaded-LevelChunk frontier for "
 						+ this.frontierHoldTicks + " ticks");
 			}
 		}else
@@ -1250,7 +1250,7 @@ public final class FlightController
 		dirs.add(new Vec3(-1.0, 0.0, 0.0));
 		dirs.add(new Vec3(0.0, 0.0, 1.0));
 		dirs.add(new Vec3(0.0, 0.0, -1.0));
-		AABB box = this.player().getBoundingBox().deflate(1.0E-6);
+		AABB AABB = this.player().getBoundingBox().deflate(1.0E-6);
 		for(double mag = 0.1; mag <= 0.85; mag += 0.15)
 		{
 			for(Vec3 d : dirs)
@@ -1993,7 +1993,7 @@ public final class FlightController
 			return probe;
 		}
 		Vec3 dir = move.scale(1.0 / len);
-		AABB box = this.player().getBoundingBox();
+		AABB AABB = this.player().getBoundingBox();
 		double step = 0.1;
 		for(double d = 0.1; d <= probe; d += 0.1)
 		{
@@ -2007,7 +2007,7 @@ public final class FlightController
 		return probe;
 	}
 	
-	private boolean boxIntersectsBurnHazard(AABB box)
+	private boolean boxIntersectsBurnHazard(AABB AABB)
 	{
 		if(this.level() == null)
 		{

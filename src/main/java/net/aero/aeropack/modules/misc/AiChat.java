@@ -9,8 +9,8 @@ import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.network.packet.s2c.play.ChatMessageS2CPacket;
-import net.minecraft.network.packet.s2c.play.GameMessageS2CPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerChatPacket;
+import net.minecraft.network.protocol.game.ClientboundDisguisedChatPacket;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -264,11 +264,10 @@ public class AiChat extends Module {
 
         String message = null;
 
-        if (event.packet instanceof GameMessageS2CPacket sysPacket) {
-            if (sysPacket.overlay()) return;
+        if (event.packet instanceof ClientboundDisguisedChatPacket sysPacket) {
             if (!listenServerMessages.get()) return;
-            message = sysPacket.content().getString();
-        } else if (event.packet instanceof ChatMessageS2CPacket chatPacket) {
+            message = sysPacket.message().getString();
+        } else if (event.packet instanceof ClientboundPlayerChatPacket chatPacket) {
             if (!listenPlayerChat.get()) return;
             message = chatPacket.unsignedContent() != null
                 ? chatPacket.unsignedContent().getString()
@@ -330,7 +329,7 @@ public class AiChat extends Module {
             final String toSend = response;
             if (mc.player != null && mc.getConnection() != null) {
                 mc.execute(() -> {
-                    mc.player.networkHandler.sendChatMessage(toSend);
+                    mc.player.connection.sendChat(toSend);
                     lastResponseTime.set(System.currentTimeMillis());
                     requestCount.incrementAndGet();
                     if (showResponses.get()) info("Responded: " + toSend);
@@ -398,12 +397,12 @@ public class AiChat extends Module {
 
         JsonObject json = JsonParser.parseString(res.body()).getAsJsonObject();
         if (json.has("error")) { log("Anthropic: " + json.getAsJsonObject("error").get("message").getAsString(), true); return null; }
-        return json.getAsJsonArray("content").get(0).getAsJsonObject().get("text").getAsString();
+        return json.getAsJsonArray("content").get(0).getAsJsonObject().get("Component").getAsString();
     }
 
     private String callGoogle(String system, String user) throws Exception {
         String combined = system + "\n\nChat message to respond to: " + user;
-        JsonObject part = new JsonObject(); part.addProperty("text", combined);
+        JsonObject part = new JsonObject(); part.addProperty("Component", combined);
         JsonArray parts = new JsonArray(); parts.add(part);
         JsonObject contentObj = new JsonObject(); contentObj.add("parts", parts);
         JsonArray contents = new JsonArray(); contents.add(contentObj);
@@ -445,7 +444,7 @@ public class AiChat extends Module {
         for (JsonElement p : partsEl.getAsJsonArray()) {
             if (!p.isJsonObject()) continue;
             JsonObject pObj = p.getAsJsonObject();
-            JsonElement textEl = pObj.get("text");
+            JsonElement textEl = pObj.get("Component");
             if (textEl == null || textEl.getAsString().isBlank()) continue;
             boolean isThought = pObj.has("thought") && pObj.get("thought").getAsBoolean();
             if (!isThought) return textEl.getAsString();
@@ -546,9 +545,9 @@ public class AiChat extends Module {
         String serverName = "Unknown";
         if (mc.getCurrentServer() != null) {
             serverName = mc.getCurrentServer().name.isBlank()
-                ? mc.getCurrentServer().address
+                ? mc.getCurrentServer().ip
                 : mc.getCurrentServer().name;
-        } else if (mc.isInSingleplayer()) {
+        } else if (mc.isSingleplayer()) {
             serverName = "Singleplayer";
         }
         return DEFAULT_PROMPT.replace("{SERVER_NAME}", serverName);

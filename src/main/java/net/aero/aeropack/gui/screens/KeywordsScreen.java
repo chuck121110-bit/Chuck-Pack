@@ -7,6 +7,7 @@ import meteordevelopment.meteorclient.gui.WindowScreen;
 import meteordevelopment.meteorclient.gui.widgets.containers.WTable;
 import meteordevelopment.meteorclient.gui.widgets.pressable.WButton;
 import meteordevelopment.meteorclient.systems.modules.Modules;
+import net.minecraft.client.Minecraft;
 
 /**
  * Screen for managing chat keywords.
@@ -24,7 +25,7 @@ public class KeywordsScreen extends WindowScreen {
     @Override
     public void initWidgets() {
         WButton addButton = add(theme.button("Add")).expandX().widget();
-        addButton.action = () -> client.setScreen(new EditKeywordScreen(theme, null, keyword -> {
+        addButton.action = () -> Minecraft.getInstance().setScreen(new EditKeywordScreen(theme, null, keyword -> {
             if (!module.keywords.contains(keyword)) {
                 module.keywords.add(keyword);
             }
@@ -43,7 +44,7 @@ public class KeywordsScreen extends WindowScreen {
             table.add(theme.label(keyword.name));
 
             WButton editButton = table.add(theme.button("Edit")).widget();
-            editButton.action = () -> client.setScreen(new EditKeywordScreen(theme, keyword, k -> refresh()));
+            editButton.action = () -> Minecraft.getInstance().setScreen(new EditKeywordScreen(theme, keyword, k -> refresh()));
 
             WButton deleteButton = table.add(theme.button("Remove")).widget();
             deleteButton.action = () -> {

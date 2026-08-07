@@ -15,21 +15,22 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.orbit.EventHandler;
 import net.aero.aeropack.modules.misc.oppstats.OppStatsScreen;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.client.network.ServerInfo;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.ItemEnchantmentsComponent;
-import net.minecraft.component.type.LoreComponent;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.minecraft.world.item.component.ItemLore;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.core.Holder;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.phys.Vec3;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -108,7 +109,7 @@ public class OppStats extends Module {
 
         long now = System.currentTimeMillis();
         Set<UUID> onlineNow = new LinkedHashSet<>();
-        for (PlayerListEntry entry : mc.getConnection().getPlayerList()) {
+        for (PlayerInfo entry : mc.getConnection().getOnlinePlayers()) {
             UUID id = entry.getProfile().id();
             String name = entry.getProfile().name();
             if (ignoreNpcs.get() && isBotLikeIdentity(id, name))
@@ -119,7 +120,7 @@ public class OppStats extends Module {
             rec.name = name;
             rec.online = true;
             rec.ping = entry.getLatency();
-            rec.gamemode = entry.getGameMode() == null ? "N/A" : entry.getGameMode().name();
+            rec.GameType = entry.getGameMode() == null ? "N/A" : entry.getGameMode().name();
             rec.tabSeenAt = now;
             if (!lastOnline.contains(id)) {
                 rec.joinCount++;
@@ -146,7 +147,7 @@ public class OppStats extends Module {
         lastOnline.addAll(onlineNow);
 
         if (mc.level != null && mc.player != null) {
-            for (PlayerEntity p : mc.level.getPlayers()) {
+            for (Player p : mc.level.players()) {
                 if (p == mc.player)
                     continue;
                 if (!onlineNow.contains(p.getUUID()))
@@ -164,20 +165,20 @@ public class OppStats extends Module {
         saveIfNeeded(false);
     }
 
-    private void updateFromLivePlayer(OppRecord rec, PlayerEntity p, long now) {
+    private void updateFromLivePlayer(OppRecord rec, Player p, long now) {
         rec.name = p.getName().getString();
-        rec.lastPos = new Vec3d(p.getX(), p.getY(), p.getZ());
+        rec.lastPos = new Vec3(p.getX(), p.getY(), p.getZ());
         rec.lastSeenAt = now;
         rec.distance = mc.player == null ? Double.NaN : p.distanceTo(mc.player);
         rec.health = p.getHealth();
         rec.absorption = p.getAbsorptionAmount();
-        rec.armorValue = p.getArmor();
-        rec.mainHand = observeEquipment(rec, "Main hand", rec.mainHand, p.getMainItemStack(), now);
-        rec.offHand = observeEquipment(rec, "Off hand", rec.offHand, p.getOffhandItem(), now);
-        rec.helmet = observeEquipment(rec, "Helmet", rec.helmet, p.getEquippedStack(EquipmentSlot.HEAD), now);
-        rec.chest = observeEquipment(rec, "Chestplate", rec.chest, p.getEquippedStack(EquipmentSlot.CHEST), now);
-        rec.legs = observeEquipment(rec, "Leggings", rec.legs, p.getEquippedStack(EquipmentSlot.LEGS), now);
-        rec.boots = observeEquipment(rec, "Boots", rec.boots, p.getEquippedStack(EquipmentSlot.FEET), now);
+        rec.armorValue = p.getArmorValue();
+        rec.mainHand = observeEquipment(rec, "Main InteractionHand", rec.mainHand, p.getMainHandItem(), now);
+        rec.offHand = observeEquipment(rec, "Off InteractionHand", rec.offHand, p.getOffhandItem(), now);
+        rec.helmet = observeEquipment(rec, "Helmet", rec.helmet, p.getItemBySlot(EquipmentSlot.HEAD), now);
+        rec.chest = observeEquipment(rec, "Chestplate", rec.chest, p.getItemBySlot(EquipmentSlot.CHEST), now);
+        rec.legs = observeEquipment(rec, "Leggings", rec.legs, p.getItemBySlot(EquipmentSlot.LEGS), now);
+        rec.boots = observeEquipment(rec, "Boots", rec.boots, p.getItemBySlot(EquipmentSlot.FEET), now);
     }
 
     private String observeEquipment(OppRecord rec, String slot, String previous, ItemStack stack, long now) {
@@ -199,7 +200,7 @@ public class OppStats extends Module {
             return;
 
         long now = System.currentTimeMillis();
-        for (PlayerListEntry entry : mc.getConnection().getPlayerList()) {
+        for (PlayerInfo entry : mc.getConnection().getOnlinePlayers()) {
             UUID id = entry.getProfile().id();
             String name = entry.getProfile().name();
             if (ignoreNpcs.get() && isBotLikeIdentity(id, name))
@@ -208,7 +209,7 @@ public class OppStats extends Module {
             rec.name = name;
             rec.online = true;
             rec.ping = entry.getLatency();
-            rec.gamemode = entry.getGameMode() == null ? "N/A" : entry.getGameMode().name();
+            rec.GameType = entry.getGameMode() == null ? "N/A" : entry.getGameMode().name();
             rec.tabSeenAt = now;
             lastOnline.add(id);
         }
@@ -239,9 +240,9 @@ public class OppStats extends Module {
             + "\nPosition: " + pos + "\nDistance: " + dist
             + "\nTarget status: health=" + formatFloat(r.health)
             + ", absorption=" + formatFloat(r.absorption) + ", armor="
-            + r.armorValue + ", ping=" + r.ping + ", gamemode="
-            + nullToNA(r.gamemode) + "\nMain hand: " + r.mainHand
-            + "\nOff hand: " + r.offHand + "\nHelmet: " + r.helmet
+            + r.armorValue + ", ping=" + r.ping + ", GameType="
+            + nullToNA(r.GameType) + "\nMain InteractionHand: " + r.mainHand
+            + "\nOff InteractionHand: " + r.offHand + "\nHelmet: " + r.helmet
             + "\nChestplate: " + r.chest + "\nLeggings: " + r.legs + "\nBoots: "
             + r.boots + "\nRecent observed items:\n"
             + (r.recentItems.isEmpty() ? "N/A" : String.join("\n", r.recentItems))
@@ -270,12 +271,12 @@ public class OppStats extends Module {
     private String stackInfo(ItemStack stack) {
         if (stack == null || stack.isEmpty())
             return "N/A";
-        String itemId = Registries.ITEM.getId(stack.getItem()).toString();
+        String itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
         String ench = getEnchantmentSummary(stack);
-        String dur = stack.isDamageable()
-            ? (stack.getMaxDamage() - stack.getDamage()) + "/" + stack.getMaxDamage()
+        String dur = stack.isDamageableItem()
+            ? (stack.getMaxDamage() - stack.getDamageValue()) + "/" + stack.getMaxDamage()
             : "N/A";
-        return stack.getName().getString() + " x" + stack.getCount()
+        return stack.getHoverName().getString() + " x" + stack.getCount()
             + " [id=" + itemId + ", durability=" + dur + ", enchants="
             + (ench.isBlank() ? "none" : ench) + "]";
     }
@@ -288,38 +289,38 @@ public class OppStats extends Module {
     private String getEnchantmentSummary(ItemStack stack) {
         ArrayList<String> parts = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
-        appendEnchantments(parts, seen, stack.getComponents()
-            .getOrDefault(DataComponentTypes.ENCHANTMENTS, ItemEnchantmentsComponent.DEFAULT));
-        appendEnchantments(parts, seen, stack.getComponents()
-            .getOrDefault(DataComponentTypes.STORED_ENCHANTMENTS, ItemEnchantmentsComponent.DEFAULT));
-        LoreComponent lore = stack.getComponents().get(DataComponentTypes.LORE);
+        ItemEnchantments enchants = stack.getComponents().get(DataComponents.ENCHANTMENTS);
+        if (enchants != null) appendEnchantments(parts, seen, enchants);
+        ItemEnchantments stored = stack.getComponents().get(DataComponents.STORED_ENCHANTMENTS);
+        if (stored != null) appendEnchantments(parts, seen, stored);
+        ItemLore lore = stack.getComponents().get(DataComponents.LORE);
         appendLoreEnchantments(parts, seen, lore);
         return String.join(", ", parts);
     }
 
     private static void appendEnchantments(List<String> out, Set<String> seen,
-        ItemEnchantmentsComponent enchantments) {
-        for (Object2IntMap.Entry<RegistryEntry<Enchantment>> entry : enchantments.getEnchantmentEntries()) {
-            RegistryEntry<Enchantment> holder = entry.getKey();
+        ItemEnchantments enchantments) {
+        for (Object2IntMap.Entry<Holder<Enchantment>> entry : enchantments.entrySet()) {
+            Holder<Enchantment> holder = entry.getKey();
             int lvl = entry.getIntValue();
-            String key = holder.getKey().map(k -> k.getValue().toString()).orElse("?") + "#" + lvl;
+            String key = holder.unwrapKey().map(k -> k.identifier().toString()).orElse("?") + "#" + lvl;
             if (!seen.add(key))
                 continue;
-            out.add(Enchantment.getName(holder, lvl).getString());
+            out.add(Enchantment.getFullname(holder, lvl).getString());
         }
     }
 
-    private static void appendLoreEnchantments(List<String> out, Set<String> seen, LoreComponent lore) {
+    private static void appendLoreEnchantments(List<String> out, Set<String> seen, ItemLore lore) {
         if (lore == null)
             return;
 
-        for (Text line : lore.lines()) {
-            String text = line.getString().trim();
-            if (text.isBlank())
+        for (Component line : lore.lines()) {
+            String Component = line.getString().trim();
+            if (Component.isBlank())
                 continue;
-            if (!seen.add(text + "#lore"))
+            if (!seen.add(Component + "#lore"))
                 continue;
-            out.add(text);
+            out.add(Component);
         }
     }
 
@@ -378,22 +379,22 @@ public class OppStats extends Module {
     }
 
     private String resolveServerKey() {
-        ServerInfo info = mc.getCurrentServer();
+        ServerData info = mc.getCurrentServer();
         if (info != null) {
-            if (info.address != null && !info.address.isEmpty())
-                return info.address.replace(':', '_');
+            if (info.ip != null && !info.ip.isEmpty())
+                return info.ip.replace(':', '_');
             if (info.isRealm())
                 return "realms_" + (info.name == null ? "" : info.name);
             if (info.name != null && !info.name.isEmpty())
                 return "server_" + info.name;
         }
-        if (mc.isInSingleplayer())
+        if (mc.isSingleplayer())
             return "singleplayer";
         return "unknown";
     }
 
     public void openScreen() {
-        Screen prev = mc.currentScreen;
+        Screen prev = mc.screen;
         mc.setScreen(new OppStatsScreen(prev, this));
     }
 
@@ -465,8 +466,8 @@ public class OppStats extends Module {
         public String name;
         public boolean online;
         public int ping = -1;
-        public String gamemode = "N/A";
-        public Vec3d lastPos;
+        public String GameType = "N/A";
+        public Vec3 lastPos;
         public double distance = Double.NaN;
         public float health = Float.NaN;
         public float absorption = Float.NaN;
@@ -490,16 +491,16 @@ public class OppStats extends Module {
             this.name = name == null ? "unknown" : name;
         }
 
-        public void addEvent(String text) {
-            String line = TS_FORMAT.format(Instant.now()) + " - " + text;
+        public void addEvent(String Component) {
+            String line = TS_FORMAT.format(Instant.now()) + " - " + Component;
             events.add(0, line);
             while (events.size() > 80)
                 events.remove(events.size() - 1);
         }
 
-        public void addRecentItem(String text, long epochMs) {
-            String line = TS_FORMAT.format(Instant.ofEpochMilli(epochMs)) + " - " + text;
-            recentItems.removeIf(s -> s.endsWith(text));
+        public void addRecentItem(String Component, long epochMs) {
+            String line = TS_FORMAT.format(Instant.ofEpochMilli(epochMs)) + " - " + Component;
+            recentItems.removeIf(s -> s.endsWith(Component));
             recentItems.add(0, line);
             while (recentItems.size() > 36)
                 recentItems.remove(recentItems.size() - 1);
@@ -511,7 +512,7 @@ public class OppStats extends Module {
             o.addProperty("name", name);
             o.addProperty("online", online);
             o.addProperty("ping", ping);
-            o.addProperty("gamemode", gamemode);
+            o.addProperty("GameType", GameType);
             if (lastPos != null) {
                 o.addProperty("x", lastPos.x);
                 o.addProperty("y", lastPos.y);
@@ -550,9 +551,9 @@ public class OppStats extends Module {
             OppRecord r = new OppRecord(id, get(o, "name", "unknown"));
             r.online = getBool(o, "online", false);
             r.ping = getInt(o, "ping", -1);
-            r.gamemode = get(o, "gamemode", "N/A");
+            r.GameType = get(o, "GameType", "N/A");
             if (o.has("x") && o.has("y") && o.has("z"))
-                r.lastPos = new Vec3d(o.get("x").getAsDouble(),
+                r.lastPos = new Vec3(o.get("x").getAsDouble(),
                     o.get("y").getAsDouble(), o.get("z").getAsDouble());
             r.distance = getDouble(o, "distance", Double.NaN);
             r.health = (float) getDouble(o, "health", Double.NaN);

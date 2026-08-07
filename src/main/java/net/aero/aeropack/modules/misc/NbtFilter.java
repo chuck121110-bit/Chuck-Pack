@@ -14,43 +14,44 @@ import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.block.entity.LockableContainerBlockEntity;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.network.NetworkPhase;
-import net.minecraft.network.NetworkSide;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.PacketType;
-import net.minecraft.network.packet.c2s.play.ButtonClickC2SPacket;
-import net.minecraft.network.packet.c2s.play.ClickSlotC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.BundleS2CPacket;
-import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
-import net.minecraft.network.packet.s2c.play.ChunkDeltaUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntitiesDestroyS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityEquipmentUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityPositionS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityPositionSyncS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntitySetHeadYawS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityStatusS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityTrackerUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.InventoryS2CPacket;
-import net.minecraft.network.packet.s2c.play.LightUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.ScreenHandlerSlotUpdateS2CPacket;
-import net.minecraft.network.state.NetworkState;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.level.block.entity.BaseContainerBlockEntity;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.network.protocol.game.ServerboundContainerButtonClickPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundBundlePacket;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
+import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEquipmentPacket;
+import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEntityLinkPacket;
+import net.minecraft.network.protocol.game.ClientboundRotateHeadPacket;
+import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundEntityEventPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
+import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
+import net.minecraft.network.protocol.game.ClientboundLightUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket;
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.level.ChunkPos;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
@@ -170,7 +171,7 @@ public class NbtFilter extends Module {
         if (!(event.result instanceof BlockHitResult hit))
             return;
 
-        if (!(mc.level.getBlockEntity(hit.blockPosition()) instanceof LockableContainerBlockEntity))
+        if (!(mc.level.getBlockEntity(hit.getBlockPos()) instanceof BaseContainerBlockEntity))
             return;
 
         long total = getInventoryNbtSize();
@@ -190,9 +191,9 @@ public class NbtFilter extends Module {
     }
 
     private boolean isContainerActionPacket(Packet<?> packet) {
-        if (packet instanceof ClickSlotC2SPacket
-            || packet instanceof ButtonClickC2SPacket
-            || packet instanceof PlayerInteractBlockC2SPacket)
+        if (packet instanceof ServerboundContainerClickPacket
+            || packet instanceof ServerboundContainerButtonClickPacket
+            || packet instanceof ServerboundUseItemOnPacket)
             return true;
 
         // Keep this compatible with mappings and helper packets that use a
@@ -248,9 +249,9 @@ public class NbtFilter extends Module {
         // inspect chunks, block entities, entity metadata, or bundles here:
         // those packets can contain server-controlled recursive data and are
         // unrelated to preventing oversized inventory/container packets.
-        if (!(packet instanceof InventoryS2CPacket)
-            && !(packet instanceof ScreenHandlerSlotUpdateS2CPacket)
-            && !(packet instanceof EntityTrackerUpdateS2CPacket))
+        if (!(packet instanceof ClientboundContainerSetContentPacket)
+            && !(packet instanceof ClientboundContainerSetSlotPacket)
+            && !(packet instanceof ClientboundSetEntityDataPacket))
             return;
 
         InspectionResult result = checkItemStackCarrierPacket(packet);
@@ -261,7 +262,7 @@ public class NbtFilter extends Module {
         // The server may have opened the screen before sending its contents.
         // Remove that screen as well so the oversized container data cannot be
         // interacted with after its contents packet was rejected.
-        if (mc.currentScreen instanceof HandledScreen<?>)
+        if (mc.screen instanceof AbstractContainerScreen<?>)
             mc.setScreen(null);
         recordBlocked(result);
     }
@@ -271,7 +272,7 @@ public class NbtFilter extends Module {
             return InspectionResult.safe();
 
         try {
-            if (packet instanceof EntitiesDestroyS2CPacket remove) {
+            if (packet instanceof ClientboundRemoveEntitiesPacket remove) {
                 for (int id : remove.getEntityIds()) {
                     bannedEntityIds.remove(id);
                     entityIdToChunk.remove(id);
@@ -279,7 +280,7 @@ public class NbtFilter extends Module {
                 return InspectionResult.safe();
             }
 
-            if (packet instanceof BundleS2CPacket bundle)
+            if (packet instanceof ClientboundBundlePacket bundle)
                 return checkBundlePacket(bundle);
 
             InspectionResult quarantineHit = checkQuarantinePacket(packet);
@@ -305,40 +306,40 @@ public class NbtFilter extends Module {
     }
 
     private InspectionResult inspectDangerousPacket(Packet<?> packet) {
-        if (packet instanceof ChunkDataS2CPacket chunkPkt)
+        if (packet instanceof ClientboundLevelChunkWithLightPacket chunkPkt)
             return checkChunkPacket(chunkPkt);
 
-        if (packet instanceof BlockEntityUpdateS2CPacket bePkt)
+        if (packet instanceof ClientboundBlockEntityDataPacket bePkt)
             return checkBlockEntityPacket(bePkt);
 
-        if (packet instanceof EntityTrackerUpdateS2CPacket metadata)
+        if (packet instanceof ClientboundSetEntityDataPacket metadata)
             return checkEntityMetadataPacket(metadata);
 
-        if (packet instanceof InventoryS2CPacket content)
+        if (packet instanceof ClientboundContainerSetContentPacket content)
             return checkItemStackCarrierPacket(content);
-        if (packet instanceof ScreenHandlerSlotUpdateS2CPacket slot)
+        if (packet instanceof ClientboundContainerSetSlotPacket slot)
             return checkItemStackCarrierPacket(slot);
-        if (packet instanceof EntityEquipmentUpdateS2CPacket equipment)
+        if (packet instanceof ClientboundSetEquipmentPacket equipment)
             return checkEquipmentPacket(equipment);
 
         return InspectionResult.safe();
     }
 
-    private InspectionResult checkChunkPacket(ChunkDataS2CPacket packet) {
-        ChunkPos chunkPos = new ChunkPos(packet.getChunkX(), packet.getChunkZ());
+    private InspectionResult checkChunkPacket(ClientboundLevelChunkWithLightPacket packet) {
+        ChunkPos chunkPos = new ChunkPos(packet.getX(), packet.getZ());
         if (isBannedChunk(chunkPos))
-            return InspectionResult.dangerous(PacketKind.CHUNK,
-                "quarantined chunk", -1, chunkPos, null);
+            return InspectionResult.dangerous(PacketKind.LevelChunk,
+                "quarantined LevelChunk", -1, chunkPos, null);
 
         try {
             int sizeBytes =
-                packet.getChunkData().getSectionsDataBuf().readableBytes();
+                packet.getChunkData().getReadBuffer().readableBytes();
             double sizeMB = sizeBytes / (1024.0 * 1024.0);
 
             if (sizeMB > maxSuspiciousPacketSizeMb.get()) {
                 quarantineChunk(chunkPos);
-                return InspectionResult.dangerous(PacketKind.CHUNK,
-                    "chunk payload "
+                return InspectionResult.dangerous(PacketKind.LevelChunk,
+                    "LevelChunk payload "
                         + String.format(Locale.ROOT, "%.2f", sizeMB) + " MB",
                     sizeBytes, chunkPos, null);
             }
@@ -351,8 +352,8 @@ public class NbtFilter extends Module {
         } catch (Throwable t) {
             if (failClosedOnExceptions.get()) {
                 quarantineChunk(chunkPos);
-                return InspectionResult.dangerous(PacketKind.CHUNK,
-                    "chunk inspection exception: "
+                return InspectionResult.dangerous(PacketKind.LevelChunk,
+                    "LevelChunk inspection exception: "
                         + t.getClass().getSimpleName(),
                     -1, chunkPos, null);
             }
@@ -373,12 +374,12 @@ public class NbtFilter extends Module {
 
         while (iterator.hasNext()) {
             Object record = iterator.next();
-            NbtCompound tag = findCompoundTag(record);
+            CompoundTag tag = findCompoundTag(record);
             if (tag == null)
                 continue;
 
             InspectionResult result = checkTagAgainstLimits(tag,
-                PacketKind.CHUNK, fallbackChunk, null);
+                PacketKind.LevelChunk, fallbackChunk, null);
             if (result.dangerous()) {
                 unsafeRecordFound = true;
                 int removed = removeCurrentRecord(iterator,
@@ -431,7 +432,7 @@ public class NbtFilter extends Module {
     }
 
     private int removeCurrentRecord(java.util.Iterator<?> iterator,
-        Object chunkData, Object records, Object record, ChunkPos chunk) {
+        Object chunkData, Object records, Object record, ChunkPos LevelChunk) {
         try {
             iterator.remove();
             return 1;
@@ -447,20 +448,20 @@ public class NbtFilter extends Module {
             }
         }
 
-        return replaceDangerousBlockEntityRecords(chunkData, records, chunk);
+        return replaceDangerousBlockEntityRecords(chunkData, records, LevelChunk);
     }
 
     private int replaceDangerousBlockEntityRecords(Object chunkData,
-        Object records, ChunkPos chunk) {
+        Object records, ChunkPos LevelChunk) {
         if (!(records instanceof Iterable<?> iterable))
             return 0;
 
         java.util.ArrayList<Object> safeRecords = new java.util.ArrayList<>();
         int removed = 0;
         for (Object candidate : iterable) {
-            NbtCompound tag = findCompoundTag(candidate);
+            CompoundTag tag = findCompoundTag(candidate);
             InspectionResult result = tag == null ? InspectionResult.safe()
-                : checkTagAgainstLimits(tag, PacketKind.CHUNK, chunk, null);
+                : checkTagAgainstLimits(tag, PacketKind.LevelChunk, LevelChunk, null);
             if (result.dangerous()) {
                 removed++;
                 continue;
@@ -511,23 +512,23 @@ public class NbtFilter extends Module {
         return false;
     }
 
-    private void debugSanitizedChunk(ChunkPos chunk, int strippedRecords) {
+    private void debugSanitizedChunk(ChunkPos LevelChunk, int strippedRecords) {
         if (mc.player == null)
             return;
 
-        sendRed("Sanitized chunk [" + chunkX(chunk)
-            + ", " + chunkZ(chunk) + "] - stripped " + strippedRecords
+        sendRed("Sanitized LevelChunk [" + chunkX(LevelChunk)
+            + ", " + chunkZ(LevelChunk) + "] - stripped " + strippedRecords
             + " dangerous block entity record(s).");
     }
 
     private InspectionResult checkBlockEntityPacket(
-        BlockEntityUpdateS2CPacket packet) {
-        ChunkPos chunkPos = new ChunkPos(packet.getPos());
+        ClientboundBlockEntityDataPacket packet) {
+        ChunkPos chunkPos = ChunkPos.containing(packet.getPos());
         if (isBannedChunk(chunkPos))
             return InspectionResult.dangerous(PacketKind.BLOCK_ENTITY,
-                "block entity in quarantined chunk", -1, chunkPos, null);
+                "block entity in quarantined LevelChunk", -1, chunkPos, null);
 
-        NbtCompound tag = packet.getNbt();
+        CompoundTag tag = packet.getTag();
         if (tag == null)
             return InspectionResult.safe();
 
@@ -543,7 +544,7 @@ public class NbtFilter extends Module {
     }
 
     private InspectionResult checkEntityMetadataPacket(
-        EntityTrackerUpdateS2CPacket packet) {
+        ClientboundSetEntityDataPacket packet) {
         int entityId = packet.id();
         if (isBannedEntity(entityId))
             return InspectionResult.dangerous(PacketKind.ENTITY_METADATA,
@@ -563,9 +564,9 @@ public class NbtFilter extends Module {
                 continue;
 
             quarantineEntity(entityId);
-            ChunkPos chunk = entityIdToChunk.get(entityId);
-            if (chunk != null)
-                quarantineChunk(chunk);
+            ChunkPos LevelChunk = entityIdToChunk.get(entityId);
+            if (LevelChunk != null)
+                quarantineChunk(LevelChunk);
             return result;
         }
 
@@ -591,7 +592,7 @@ public class NbtFilter extends Module {
     }
 
     private InspectionResult checkEquipmentPacket(
-        EntityEquipmentUpdateS2CPacket p) {
+        ClientboundSetEquipmentPacket p) {
         int entityId = readPacketEntityId(p);
         if (isBannedEntity(entityId))
             return InspectionResult.dangerous(PacketKind.ITEM_STACK,
@@ -610,10 +611,10 @@ public class NbtFilter extends Module {
         return InspectionResult.safe();
     }
 
-    private InspectionResult checkBundlePacket(BundleS2CPacket bundle) {
+    private InspectionResult checkBundlePacket(ClientboundBundlePacket bundle) {
         bundlesScanned++;
 
-        for (Packet<?> sub : bundle.getPackets()) {
+        for (Packet<?> sub : bundle.subPackets()) {
             InspectionResult result = inspectPacket(sub);
             if (result.dangerous())
                 return result.withKind(PacketKind.BUNDLE);
@@ -625,8 +626,8 @@ public class NbtFilter extends Module {
     private InspectionResult checkQuarantinePacket(Packet<?> packet) {
         ChunkPos affectedChunk = getAffectedChunk(packet);
         if (affectedChunk != null && isBannedChunk(affectedChunk))
-            return InspectionResult.dangerous(PacketKind.CHUNK,
-                "follow-up packet for quarantined chunk", -1, affectedChunk,
+            return InspectionResult.dangerous(PacketKind.LevelChunk,
+                "follow-up packet for quarantined LevelChunk", -1, affectedChunk,
                 null);
 
         int entityId = readPacketEntityId(packet);
@@ -642,40 +643,40 @@ public class NbtFilter extends Module {
         int entityId = readPacketEntityId(packet);
         if (entityId >= 0 && isBannedEntity(entityId))
             return InspectionResult.dangerous(PacketKind.ENTITY_METADATA,
-                "entity spawned or moved inside quarantined chunk", -1,
+                "entity spawned or moved inside quarantined LevelChunk", -1,
                 entityIdToChunk.get(entityId), entityId);
 
         return InspectionResult.safe();
     }
 
     private ChunkPos getAffectedChunk(Packet<?> packet) {
-        if (packet instanceof ChunkDataS2CPacket p)
-            return new ChunkPos(p.getChunkX(), p.getChunkZ());
+        if (packet instanceof ClientboundLevelChunkWithLightPacket p)
+            return new ChunkPos(p.getX(), p.getZ());
 
-        if (packet instanceof BlockEntityUpdateS2CPacket p)
-            return new ChunkPos(p.getPos());
+        if (packet instanceof ClientboundBlockEntityDataPacket p)
+            return ChunkPos.containing(p.getPos());
 
-        if (packet instanceof BlockUpdateS2CPacket p)
-            return new ChunkPos(p.getPos());
+        if (packet instanceof ClientboundBlockUpdatePacket p)
+            return ChunkPos.containing(p.getPos());
 
-        if (packet instanceof ChunkDeltaUpdateS2CPacket p)
+        if (packet instanceof ClientboundSectionBlocksUpdatePacket p)
             return getSectionUpdateChunk(p);
 
-        if (packet instanceof LightUpdateS2CPacket p)
-            return new ChunkPos(p.getChunkX(), p.getChunkZ());
+        if (packet instanceof ClientboundLightUpdatePacket p)
+            return new ChunkPos(p.getX(), p.getZ());
 
         return null;
     }
 
-    private ChunkPos getSectionUpdateChunk(ChunkDeltaUpdateS2CPacket packet) {
+    private ChunkPos getSectionUpdateChunk(ClientboundSectionBlocksUpdatePacket packet) {
         Object sectionPos = invokeNoArg(packet, "getSectionPos");
         if (sectionPos == null)
             sectionPos = invokeNoArg(packet, "sectionPos");
         if (sectionPos == null)
             sectionPos = readFieldByTypeName(packet, "SectionPos");
 
-        Object chunk = invokeNoArg(sectionPos, "chunk");
-        if (chunk instanceof ChunkPos chunkPos)
+        Object LevelChunk = invokeNoArg(sectionPos, "LevelChunk");
+        if (LevelChunk instanceof ChunkPos chunkPos)
             return chunkPos;
 
         Integer x = readIntByMethods(sectionPos, "x", "getX", "getXChunk");
@@ -687,11 +688,11 @@ public class NbtFilter extends Module {
     }
 
     private void updateTrackedEntityChunk(Packet<?> packet) {
-        if (packet instanceof EntitySpawnS2CPacket add) {
-            int id = add.getEntityId();
-            ChunkPos chunk = chunkFromCoordinates(add.getX(), add.getZ());
-            entityIdToChunk.put(id, chunk);
-            if (isBannedChunk(chunk))
+        if (packet instanceof ClientboundAddEntityPacket add) {
+            int id = add.getId();
+            ChunkPos LevelChunk = chunkFromCoordinates(add.getX(), add.getZ());
+            entityIdToChunk.put(id, LevelChunk);
+            if (isBannedChunk(LevelChunk))
                 quarantineEntity(id);
             return;
         }
@@ -701,11 +702,19 @@ public class NbtFilter extends Module {
             return;
 
         ChunkPos newChunk = null;
-        if (packet instanceof EntityPositionS2CPacket tp) {
-            newChunk = chunkFromVecLike(tp.change().position());
-        } else if (packet instanceof EntityPositionSyncS2CPacket sync) {
-            newChunk = chunkFromVecLike(sync.values().position());
-        } else if (packet instanceof EntityS2CPacket) {
+        if (packet instanceof ClientboundMoveEntityPacket tp) {
+            if (mc.level != null) {
+                Entity movedEntity = mc.level.getEntity(entityId);
+                if (movedEntity != null)
+                    newChunk = chunkFromCoordinates(movedEntity.getX(), movedEntity.getZ());
+            }
+        } else if (packet instanceof ClientboundSetEntityLinkPacket sync) {
+            if (mc.level != null) {
+                Entity linkedEntity = mc.level.getEntity(sync.getDestId());
+                if (linkedEntity != null)
+                    newChunk = chunkFromCoordinates(linkedEntity.getX(), linkedEntity.getZ());
+            }
+        } else if (packet instanceof ClientboundMoveEntityPacket) {
             newChunk = entityIdToChunk.get(entityId);
         }
 
@@ -736,7 +745,7 @@ public class NbtFilter extends Module {
 
     private void recordBlocked(InspectionResult result) {
         switch (result.kind()) {
-            case CHUNK -> chunksBlocked++;
+            case LevelChunk -> chunksBlocked++;
             case BLOCK_ENTITY -> blockEntitiesBlocked++;
             case ENTITY_METADATA -> entityMetadataBlocked++;
             case ITEM_STACK -> itemStacksBlocked++;
@@ -762,9 +771,9 @@ public class NbtFilter extends Module {
 
     private String formatResultDetails(InspectionResult result) {
         StringBuilder details = new StringBuilder();
-        if (result.chunk() != null)
-            details.append(" chunk [").append(chunkX(result.chunk()))
-                .append(", ").append(chunkZ(result.chunk())).append("]");
+        if (result.LevelChunk() != null)
+            details.append(" LevelChunk [").append(chunkX(result.LevelChunk()))
+                .append(", ").append(chunkZ(result.LevelChunk())).append("]");
         if (result.entityId() != null)
             details.append(" entity #").append(result.entityId());
         if (result.estimatedBytes() >= 0)
@@ -773,28 +782,28 @@ public class NbtFilter extends Module {
         return details.toString();
     }
 
-    private int chunkX(ChunkPos chunk) {
-        return chunk == null ? 0 : chunk.x;
+    private int chunkX(ChunkPos LevelChunk) {
+        return LevelChunk == null ? 0 : LevelChunk.x();
     }
 
-    private int chunkZ(ChunkPos chunk) {
-        return chunk == null ? 0 : chunk.z;
+    private int chunkZ(ChunkPos LevelChunk) {
+        return LevelChunk == null ? 0 : LevelChunk.z();
     }
 
-    private boolean isBannedChunk(ChunkPos chunk) {
-        return shouldHardQuarantineChunks() && chunk != null
-            && bannedChunks.contains(chunk);
+    private boolean isBannedChunk(ChunkPos LevelChunk) {
+        return shouldHardQuarantineChunks() && LevelChunk != null
+            && bannedChunks.contains(LevelChunk);
     }
 
     private boolean isBannedEntity(int entityId) {
         return entityId >= 0 && bannedEntityIds.contains(entityId);
     }
 
-    private void quarantineChunk(ChunkPos chunk) {
-        if (!shouldHardQuarantineChunks() || chunk == null)
+    private void quarantineChunk(ChunkPos LevelChunk) {
+        if (!shouldHardQuarantineChunks() || LevelChunk == null)
             return;
 
-        if (bannedChunks.add(chunk))
+        if (bannedChunks.add(LevelChunk))
             quarantinedChunks++;
     }
 
@@ -810,31 +819,31 @@ public class NbtFilter extends Module {
             quarantinedEntities++;
     }
 
-    private InspectionResult checkTagAgainstLimits(NbtCompound tag,
-        PacketKind kind, ChunkPos chunk, Integer entityId) {
+    private InspectionResult checkTagAgainstLimits(CompoundTag tag,
+        PacketKind kind, ChunkPos LevelChunk, Integer entityId) {
         try {
             long estimatedSize = estimateTagSize(tag);
             if (isDangerousTag(tag))
                 return InspectionResult.dangerous(kind, "dangerous NBT tag",
-                    estimatedSize, chunk, entityId);
+                    estimatedSize, LevelChunk, entityId);
 
         } catch (Throwable t) {
             if (failClosedOnExceptions.get())
                 return InspectionResult.dangerous(kind,
                     "NBT inspection exception: " + t.getClass().getSimpleName(),
-                    -1, chunk, entityId);
+                    -1, LevelChunk, entityId);
         }
 
         return InspectionResult.safe();
     }
 
     private InspectionResult checkItemStackAgainstLimits(ItemStack stack,
-        PacketKind kind, ChunkPos chunk, Integer entityId) {
+        PacketKind kind, ChunkPos LevelChunk, Integer entityId) {
         try {
             if (isDangerousItemStack(stack))
                 return InspectionResult.dangerous(kind,
                     "dangerous item stack NBT/components",
-                    estimateItemStackNbtSize(stack), chunk, entityId);
+                    estimateItemStackNbtSize(stack), LevelChunk, entityId);
 
         } catch (Throwable t) {
             if (failClosedOnExceptions.get())
@@ -842,42 +851,42 @@ public class NbtFilter extends Module {
                     .dangerous(kind,
                         "item stack inspection exception: "
                             + t.getClass().getSimpleName(),
-                        -1, chunk, entityId);
+                        -1, LevelChunk, entityId);
         }
 
         return InspectionResult.safe();
     }
 
     private InspectionResult checkObjectForDangerousPayload(Object value,
-        PacketKind kind, ChunkPos chunk, Integer entityId) {
+        PacketKind kind, ChunkPos LevelChunk, Integer entityId) {
         if (value instanceof ItemStack stack)
-            return checkItemStackAgainstLimits(stack, kind, chunk, entityId);
+            return checkItemStackAgainstLimits(stack, kind, LevelChunk, entityId);
 
-        if (value instanceof NbtCompound tag)
-            return checkTagAgainstLimits(tag, kind, chunk, entityId);
+        if (value instanceof CompoundTag tag)
+            return checkTagAgainstLimits(tag, kind, LevelChunk, entityId);
 
         long estimated = estimateObjectNbtOrComponentSize(value);
         if (estimated > maxItemStackBytes()
             || estimated > maxSuspiciousPacketBytes())
             return InspectionResult.dangerous(kind,
-                "large NBT/component-like metadata value", estimated, chunk,
+                "large NBT/component-like metadata value", estimated, LevelChunk,
                 entityId);
 
         for (ItemStack stack : findItemStacks(value)) {
             InspectionResult result =
-                checkItemStackAgainstLimits(stack, kind, chunk, entityId);
+                checkItemStackAgainstLimits(stack, kind, LevelChunk, entityId);
             if (result.dangerous())
                 return result;
         }
 
-        NbtCompound tag = findCompoundTag(value);
+        CompoundTag tag = findCompoundTag(value);
         if (tag != null)
-            return checkTagAgainstLimits(tag, kind, chunk, entityId);
+            return checkTagAgainstLimits(tag, kind, LevelChunk, entityId);
 
         return InspectionResult.safe();
     }
 
-    private boolean isDangerousTag(NbtCompound tag) {
+    private boolean isDangerousTag(CompoundTag tag) {
         if (tag == null)
             return false;
 
@@ -886,18 +895,18 @@ public class NbtFilter extends Module {
             || estimatedSize > maxSuspiciousPacketBytes())
             return true;
 
-        ArrayDeque<NbtElement> queue = new ArrayDeque<>();
+        ArrayDeque<Tag> queue = new ArrayDeque<>();
         queue.add(tag);
         int visited = 0;
 
         while (!queue.isEmpty() && visited++ < 4096) {
-            NbtElement current = queue.removeFirst();
-            if (current instanceof NbtCompound compound) {
-                if (compound.getSizeInBytes() > maxBlockEntityBytes())
+            Tag current = queue.removeFirst();
+            if (current instanceof CompoundTag compound) {
+                if (compound.sizeInBytes() > maxBlockEntityBytes())
                     return true;
 
-                for (String key : compound.getKeys()) {
-                    NbtElement child = compound.get(key);
+                for (String key : compound.keySet()) {
+                    Tag child = compound.get(key);
                     if (child == null)
                         continue;
 
@@ -910,7 +919,7 @@ public class NbtFilter extends Module {
                 }
             } else if (current instanceof Iterable<?> iterable) {
                 for (Object child : iterable)
-                    if (child instanceof NbtElement childTag)
+                    if (child instanceof Tag childTag)
                         queue.add(childTag);
             }
         }
@@ -933,10 +942,10 @@ public class NbtFilter extends Module {
         if (mc.level == null)
             return Long.MAX_VALUE;
 
-        RegistryByteBuf buf = new RegistryByteBuf(
-            Unpooled.buffer(), mc.level.getRegistryManager());
+        RegistryFriendlyByteBuf buf = new RegistryFriendlyByteBuf(
+            Unpooled.buffer(), mc.level.registryAccess());
         try {
-            ItemStack.OPTIONAL_PACKET_CODEC.encode(buf, stack);
+            ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, stack);
             return buf.writerIndex();
 
         } catch (Throwable t) {
@@ -960,9 +969,9 @@ public class NbtFilter extends Module {
             return maxSuspiciousPacketBytes() + 1;
         if (value instanceof ItemStack stack)
             return estimateItemStackNbtSize(stack);
-        if (value instanceof NbtCompound tag)
-            return tag.getSizeInBytes();
-        if (value instanceof NbtElement tag)
+        if (value instanceof CompoundTag tag)
+            return tag.sizeInBytes();
+        if (value instanceof Tag tag)
             return estimateTagSize(tag);
         if (value instanceof Collection<?> collection) {
             long total = 0;
@@ -982,8 +991,8 @@ public class NbtFilter extends Module {
             return 0;
         var inventory = mc.player.getInventory();
         long total = 0;
-        for (int i = 0; i < inventory.size(); i++) {
-            ItemStack stack = inventory.getStack(i);
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            ItemStack stack = inventory.getItem(i);
             total = saturatingAdd(total, estimateItemStackNbtSize(stack));
             if (total > inventoryNbtLimitBytes())
                 return total;
@@ -997,37 +1006,37 @@ public class NbtFilter extends Module {
         return left + right;
     }
 
-    private long estimateTagSize(NbtElement tag) {
+    private long estimateTagSize(Tag tag) {
         if (tag == null)
             return 0;
 
         // Do not call getSizeInBytes here. It recursively visits the whole
         // structure and can overflow the client stack on deliberately deep NBT.
-        ArrayDeque<NbtElement> pending = new ArrayDeque<>();
-        Set<NbtElement> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        ArrayDeque<Tag> pending = new ArrayDeque<>();
+        Set<Tag> seen = Collections.newSetFromMap(new IdentityHashMap<>());
         pending.add(tag);
         long total = 0;
         int visited = 0;
         long limit = maxSuspiciousPacketBytes();
 
         while (!pending.isEmpty()) {
-            NbtElement current = pending.removeFirst();
+            Tag current = pending.removeFirst();
             if (!seen.add(current) || ++visited > 4096)
                 return limit + 1;
 
             // This is intentionally conservative. It only needs to distinguish
             // safe data from data large enough to reject.
             total = saturatingAdd(total, 16);
-            if (current instanceof NbtCompound compound) {
-                for (String key : compound.getKeys()) {
+            if (current instanceof CompoundTag compound) {
+                for (String key : compound.keySet()) {
                     total = saturatingAdd(total, key.length() * 2L + 4);
-                    NbtElement child = compound.get(key);
+                    Tag child = compound.get(key);
                     if (child != null)
                         pending.addLast(child);
                 }
             } else if (current instanceof Iterable<?> iterable) {
                 for (Object child : iterable)
-                    if (child instanceof NbtElement childTag)
+                    if (child instanceof Tag childTag)
                         pending.addLast(childTag);
             }
 
@@ -1049,7 +1058,7 @@ public class NbtFilter extends Module {
             || lower.contains("tag") || lower.contains("blockentitytag");
     }
 
-    private List<?> getPacketDataList(EntityTrackerUpdateS2CPacket packet) {
+    private List<?> getPacketDataList(ClientboundSetEntityDataPacket packet) {
         Object result = invokeNoArg(packet, "packedItems");
         if (result instanceof List<?> list)
             return list;
@@ -1119,43 +1128,43 @@ public class NbtFilter extends Module {
         }
     }
 
-    private NbtCompound findCompoundTag(Object obj) {
-        if (obj instanceof NbtCompound tag)
+    private CompoundTag findCompoundTag(Object obj) {
+        if (obj instanceof CompoundTag tag)
             return tag;
 
         for (String methodName : new String[]{"tag", "getTag", "getNbt", "nbt",
             "getCompoundTag"}) {
             Object value = invokeNoArg(obj, methodName);
-            if (value instanceof NbtCompound tag)
+            if (value instanceof CompoundTag tag)
                 return tag;
         }
 
         Object fieldValue = readFieldBySimpleNameContains(obj, "CompoundTag",
-            "NbtCompound");
-        if (fieldValue instanceof NbtCompound tag)
+            "CompoundTag");
+        if (fieldValue instanceof CompoundTag tag)
             return tag;
 
         return null;
     }
 
     private int readPacketEntityId(Packet<?> packet) {
-        if (packet instanceof EntityTrackerUpdateS2CPacket metadata)
+        if (packet instanceof ClientboundSetEntityDataPacket metadata)
             return metadata.id();
-        if (packet instanceof EntitySpawnS2CPacket add)
-            return add.getEntityId();
-        if (packet instanceof EntityPositionS2CPacket tp)
-            return tp.entityId();
-        if (packet instanceof EntityPositionSyncS2CPacket sync)
-            return sync.id();
-        if (packet instanceof EntityVelocityUpdateS2CPacket motion)
-            return motion.getEntityId();
-        if (packet instanceof EntityEquipmentUpdateS2CPacket equipment)
-            return equipment.getEntityId();
-        if (packet instanceof EntitySetHeadYawS2CPacket rotate)
+        if (packet instanceof ClientboundAddEntityPacket add)
+            return add.getId();
+        if (packet instanceof ClientboundMoveEntityPacket tp)
+            return readPacketEntityIdReflective(tp);
+        if (packet instanceof ClientboundSetEntityLinkPacket sync)
+            return sync.getSourceId();
+        if (packet instanceof ClientboundSetEntityMotionPacket motion)
+            return motion.id();
+        if (packet instanceof ClientboundSetEquipmentPacket equipment)
+            return equipment.getEntity();
+        if (packet instanceof ClientboundRotateHeadPacket rotate)
             return readPacketEntityIdReflective(rotate);
-        if (packet instanceof EntityStatusS2CPacket event)
+        if (packet instanceof ClientboundEntityEventPacket event)
             return readPacketEntityIdReflective(event);
-        if (packet instanceof EntityS2CPacket move)
+        if (packet instanceof ClientboundMoveEntityPacket move)
             return readPacketEntityIdReflective(move);
 
         return readPacketEntityIdReflective(packet);
@@ -1276,13 +1285,12 @@ public class NbtFilter extends Module {
     }
 
     public static boolean shouldDropRawClientboundPacket(
-        NetworkState<?> state, ByteBuf buf) {
+        ConnectionProtocol state, ByteBuf buf) {
         NbtFilter hack = getActiveInstance();
         if (hack == null || state == null || buf == null)
             return false;
 
-        if (state.id() != NetworkPhase.PLAY
-            || state.side() != NetworkSide.CLIENTBOUND)
+        if (state != ConnectionProtocol.PLAY)
             return false;
 
         RawPacketId rawId = readRawPacketId(buf);
@@ -1325,8 +1333,8 @@ public class NbtFilter extends Module {
         return null;
     }
 
-    private static Integer resolveChunkPacketId(NetworkState<?> state) {
-        Object2IntMap<?> map = findObject2IntMap(state.codec(),
+    private static Integer resolveChunkPacketId(ConnectionProtocol state) {
+        Object2IntMap<?> map = findObject2IntMap(state,
             Collections.newSetFromMap(new IdentityHashMap<>()), 0);
         if (map == null)
             return null;
@@ -1335,7 +1343,7 @@ public class NbtFilter extends Module {
             for (Object key : map.keySet()) {
                 if (key instanceof PacketType<?> packetType) {
                     Identifier id = packetType.id();
-                    if ("chunk_load".equals(id.getPath()))
+                    if ("LevelChunk_load".equals(id.getPath()))
                         return map.getInt(key);
                 }
             }
@@ -1382,7 +1390,7 @@ public class NbtFilter extends Module {
     }
 
     private enum PacketKind {
-        CHUNK("chunk"),
+        LevelChunk("LevelChunk"),
         BLOCK_ENTITY("block entity"),
         ENTITY_METADATA("entity metadata"),
         ITEM_STACK("item stack carrier"),
@@ -1397,22 +1405,22 @@ public class NbtFilter extends Module {
     }
 
     private record InspectionResult(boolean dangerous, PacketKind kind,
-        String reason, long estimatedBytes, ChunkPos chunk, Integer entityId) {
+        String reason, long estimatedBytes, ChunkPos LevelChunk, Integer entityId) {
         private static InspectionResult safe() {
             return new InspectionResult(false, PacketKind.PACKET, "", -1, null,
                 null);
         }
 
         private static InspectionResult dangerous(PacketKind kind,
-            String reason, long estimatedBytes, ChunkPos chunk,
+            String reason, long estimatedBytes, ChunkPos LevelChunk,
             Integer entityId) {
             return new InspectionResult(true, kind, reason, estimatedBytes,
-                chunk, entityId);
+                LevelChunk, entityId);
         }
 
         private InspectionResult withKind(PacketKind newKind) {
             return new InspectionResult(dangerous, newKind, reason,
-                estimatedBytes, chunk, entityId);
+                estimatedBytes, LevelChunk, entityId);
         }
     }
 

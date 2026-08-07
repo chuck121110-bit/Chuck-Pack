@@ -11,8 +11,8 @@ import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import net.minecraft.client.Minecraft;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 public class AutoFlyHud extends HudElement
 {
@@ -26,7 +26,7 @@ public class AutoFlyHud extends HudElement
 
 	private final Setting<Boolean> shadow = sgGeneral.add(new BoolSetting.Builder()
 		.name("shadow")
-		.description("Renders shadow behind text.")
+		.description("Renders shadow behind Component.")
 		.defaultValue(true)
 		.build()
 	);
@@ -70,8 +70,8 @@ public class AutoFlyHud extends HudElement
 	);
 
 	private final Setting<Integer> maxWidth = sgGeneral.add(new IntSetting.Builder()
-		.name("max-text-width")
-		.description("Maximum horizontal width of the text in pixels. 0 = unlimited.")
+		.name("max-Component-width")
+		.description("Maximum horizontal width of the Component in pixels. 0 = unlimited.")
 		.defaultValue(0)
 		.min(0)
 		.max(800)
@@ -157,7 +157,7 @@ public class AutoFlyHud extends HudElement
 		if(destCheck == null) destCheck = af.getDestination();
 		if(destCheck != null)
 		{
-			double distCheck = mc.player.getEntityPos().distanceTo(Vec3d.ofCenter(destCheck));
+			double distCheck = mc.player.position().distanceTo(Vec3.atCenterOf(destCheck));
 			if(distCheck < 5.0)
 			{
 				cachedText = "Arrived";
@@ -189,9 +189,9 @@ public class AutoFlyHud extends HudElement
 
 		overrideColor = 0;
 
-		double dx = (mc.player.getX() - mc.player.lastX) * 20.0;
-		double dy = (mc.player.getY() - mc.player.lastY) * 20.0;
-		double dz = (mc.player.getZ() - mc.player.lastZ) * 20.0;
+		double dx = (mc.player.getX() - mc.player.xOld) * 20.0;
+		double dy = (mc.player.getY() - mc.player.yOld) * 20.0;
+		double dz = (mc.player.getZ() - mc.player.zOld) * 20.0;
 		double rawSpeed = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
 		if(rawSpeed > 1.0)
@@ -212,7 +212,7 @@ public class AutoFlyHud extends HudElement
 
 		BlockPos dest = af.getFinalTarget();
 		if(dest == null) dest = af.getDestination();
-		double distance = mc.player.getEntityPos().distanceTo(Vec3d.ofCenter(dest));
+		double distance = mc.player.position().distanceTo(Vec3.atCenterOf(dest));
 
 		boolean arrived = distance < 5.0;
 		cachedMoving = speed > 0.01 && !arrived;
