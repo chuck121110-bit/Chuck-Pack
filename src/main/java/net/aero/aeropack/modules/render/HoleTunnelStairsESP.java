@@ -411,7 +411,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     private void renderShader(Render3DEvent event) {
         if (holes.isEmpty() && tunnels.isEmpty() && staircases.isEmpty()) return;
 
-        mesh.begin();
+        if (!mesh.isBuilding()) mesh.begin();
 
         switch (detectionMode.get()) {
             case ALL:
