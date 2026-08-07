@@ -13,6 +13,8 @@ out/
 AGENTS.md
 Source References/
 meteor-client-*/
-build-log.txt
+build-log*.txt
 gradle-*-bin.zip
 *.log
+yarn-to-mojang-map.txt
+meteordevelopment/
