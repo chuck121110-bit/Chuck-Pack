@@ -32,9 +32,9 @@ public class MaceDamage extends Module {
 
     @EventHandler
     private void onAttackEntity(AttackEntityEvent event) {
-        if (mc.player == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.getConnection() == null) return;
         if (mc.crosshairTarget == null || mc.crosshairTarget.getType() != HitResult.Type.ENTITY) return;
-        if (!mc.player.getMainHandStack().isOf(Items.MACE)) return;
+        if (!mc.player.getMainItemStack().isOf(Items.MACE)) return;
 
         for (int i = 0; i < 4; i++) sendFakeY(0.0);
         sendFakeY(Math.sqrt(fallHeight.get() * fallHeight.get()));
@@ -42,7 +42,7 @@ public class MaceDamage extends Module {
     }
 
     private void sendFakeY(double offset) {
-        mc.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(
+        mc.getConnection().sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(
             mc.player.getX(),
             mc.player.getY() + offset,
             mc.player.getZ(),

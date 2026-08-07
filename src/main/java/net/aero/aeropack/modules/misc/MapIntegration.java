@@ -25,7 +25,7 @@ public class MapIntegration extends Module {
     }
 
     private void freecamWaypoint() {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         Freecam freecam = Modules.get().get(Freecam.class);
         if (freecam == null || !freecam.isActive()) return;
@@ -74,7 +74,7 @@ public class MapIntegration extends Module {
             for (java.lang.reflect.Constructor<?> ctor : guiClass.getConstructors()) {
                 if (ctor.getParameterTypes().length == 9) {
                     Object gui = ctor.newInstance(hudMod, session, null, null, wpList, path, currentWorld, setId, true);
-                    net.minecraft.client.MinecraftClient.getInstance().setScreen((net.minecraft.client.gui.screen.Screen) gui);
+                    net.minecraft.client.Minecraft.getInstance().setScreen((net.minecraft.client.gui.screen.Screen) gui);
                     return;
                 }
             }

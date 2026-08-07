@@ -260,7 +260,7 @@ public class AiChat extends Module {
 
     @EventHandler
     private void onPacket(PacketEvent.Receive event) {
-        if (mc.player == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.getConnection() == null) return;
 
         String message = null;
 
@@ -328,7 +328,7 @@ public class AiChat extends Module {
             if (totalDelay > 0) Thread.sleep(totalDelay);
 
             final String toSend = response;
-            if (mc.player != null && mc.getNetworkHandler() != null) {
+            if (mc.player != null && mc.getConnection() != null) {
                 mc.execute(() -> {
                     mc.player.networkHandler.sendChatMessage(toSend);
                     lastResponseTime.set(System.currentTimeMillis());
@@ -544,10 +544,10 @@ public class AiChat extends Module {
     private String buildSystemPrompt() {
         if (useCustomPrompt.get()) return customPrompt.get();
         String serverName = "Unknown";
-        if (mc.getCurrentServerEntry() != null) {
-            serverName = mc.getCurrentServerEntry().name.isBlank()
-                ? mc.getCurrentServerEntry().address
-                : mc.getCurrentServerEntry().name;
+        if (mc.getCurrentServer() != null) {
+            serverName = mc.getCurrentServer().name.isBlank()
+                ? mc.getCurrentServer().address
+                : mc.getCurrentServer().name;
         } else if (mc.isInSingleplayer()) {
             serverName = "Singleplayer";
         }

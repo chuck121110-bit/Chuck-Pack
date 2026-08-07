@@ -29,10 +29,10 @@ public class DoubleDoorsInteract extends Module {
         if (isInteracting) return;
 
         isInteracting = true;
-        BlockPos doorPos = event.result.getBlockPos();
-        if (mc.world == null) { isInteracting = false; return; }
+        BlockPos doorPos = event.result.blockPosition();
+        if (mc.level == null) { isInteracting = false; return; }
 
-        var blockState = mc.world.getBlockState(doorPos);
+        var blockState = mc.level.getBlockState(doorPos);
         if (blockState.getBlock() instanceof DoorBlock) {
             Direction doorFacing = blockState.get(DoorBlock.FACING);
             DoorHinge doorHinge = blockState.get(DoorBlock.HINGE);
@@ -44,7 +44,7 @@ public class DoubleDoorsInteract extends Module {
                 otherDoorPos = doorPos.offset(doorFacing.rotateYCounterclockwise());
             }
 
-            var otherBlockState = mc.world.getBlockState(otherDoorPos);
+            var otherBlockState = mc.level.getBlockState(otherDoorPos);
             if (otherBlockState.getBlock() instanceof DoorBlock) {
                 if (blockState.get(DoorBlock.HALF) == otherBlockState.get(DoorBlock.HALF)
                         && blockState.get(DoorBlock.HINGE) != otherBlockState.get(DoorBlock.HINGE)

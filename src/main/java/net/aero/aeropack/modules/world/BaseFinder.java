@@ -28,7 +28,7 @@ import net.minecraft.block.entity.SignBlockEntity;
 import net.minecraft.block.entity.SignText;
 import net.minecraft.block.enums.DoubleBlockHalf;
 import net.minecraft.block.enums.BedPart;
-import net.minecraft.client.gui.screen.DisconnectedScreen;
+import net.minecraft.client.gui.screen.DisconnectionScreen;
 import net.minecraft.client.gui.screen.world.LevelLoadingScreen;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -58,7 +58,7 @@ import net.minecraft.world.Heightmap;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -631,7 +631,7 @@ public class BaseFinder extends Module {
         table1.row();
         WButton deletedata = table1.add(theme.button("**DELETE ALL BASE DATA**")).expandX().minWidth(100).widget();
         deletedata.action = () -> {
-            if (!(mc.world==null) && mc.world.isChunkLoaded(mc.player.getChunkPos().x,mc.player.getChunkPos().z)){
+            if (!(mc.level==null) && mc.level.isChunkLoaded(mc.player.getChunkPos().x,mc.player.getChunkPos().z)){
                 if (deletewarning==0) error("PRESS AGAIN WITHIN 5s TO DELETE ALL BASE DATA FOR THIS DIMENSION.");
                 deletewarningTicks=0;
                 deletewarning++;
@@ -876,15 +876,15 @@ public class BaseFinder extends Module {
     }
 
     private boolean isInSpawnChunks(ChunkPos pos) {
-        if (mc.world == null) return false;
+        if (mc.level == null) return false;
 
-        int minDistance = mc.world.getRegistryKey() == World.NETHER
+        int minDistance = mc.level.dimension() == World.NETHER
             ? minSpawnDistanceNether.get()
             : minSpawnDistanceOverworld.get();
 
         if (minDistance <= 0) return false;
 
-        BlockPos spawnPos = mc.world.getLevelProperties().getSpawnPoint().getPos();
+        BlockPos spawnPos = mc.level.getLevelData().getSpawnPoint().getPos();
         ChunkPos spawnChunk = new ChunkPos(spawnPos);
         double dx = pos.x - spawnChunk.x;
         double dz = pos.z - spawnChunk.z;
@@ -917,9 +917,9 @@ public class BaseFinder extends Module {
                     serverip = "singleplayer";
                 }
             } else {
-                serverip = mc.getCurrentServerEntry().address.replaceAll("[^a-zA-Z0-9._\\-]", "_");
+                serverip = mc.getCurrentServer().address.replaceAll("[^a-zA-Z0-9._\\-]", "_");
             }
-            world= mc.world.getRegistryKey().getValue().toString().replaceAll("[^a-zA-Z0-9._\\-]", "_");
+            world= mc.level.dimension().getValue().toString().replaceAll("[^a-zA-Z0-9._\\-]", "_");
             if (save.get()) {
                 try {
                     Path baseDir = FabricLoader.getInstance().getGameDir()
@@ -985,7 +985,7 @@ public class BaseFinder extends Module {
 
     @EventHandler
     private void onScreenOpen(OpenScreenEvent event) {
-        if (event.screen instanceof DisconnectedScreen) {
+        if (event.screen instanceof DisconnectionScreen) {
             if (worldleaveremove.get()) {
                 clearChunkData();
             }
@@ -1002,7 +1002,7 @@ public class BaseFinder extends Module {
     }
     @EventHandler
     private void onPreTick(TickEvent.Pre event) {
-        world = mc.world.getRegistryKey().getValue().toString().replaceAll("[^a-zA-Z0-9._\\-]", "_");
+        world = mc.level.dimension().getValue().toString().replaceAll("[^a-zA-Z0-9._\\-]", "_");
 
         if (basefound && basefoundspamTicks < bsefndtickdelay.get()) basefoundspamTicks++;
         else if (basefoundspamTicks >= bsefndtickdelay.get()) {
@@ -1022,7 +1022,7 @@ public class BaseFinder extends Module {
                     serverip = "singleplayer";
                 }
             } else {
-                serverip = mc.getCurrentServerEntry().address.replaceAll("[^a-zA-Z0-9._\\-]", "_");
+                serverip = mc.getCurrentServer().address.replaceAll("[^a-zA-Z0-9._\\-]", "_");
             }
             clearChunkData();
             try {
@@ -1079,9 +1079,9 @@ public class BaseFinder extends Module {
                     serverip = "singleplayer";
                 }
             } else {
-                serverip = mc.getCurrentServerEntry().address.replaceAll("[^a-zA-Z0-9._\\-]", "_");
+                serverip = mc.getCurrentServer().address.replaceAll("[^a-zA-Z0-9._\\-]", "_");
             }
-            world = mc.world.getRegistryKey().getValue().toString().replaceAll("[^a-zA-Z0-9._\\-]", "_");
+            world = mc.level.dimension().getValue().toString().replaceAll("[^a-zA-Z0-9._\\-]", "_");
         }
 
         if (autoreload.get()) {
@@ -1117,25 +1117,25 @@ public class BaseFinder extends Module {
 
         if (entityScanTicks < entityScanDelay.get()) entityScanTicks++;
         if (entityScanTicks >= entityScanDelay.get() && (pearlFinder.get() || frameFinder.get() || villagerFinder.get() || nameFinder.get() || boatFinder.get() || entityClusterFinder.get())) {
-            if (mc.world == null) return;
+            if (mc.level == null) return;
 
             chunkEntityCounts.clear();
 
             int renderDistance = mc.options.getViewDistance().getValue();
-            ChunkPos playerChunkPos = new ChunkPos(mc.player.getBlockPos());
+            ChunkPos playerChunkPos = new ChunkPos(mc.player.blockPosition());
             for (int chunkX = playerChunkPos.x - renderDistance; chunkX <= playerChunkPos.x + renderDistance; chunkX++) {
                 for (int chunkZ = playerChunkPos.z - renderDistance; chunkZ <= playerChunkPos.z + renderDistance; chunkZ++) {
-                    WorldChunk chunk = mc.world.getChunk(chunkX, chunkZ);
+                    LevelChunk chunk = mc.level.getChunk(chunkX, chunkZ);
                     if (chunk != null && chunk.getStatus().isAtLeast(ChunkStatus.FULL)) {
                         if (isInSpawnChunks(chunk.getPos())) continue;
                         Box chunkBox = new Box(
-                                chunk.getPos().getStartX(), mc.world.getBottomY(), chunk.getPos().getStartZ(),
-                                chunk.getPos().getEndX() + 1, mc.world.getTopYInclusive(), chunk.getPos().getEndZ() + 1
+                                chunk.getPos().getStartX(), mc.level.getMinBuildHeight(), chunk.getPos().getStartZ(),
+                                chunk.getPos().getEndX() + 1, mc.level.getMaxBuildHeight(), chunk.getPos().getEndZ() + 1
                         );
                         if (!suppressedChunks.contains(chunk.getPos())) {
                             boolean alreadyFlagged = baseChunks.contains(chunk.getPos());
                             AtomicInteger animalsFound = new AtomicInteger();
-                            mc.world.getEntitiesByClass(Entity.class, chunkBox, entity -> true).forEach(entity -> {
+                            mc.level.getEntitiesByClass(Entity.class, chunkBox, entity -> true).forEach(entity -> {
                                 if ((entity instanceof ItemFrameEntity || entity instanceof GlowItemFrameEntity) && frameFinder.get()) {
                                     ItemFrameEntity itemFrame = (ItemFrameEntity) entity;
                                     Item heldItem = itemFrame.getHeldItemStack().getItem();
@@ -1330,12 +1330,12 @@ public class BaseFinder extends Module {
     private void onReadPacket(PacketEvent.Receive event) {
         if (deactivating) return;
         if (event.packet instanceof PlayerMoveC2SPacket) return; //this keeps getting cast to the chunkdata for no reason
-        if (!(event.packet instanceof PlayerMoveC2SPacket) && event.packet instanceof ChunkDataS2CPacket packet && mc.world != null) {
+        if (!(event.packet instanceof PlayerMoveC2SPacket) && event.packet instanceof ChunkDataS2CPacket packet && mc.level != null) {
 
             basepos = new ChunkPos(packet.getChunkX(), packet.getChunkZ());
 
-            if (mc.world.getChunkManager().getChunk(packet.getChunkX(), packet.getChunkZ()) == null) {
-                WorldChunk chunk = new WorldChunk(mc.world, basepos);
+            if (mc.level.getChunkManager().getChunk(packet.getChunkX(), packet.getChunkZ()) == null) {
+                LevelChunk chunk = new LevelChunk(mc.level, basepos);
                 try {
                     Map<Heightmap.Type, long[]> heightmaps = new EnumMap<>(Heightmap.Type.class);
 
@@ -1355,8 +1355,8 @@ public class BaseFinder extends Module {
                 deduplicateBlockLists();
                 boolean newlyFound = false;
                 if (bubblesFinder.get() || spawner.get() || signFinder.get() || portalFinder.get() || roofDetector.get() || bedrockfind.get() || skybuildfind.get() || !blockSet1.isEmpty() || !blockSet2.isEmpty() || !blockSet3.isEmpty() || !blockSet4.isEmpty() || !blockSet5.isEmpty() || !blockSet6.isEmpty() || !blockSet7.isEmpty()){
-                    int Ymin = mc.world.getBottomY()+minY.get();
-                    int Ymax = mc.world.getTopYInclusive()-maxY.get();
+                    int Ymin = mc.level.getMinBuildHeight()+minY.get();
+                    int Ymax = mc.level.getMaxBuildHeight()-maxY.get();
                     try {
                         Set<BlockPos> blockpositions1 = Collections.synchronizedSet(new HashSet<>());
                         Set<BlockPos> blockpositions2 = Collections.synchronizedSet(new HashSet<>());
@@ -1371,14 +1371,14 @@ public class BaseFinder extends Module {
                             chunkExcluded = true;
                         }
                         ChunkSection[] sections = chunk.getSectionArray();
-                        int Y = mc.world.getBottomY();
+                        int Y = mc.level.getMinBuildHeight();
                         if (!chunkExcluded)
                         for (ChunkSection section: sections){
                             if (section == null) {
                                 Y+=16;
                                 continue;
                             }
-                            boolean isNetherRoofSection = mc.world.getRegistryKey() == World.NETHER && Y >= 128;
+                            boolean isNetherRoofSection = mc.level.dimension() == World.NETHER && Y >= 128;
                             if (section.isEmpty() && !isNetherRoofSection) {
                                 Y+=16;
                                 continue;
@@ -1510,7 +1510,7 @@ public class BaseFinder extends Module {
                                                         }
                                                     }
                                                 }
-                                                if (bedrockfind.get() && blerks.getBlock()==Blocks.BEDROCK && ((currentY>mc.world.getBottomY()+bedrockint.get() && mc.world.getRegistryKey() == World.OVERWORLD) || (currentY>mc.world.getBottomY()+bedrockint.get() && (currentY < 123 || currentY > 127) && mc.world.getRegistryKey() == World.NETHER))) {
+                                                if (bedrockfind.get() && blerks.getBlock()==Blocks.BEDROCK && ((currentY>mc.level.getMinBuildHeight()+bedrockint.get() && mc.level.dimension() == World.OVERWORLD) || (currentY>mc.level.getMinBuildHeight()+bedrockint.get() && (currentY < 123 || currentY > 127) && mc.level.dimension() == World.NETHER))) {
                                                     if (!baseChunks.contains(basepos) && !suppressedChunks.contains(basepos)){
                                                         baseChunks.add(basepos);
                                                         addTrigger(basepos, "Bedrock");
@@ -1528,7 +1528,7 @@ public class BaseFinder extends Module {
                                                         }
                                                     }
                                                 }
-                                                if (roofDetector.get() && blerks.getBlock()!=Blocks.RED_MUSHROOM && blerks.getBlock()!=Blocks.BROWN_MUSHROOM && currentY>=128 && mc.world.getRegistryKey() == World.NETHER){
+                                                if (roofDetector.get() && blerks.getBlock()!=Blocks.RED_MUSHROOM && blerks.getBlock()!=Blocks.BROWN_MUSHROOM && currentY>=128 && mc.level.dimension() == World.NETHER){
                                                     if (!baseChunks.contains(basepos) && !suppressedChunks.contains(basepos)){
                                                         baseChunks.add(basepos);
                                                         addTrigger(basepos, "Nether Roof");
@@ -1552,8 +1552,8 @@ public class BaseFinder extends Module {
                                                         spawnerfound=true;
                                                     }
                                                     //dungeon MOSSY_COBBLESTONE, mineshaft COBWEB, fortress NETHER_BRICK_FENCE, stronghold STONE_BRICK_STAIRS, bastion CHAIN
-                                                    if (mc.world.getRegistryKey() == World.OVERWORLD && (blerks.getBlock()==Blocks.MOSSY_COBBLESTONE || blerks.getBlock()==Blocks.COBWEB || blerks.getBlock()==Blocks.STONE_BRICK_STAIRS || blerks.getBlock()==Blocks.BUDDING_AMETHYST))spawnernaturalblocks=true;
-                                                    else if (mc.world.getRegistryKey() == World.NETHER && (blerks.getBlock()==Blocks.NETHER_BRICK_FENCE || blerks.getBlock()==Blocks.IRON_CHAIN))spawnernaturalblocks=true;
+                                                    if (mc.level.dimension() == World.OVERWORLD && (blerks.getBlock()==Blocks.MOSSY_COBBLESTONE || blerks.getBlock()==Blocks.COBWEB || blerks.getBlock()==Blocks.STONE_BRICK_STAIRS || blerks.getBlock()==Blocks.BUDDING_AMETHYST))spawnernaturalblocks=true;
+                                                    else if (mc.level.dimension() == World.NETHER && (blerks.getBlock()==Blocks.NETHER_BRICK_FENCE || blerks.getBlock()==Blocks.IRON_CHAIN))spawnernaturalblocks=true;
                                                 }
                                                 boolean isMultiBlockSecondary = (blerks.getBlock() instanceof BedBlock && blerks.get(BedBlock.PART) != BedPart.FOOT)
                                                     || (blerks.getBlock() instanceof DoorBlock && blerks.get(DoorBlock.HALF) != DoubleBlockHalf.LOWER);
@@ -1972,11 +1972,11 @@ public class BaseFinder extends Module {
      * auto-deleted is gone, so it scans completely fresh if it loads again.
      */
     private void purgeUnloadedSuppressedChunks() {
-        if (mc.world == null || suppressedChunks.isEmpty()) return;
+        if (mc.level == null || suppressedChunks.isEmpty()) return;
 
         List<ChunkPos> toPurge = new ArrayList<>();
         for (ChunkPos pos : new ArrayList<>(suppressedChunks)) {
-            if (!mc.world.getChunkManager().isChunkLoaded(pos.x, pos.z)) {
+            if (!mc.level.getChunkManager().isChunkLoaded(pos.x, pos.z)) {
                 toPurge.add(pos);
             }
         }

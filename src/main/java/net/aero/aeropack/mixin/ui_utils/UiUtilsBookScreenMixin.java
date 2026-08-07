@@ -1,6 +1,6 @@
 package net.aero.aeropack.mixin.ui_utils;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.BookScreen;
 import net.minecraft.client.gui.screen.Screen;
@@ -29,7 +29,7 @@ public abstract class UiUtilsBookScreenMixin extends Screen {
         if (!UiUtilsState.isUiEnabled())
             return;
 
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         int spacing = 4;
         int buttonHeight = 20;
         int buttonCount = UiUtils.getUiWidgetRows();
@@ -41,7 +41,7 @@ public abstract class UiUtilsBookScreenMixin extends Screen {
         int nextY = UiUtils.addUiWidgets(mc, baseX, startY, spacing,
             this::addDrawableChild);
         uiUtilsChatField =
-            UiUtils.createChatField(mc, this.textRenderer, baseX, nextY + spacing);
+            UiUtils.createChatField(mc, this.font, baseX, nextY + spacing);
         addDrawableChild(uiUtilsChatField);
     }
 

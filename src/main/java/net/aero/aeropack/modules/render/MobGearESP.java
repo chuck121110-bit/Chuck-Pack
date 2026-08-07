@@ -227,7 +227,7 @@ public class MobGearESP extends Module {
     @EventHandler
     private void onRender3D(Render3DEvent event) {
         count = 0;
-        for (Entity entity : mc.world.getEntities()) {
+        for (Entity entity : mc.level.getEntities()) {
             if (!(entity instanceof LivingEntity livingEntity)) continue;
             if (shouldSkip(livingEntity)) continue;
             if (!scannedEntities.contains(entity)) {
@@ -415,8 +415,8 @@ public class MobGearESP extends Module {
     }
     @EventHandler
     private void onPreTick(TickEvent.Pre event) {
-        if (mc.world != null){
-            Iterable<net.minecraft.entity.Entity> entities = mc.world.getEntities();
+        if (mc.level != null){
+            Iterable<net.minecraft.entity.Entity> entities = mc.level.getEntities();
             scannedEntities.removeIf(entity -> {
                 Set<Entity> entitySet = new HashSet<>();
                 entities.forEach(entity1 -> entitySet.add(entity1));

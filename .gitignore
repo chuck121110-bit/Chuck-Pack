@@ -1,9 +1,6 @@
 .gradle/
 build/
 gradle-runtime/
-.gradle/
-map-integration/.gradle/
-map-integration/build/
 *.class
 *.jar
 !libs/*.jar
@@ -13,3 +10,6 @@ local.properties
 run/
 out/
 *.bat
+AGENTS.md
+Source References/
+meteor-client-*/

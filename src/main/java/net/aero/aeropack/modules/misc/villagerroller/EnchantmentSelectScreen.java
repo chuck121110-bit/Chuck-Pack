@@ -61,8 +61,8 @@ public class EnchantmentSelectScreen extends WindowScreen {
     }
 
     private void fillTable(WTable table) {
-        if (MeteorClient.mc.world == null) return;
-        Registry<Enchantment> reg = MeteorClient.mc.world.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
+        if (MeteorClient.mc.level == null) return;
+        Registry<Enchantment> reg = MeteorClient.mc.level.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
 
         List<RegistryEntry<Enchantment>> available = new ArrayList<>();
         for (RegistryEntry<Enchantment> e : reg.streamEntries().toList()) {

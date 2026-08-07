@@ -285,8 +285,8 @@ public class AiChatConverse extends Module {
             loadLogFile();
         }
 
-        if (mc.getNetworkHandler() != null && mc.getNetworkHandler().getServerInfo() != null) {
-            lastServerAddress = mc.getNetworkHandler().getServerInfo().address;
+        if (mc.getConnection() != null && mc.getConnection().getServerInfo() != null) {
+            lastServerAddress = mc.getConnection().getServerInfo().address;
         }
 
         if (apiKey.get().isBlank()) {
@@ -306,7 +306,7 @@ public class AiChatConverse extends Module {
 
     @EventHandler
     private void onPacket(PacketEvent.Receive event) {
-        if (mc.player == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.getConnection() == null) return;
         if (apiKey.get().isBlank()) return;
 
         String message = null;
@@ -325,8 +325,8 @@ public class AiChatConverse extends Module {
             // was causing name mix-ups (someone else's message getting attributed to
             // you/the wrong player). Only fall back to parsing the raw text if the
             // server didn't give us a sender UUID we can resolve.
-            if (chatPacket.sender() != null && mc.getNetworkHandler() != null) {
-                PlayerListEntry entry = mc.getNetworkHandler().getPlayerListEntry(chatPacket.sender());
+            if (chatPacket.sender() != null && mc.getConnection() != null) {
+                PlayerListEntry entry = mc.getConnection().getPlayerListEntry(chatPacket.sender());
                 if (entry != null) {
                     senderName = entry.getProfile().name();
                 }
@@ -402,8 +402,8 @@ public class AiChatConverse extends Module {
         if (mc.player == null) return;
 
         String currentServer = null;
-        if (mc.getNetworkHandler() != null && mc.getNetworkHandler().getServerInfo() != null) {
-            currentServer = mc.getNetworkHandler().getServerInfo().address;
+        if (mc.getConnection() != null && mc.getConnection().getServerInfo() != null) {
+            currentServer = mc.getConnection().getServerInfo().address;
         }
 
         if (clearOnServerJoin.get() && lastServerAddress != null && currentServer != null
@@ -593,7 +593,7 @@ public class AiChatConverse extends Module {
             }
             if (totalDelay > 0) Thread.sleep(totalDelay);
 
-            if (mc.player != null && mc.getNetworkHandler() != null) {
+            if (mc.player != null && mc.getConnection() != null) {
                 for (String part : parts) {
                     final String toSend = part;
                     mc.execute(() -> {
@@ -737,8 +737,8 @@ public class AiChatConverse extends Module {
 
     private String buildSystemPrompt() {
         String playerList = "Unknown";
-        if (mc.getNetworkHandler() != null) {
-            java.util.Collection<PlayerListEntry> entries = mc.getNetworkHandler().getPlayerList();
+        if (mc.getConnection() != null) {
+            java.util.Collection<PlayerListEntry> entries = mc.getConnection().getPlayerList();
             if (entries != null && !entries.isEmpty()) {
                 StringBuilder sb = new StringBuilder();
                 boolean first = true;

@@ -115,12 +115,12 @@ public class WorldGenUtils {
 
     private static BlockPos locateFeatureEntities(Feature feature) {
         List<Class<? extends Entity>> entities = FEATURE_ENTITIES.get(feature);
-        if (entities == null || mc.world == null) return null;
+        if (entities == null || mc.level == null) return null;
 
-        for (Entity entity : mc.world.getEntities()) {
+        for (Entity entity : mc.level.getEntities()) {
             for (Class<? extends Entity> clazz : entities) {
                 if (clazz.isInstance(entity)) {
-                    return entity.getBlockPos();
+                    return entity.blockPosition();
                 }
             }
         }
@@ -148,7 +148,7 @@ public class WorldGenUtils {
     }
 
     private static boolean isInDimension(meteordevelopment.meteorclient.utils.world.Dimension dimension) {
-        return PlayerUtils.getDimension() == dimension;
+        return PlayerUtils.dimensionType() == dimension;
     }
 
     private static meteordevelopment.meteorclient.utils.world.Dimension getDimension(Feature feature) {

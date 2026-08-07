@@ -24,15 +24,15 @@ import java.util.concurrent.CompletionException;
 
 import java.util.function.UnaryOperator;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
-import net.minecraft.client.world.ClientChunkManager;
+import net.minecraft.client.multiplayer.ClientChunkCache;
 
-import net.minecraft.client.world.ClientWorld;
+import net.minecraft.client.multiplayer.ClientLevel;
 
 import net.minecraft.client.network.ServerInfo;
 
-import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.player.LocalPlayer;
 
 import net.minecraft.server.integrated.IntegratedServer;
 
@@ -46,11 +46,11 @@ import net.minecraft.text.Text;
 
 import net.minecraft.registry.RegistryKey;
 
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.level.ServerLevel;
 
 import net.minecraft.entity.Entity;
 
-import net.minecraft.entity.player.PlayerAbilities;
+import net.minecraft.world.entity.player.Abilities;
 
 import net.minecraft.util.math.ChunkPos;
 
@@ -64,7 +64,7 @@ import net.minecraft.block.Blocks;
 
 import net.minecraft.block.BlockState;
 
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import net.minecraft.world.Heightmap;
 
@@ -132,7 +132,7 @@ public final class FlightController
 
 	private static final int FRONTIER_HOLD_PATIENCE_TICKS = 300;
 
-	private final MinecraftClient mc = MinecraftClient.getInstance();
+	private final Minecraft mc = Minecraft.getInstance();
 
 	private final PathFlightConfig config;
 
@@ -327,7 +327,7 @@ public final class FlightController
 
 	
 
-	private ClientPlayerEntity player()
+	private LocalPlayer player()
 
 	{
 
@@ -337,11 +337,11 @@ public final class FlightController
 
 	
 
-	private ClientWorld level()
+	private ClientLevel level()
 
 	{
 
-		return this.mc.world;
+		return this.mc.level;
 
 	}
 
@@ -351,7 +351,7 @@ public final class FlightController
 
 	{
 
-		return this.player().getBlockPos();
+		return this.player().blockPosition();
 
 	}
 
@@ -451,13 +451,13 @@ public final class FlightController
 
 		}
 
-		ClientPlayerEntity p = this.player();
+		LocalPlayer p = this.player();
 
 		if(p != null)
 
 		{
 
-			PlayerAbilities abilities = p.getAbilities();
+			Abilities abilities = p.getAbilities();
 
 			return abilities.allowFlying || abilities.flying;
 
@@ -562,7 +562,7 @@ public final class FlightController
 
 		boolean bl = overworld =
 
-			this.level() != null && this.level().getRegistryKey() == World.OVERWORLD;
+			this.level() != null && this.level().dimension() == World.OVERWORLD;
 
 		if(!overworld)
 
@@ -628,9 +628,9 @@ public final class FlightController
 
 		}
 
-		int min = this.level().getBottomY() + 2;
+		int min = this.level().getMinBuildHeight() + 2;
 
-		int max = this.level().getBottomY() + this.level().getHeight() - 2;
+		int max = this.level().getMinBuildHeight() + this.level().getHeight() - 2;
 
 		return Math.max(min, Math.min(max, base));
 
@@ -894,7 +894,7 @@ public final class FlightController
 
 		}
 
-		if(this.mc.player == null || this.mc.world == null)
+		if(this.mc.player == null || this.mc.level == null)
 
 		{
 
@@ -942,7 +942,7 @@ public final class FlightController
 
 			{
 
-				this.player().setVelocity(Vec3d.ZERO);
+				this.player().setDeltaMovement(Vec3d.ZERO);
 
 				this.lastCommandedVel = Vec3d.ZERO;
 
@@ -964,7 +964,7 @@ public final class FlightController
 
 			if(this.player() != null)
 
-				this.player().setVelocity(Vec3d.ZERO);
+				this.player().setDeltaMovement(Vec3d.ZERO);
 
 		}
 
@@ -1240,7 +1240,7 @@ public final class FlightController
 
 		return this.player() != null
 
-			&& this.player().getEntityWorld().getRegistryKey() == World.NETHER;
+			&& this.player().level().dimension() == World.NETHER;
 
 	}
 
@@ -1252,13 +1252,13 @@ public final class FlightController
 
 		Long stored;
 
-		ServerWorld serverLevel;
+		ServerLevel serverLevel;
 
 		IntegratedServer server = this.mc.getServer();
 
 		if(server != null && this.level() != null && (serverLevel =
 
-			server.getWorld(this.level().getRegistryKey())) != null)
+			server.getWorld(this.level().dimension())) != null)
 
 		{
 
@@ -1288,7 +1288,7 @@ public final class FlightController
 
 	{
 
-		ServerInfo data = MinecraftClient.getInstance().getCurrentServerEntry();
+		ServerInfo data = Minecraft.getInstance().getCurrentServer();
 
 		return data == null || data.address == null ? null
 
@@ -1360,11 +1360,11 @@ public final class FlightController
 
 		}
 
-		this.context = new FlightPathfinder(seed, this.level().getBottomY(),
+		this.context = new FlightPathfinder(seed, this.level().getMinBuildHeight(),
 
 			this.level().getHeight(), predict);
 
-		RegistryKey dim = this.level().getRegistryKey();
+		RegistryKey dim = this.level().dimension();
 
 		if(!dim.equals(this.noGoDimension))
 
@@ -1393,13 +1393,13 @@ public final class FlightController
 
 		if(this.level() != null
 
-			&& !this.level().getRegistryKey().equals(this.noGoDimension))
+			&& !this.level().dimension().equals(this.noGoDimension))
 
 		{
 
 			this.noGoZones.clear();
 
-			this.noGoDimension = this.level().getRegistryKey();
+			this.noGoDimension = this.level().dimension();
 
 		}
 
@@ -1493,7 +1493,7 @@ public final class FlightController
 
 		}
 
-		ClientChunkManager chunkSource = this.level().getChunkManager();
+		ClientChunkCache chunkSource = this.level().getChunkManager();
 
 		int pcx = this.feet().getX() >> 4;
 
@@ -1507,7 +1507,7 @@ public final class FlightController
 
 			{
 
-				WorldChunk chunk = (WorldChunk) chunkSource.getChunk(x, z);
+				LevelChunk chunk = (LevelChunk) chunkSource.getChunk(x, z);
 
 				if(chunk == null || chunk.isEmpty())
 
@@ -1523,7 +1523,7 @@ public final class FlightController
 
 	
 
-	public void onChunkLoaded(WorldChunk chunk)
+	public void onChunkLoaded(LevelChunk chunk)
 
 	{
 
@@ -1559,7 +1559,7 @@ public final class FlightController
 
 	{
 
-		if(this.mc.player == null || this.mc.world == null)
+		if(this.mc.player == null || this.mc.level == null)
 
 		{
 
@@ -1777,7 +1777,7 @@ public final class FlightController
 
 		}
 
-		ClientPlayerEntity player = this.player();
+		LocalPlayer player = this.player();
 
 		if(player == null)
 
@@ -1811,13 +1811,13 @@ public final class FlightController
 
 					this.freezeTicks, this.lastCommandedVel.length(),
 
-					this.player().getVelocity().length(),
+					this.player().getDeltaMovement().length(),
 
 					this.level().getChunkManager().getChunk(pcx, pcz) != null,
 
-					this.mc.getNetworkHandler() != null
+					this.mc.getConnection() != null
 
-						&& this.mc.getNetworkHandler() != null,
+						&& this.mc.getConnection() != null,
 
 					this.ticksSinceServerCorrection));
 
@@ -1828,7 +1828,7 @@ public final class FlightController
 			{
 				double[] clear = new double[1];
 				boolean ow = this.level() != null
-					&& this.level().getRegistryKey() == World.OVERWORLD;
+					&& this.level().dimension() == World.OVERWORLD;
 				if(ow)
 				{
 					this.recoveryDir = this.mostOpenDirectionToward(clear, null);
@@ -1867,7 +1867,7 @@ public final class FlightController
 			{
 				double[] clear = new double[1];
 				boolean ow = this.level() != null
-					&& this.level().getRegistryKey() == World.OVERWORLD;
+					&& this.level().dimension() == World.OVERWORLD;
 				if(ow)
 				{
 					this.recoveryDir = this.mostOpenDirectionToward(clear, null);
@@ -1922,7 +1922,7 @@ public final class FlightController
 
 				this.commandedThisTick = true;
 
-				this.player().setVelocity(0.0, 0.08, 0.0);
+				this.player().setDeltaMovement(0.0, 0.08, 0.0);
 
 				return;
 
@@ -2208,7 +2208,7 @@ public final class FlightController
 
 		boolean bl = overworld =
 
-			this.level() != null && this.level().getRegistryKey() == World.OVERWORLD;
+			this.level() != null && this.level().dimension() == World.OVERWORLD;
 
 		if(!this.aimTight && this.hardRecoveryTicks == 0
 
@@ -2226,7 +2226,7 @@ public final class FlightController
 
 			if(bl)
 			{
-				if(this.player().isTouchingWater())
+				if(this.player().isInWater())
 				{
 					this.recoveryDir = new Vec3d(0.0, 1.0, 0.0);
 					this.recoveryHover = false;
@@ -2307,7 +2307,7 @@ public final class FlightController
 
 				this.lastCommandedVel = Vec3d.ZERO;
 
-				this.player().setVelocity(Vec3d.ZERO);
+				this.player().setDeltaMovement(Vec3d.ZERO);
 
 				this.player().fallDistance = 0;
 
@@ -2349,7 +2349,7 @@ public final class FlightController
 
 				this.lastCommandedVel = v;
 
-				this.player().setVelocity(this.waterEscapeBoost(v));
+				this.player().setDeltaMovement(this.waterEscapeBoost(v));
 
 				this.player().fallDistance = 0;
 
@@ -2718,7 +2718,7 @@ public final class FlightController
 
 					playerPos.z + off.z);
 
-				this.player().setVelocity(Vec3d.ZERO);
+				this.player().setDeltaMovement(Vec3d.ZERO);
 
 				if(this.config.flightDebug)
 
@@ -3180,7 +3180,7 @@ public final class FlightController
 
 		boolean ow = this.level() != null
 
-			&& this.level().getRegistryKey() == World.OVERWORLD;
+			&& this.level().dimension() == World.OVERWORLD;
 
 		Vec3d[] dirs = new Vec3d[]{new Vec3d(0.0, 1.0, 0.0),
 
@@ -3204,7 +3204,7 @@ public final class FlightController
 
 		{
 
-			if(ow && i < 2 && !(i == 0 && this.player().isTouchingWater()))
+			if(ow && i < 2 && !(i == 0 && this.player().isInWater()))
 
 				continue;
 
@@ -3230,7 +3230,7 @@ public final class FlightController
 
 			double score;
 
-			if(ow && i < 2 && !(i == 0 && this.player().isTouchingWater()))
+			if(ow && i < 2 && !(i == 0 && this.player().isInWater()))
 
 				continue;
 
@@ -3276,7 +3276,7 @@ public final class FlightController
 
 			this.commandedThisTick = true;
 
-			this.player().setVelocity(this.waterEscapeBoost(best.multiply(escSpeed)));
+			this.player().setDeltaMovement(this.waterEscapeBoost(best.multiply(escSpeed)));
 
 			this.prevCmdSpeed = escSpeed;
 
@@ -4077,7 +4077,7 @@ public final class FlightController
 
 		}
 
-		this.player().setVelocity(this.waterEscapeBoost(vel));
+		this.player().setDeltaMovement(this.waterEscapeBoost(vel));
 
 		this.player().fallDistance = 0;
 
@@ -4111,8 +4111,8 @@ public final class FlightController
 
 	private Vec3d waterEscapeBoost(Vec3d vel)
 	{
-		ClientPlayerEntity p = this.player();
-		if(p == null || p.isInLava() || !p.isTouchingWater() || vel.y >= 0.6)
+		LocalPlayer p = this.player();
+		if(p == null || p.isInLava() || !p.isInWater() || vel.y >= 0.6)
 			return vel;
 		return vel.y > 0.0 ? new Vec3d(vel.x, 0.6, vel.z) : vel;
 	}
@@ -4227,9 +4227,9 @@ public final class FlightController
 
 		float pitch = (float)(-Math.toDegrees(Math.atan2(dy, horiz)));
 
-		this.player().setYaw(yaw);
+		this.player().setYRot(yaw);
 
-		this.player().setPitch(pitch);
+		this.player().setXRot(pitch);
 
 	}
 
@@ -4257,7 +4257,7 @@ public final class FlightController
 
 		}
 
-		ClientChunkManager chunkSource = this.level().getChunkManager();
+		ClientChunkCache chunkSource = this.level().getChunkManager();
 
 		Vec3d dir = vel.multiply(1.0 / sp);
 
@@ -4277,7 +4277,7 @@ public final class FlightController
 
 			int cz = (int)Math.floor(p.z) >> 4;
 
-			WorldChunk chunk = (WorldChunk) chunkSource.getChunk(cx, cz);
+			LevelChunk chunk = (LevelChunk) chunkSource.getChunk(cx, cz);
 
 			boolean bl = packed =
 
@@ -4717,13 +4717,13 @@ public final class FlightController
 
 	{
 
-		ClientPlayerEntity p = this.player();
+		LocalPlayer p = this.player();
 
 		if(p != null && this.isActive())
 
 		{
 
-			p.setVelocity(Vec3d.ZERO);
+			p.setDeltaMovement(Vec3d.ZERO);
 
 			this.lastCommandedVel = Vec3d.ZERO;
 
@@ -4895,7 +4895,7 @@ public final class FlightController
 
 		boolean stuck;
 
-		ClientPlayerEntity p = this.player();
+		LocalPlayer p = this.player();
 
 		boolean horiz = p.horizontalCollision;
 

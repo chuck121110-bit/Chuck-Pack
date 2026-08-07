@@ -69,7 +69,7 @@ public abstract class ExcavatorMixin implements AeroShaderSource {
             return;
         }
 
-        BlockState state = mc.world.getBlockState(pos);
+        BlockState state = mc.level.getBlockState(pos);
 
         if (state.isAir()) {
             aeropack$mesh.begin();

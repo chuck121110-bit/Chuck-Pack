@@ -336,8 +336,8 @@ public class Untouchable extends Module {
         } else if (packet instanceof EntityPositionSyncS2CPacket sync) {
             id = sync.id();
             position = sync.values().position();
-        } else if (packet instanceof EntityS2CPacket move && move.isPositionChanged() && mc.world != null) {
-            Entity movedEntity = move.getEntity(mc.world);
+        } else if (packet instanceof EntityS2CPacket move && move.isPositionChanged() && mc.level != null) {
+            Entity movedEntity = move.getEntity(mc.level);
             if (movedEntity == null)
                 return;
             id = movedEntity.getId();
@@ -347,12 +347,12 @@ public class Untouchable extends Module {
         } else
             return;
 
-        if (mc.player == null || mc.world == null || position == null)
+        if (mc.player == null || mc.level == null || position == null)
             return;
 
         handleIncomingPosition(id, position);
 
-        Entity entity = mc.world.getEntityById(id);
+        Entity entity = mc.level.getEntityById(id);
         if (!(entity instanceof PlayerEntity player) || player == mc.player
             || isIgnoredPlayer(player) || !isHoldingMace(player))
             return;
@@ -368,10 +368,10 @@ public class Untouchable extends Module {
     }
 
     private void handleEntityEvent(EntityStatusS2CPacket entityEvent) {
-        if (!isActive() || mc.player == null || mc.world == null)
+        if (!isActive() || mc.player == null || mc.level == null)
             return;
 
-        Entity entity = entityEvent.getEntity(mc.world);
+        Entity entity = entityEvent.getEntity(mc.level);
         if (!(entity instanceof PlayerEntity player))
             return;
 
@@ -380,11 +380,11 @@ public class Untouchable extends Module {
     }
 
     private void handleDamageEvent(EntityDamageS2CPacket damage) {
-        if (!isActive() || mc.player == null || mc.world == null
+        if (!isActive() || mc.player == null || mc.level == null
             || !autoDistanceOnDamage.get() || damage.entityId() != mc.player.getId())
             return;
 
-        Entity source = mc.world.getEntityById(damage.sourceCauseId());
+        Entity source = mc.level.getEntityById(damage.sourceCauseId());
         if (!(source instanceof PlayerEntity attacker) || attacker == mc.player
             || isIgnoredPlayer(attacker))
             return;
@@ -398,7 +398,7 @@ public class Untouchable extends Module {
     }
 
     private void tryImmediatePacketDodge() {
-        if (!isActive() || mc.player == null || mc.world == null
+        if (!isActive() || mc.player == null || mc.level == null
             || cooldownTicksLeft > 0)
             return;
         Threat threat = findMostUrgentThreat();
@@ -407,10 +407,10 @@ public class Untouchable extends Module {
     }
 
     private void handleSwingPacket(int entityId) {
-        if (!isActive() || mc.player == null || mc.world == null
+        if (!isActive() || mc.player == null || mc.level == null
             || cooldownTicksLeft > 0)
             return;
-        Entity entity = mc.world.getEntityById(entityId);
+        Entity entity = mc.level.getEntityById(entityId);
         if (!(entity instanceof PlayerEntity attacker) || attacker == mc.player
             || isIgnoredPlayer(attacker))
             return;
@@ -443,9 +443,9 @@ public class Untouchable extends Module {
     }
 
     private void handleIncomingPosition(int entityId, Vec3d incomingPosition) {
-        if (!isActive() || mc.player == null || mc.world == null)
+        if (!isActive() || mc.player == null || mc.level == null)
             return;
-        Entity entity = mc.world.getEntityById(entityId);
+        Entity entity = mc.level.getEntityById(entityId);
         if (!(entity instanceof PlayerEntity attacker) || attacker == mc.player
             || isIgnoredPlayer(attacker))
             return;
@@ -474,7 +474,7 @@ public class Untouchable extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null || mc.player.isSpectator()) {
+        if (mc.player == null || mc.level == null || mc.player.isSpectator()) {
             reset();
             return;
         }
@@ -503,7 +503,7 @@ public class Untouchable extends Module {
 
     private Threat findMostUrgentThreat() {
         Threat best = null;
-        for (PlayerEntity attacker : mc.world.getPlayers()) {
+        for (PlayerEntity attacker : mc.level.getPlayers()) {
             if (attacker == mc.player || !attacker.isAlive()
                 || isIgnoredPlayer(attacker) || attacker.isSpectator())
                 continue;
@@ -547,7 +547,7 @@ public class Untouchable extends Module {
                 best = threat;
         }
         if (avoidHostileMobs.get()) {
-            for (Entity entity : mc.world.getEntities()) {
+            for (Entity entity : mc.level.getEntities()) {
                 if (!(entity instanceof HostileEntity) || entity == mc.player
                     || !entity.isAlive())
                     continue;
@@ -562,7 +562,7 @@ public class Untouchable extends Module {
             }
         }
         if (avoidArrows.get()) {
-            for (Entity entity : mc.world.getEntities()) {
+            for (Entity entity : mc.level.getEntities()) {
                 if (!(entity instanceof PersistentProjectileEntity arrow) || !arrow.isAlive()
                     || arrow.getOwner() == mc.player)
                     continue;
@@ -576,7 +576,7 @@ public class Untouchable extends Module {
             }
         }
         if (avoidCrystals.get()) {
-            for (Entity entity : mc.world.getEntities()) {
+            for (Entity entity : mc.level.getEntities()) {
                 if (!(entity instanceof EndCrystalEntity crystal) || !crystal.isAlive())
                     continue;
                 Threat threat = getCrystalThreat(crystal);
@@ -601,7 +601,7 @@ public class Untouchable extends Module {
             return;
 
         Threat threat = null;
-        for (PlayerEntity attacker : mc.world.getPlayers()) {
+        for (PlayerEntity attacker : mc.level.getPlayers()) {
             if (attacker == mc.player || !attacker.isAlive()
                 || isIgnoredPlayer(attacker))
                 continue;
@@ -863,14 +863,14 @@ public class Untouchable extends Module {
     }
 
     private Threat getArrowThreat(PersistentProjectileEntity arrow) {
-        if (mc.player == null || mc.world == null)
+        if (mc.player == null || mc.level == null)
             return null;
 
         Vec3d playerCenter = mc.player.getBoundingBox().getCenter();
         Vec3d arrowCenter = arrow.getBoundingBox().getCenter();
         Vec3d velocity = getObservedVelocity(arrow);
         if (velocity.lengthSquared() < 0.01)
-            velocity = arrow.getVelocity();
+            velocity = arrow.getDeltaMovement();
         if (velocity.lengthSquared() < 0.01)
             return null;
 
@@ -925,7 +925,7 @@ public class Untouchable extends Module {
         Vec3d attackAxis = threat.pathEnd.subtract(threat.pathStart);
         if (attackAxis.lengthSquared() > 1.0E-6)
             attackAxis = attackAxis.normalize();
-        Vec3d currentVelocity = mc.player.getVelocity();
+        Vec3d currentVelocity = mc.player.getDeltaMovement();
         Vec3d currentHorizontal = new Vec3d(currentVelocity.x, 0, currentVelocity.z);
         if (currentHorizontal.lengthSquared() > 1.0E-6)
             currentHorizontal = currentHorizontal.normalize();
@@ -997,10 +997,10 @@ public class Untouchable extends Module {
 
     private boolean isSafeDestination(Vec3d offset) {
         Box moved = mc.player.getBoundingBox().offset(offset);
-        if (!mc.world.isSpaceEmpty(mc.player, moved))
+        if (!mc.level.isSpaceEmpty(mc.player, moved))
             return false;
         return !avoidDrops.get() || !mc.player.isOnGround()
-            || !mc.world.isSpaceEmpty(mc.player, moved.offset(0, -0.65, 0));
+            || !mc.level.isSpaceEmpty(mc.player, moved.offset(0, -0.65, 0));
     }
 
     private void teleportAway(Threat threat) {
@@ -1008,7 +1008,7 @@ public class Untouchable extends Module {
     }
 
     private void teleportAway(Threat threat, boolean emergency) {
-        if (mc.player == null || mc.getNetworkHandler() == null)
+        if (mc.player == null || mc.getConnection() == null)
             return;
         if (!emergency && shouldSuppressDodging(threat.pathStart))
             return;
@@ -1017,12 +1017,12 @@ public class Untouchable extends Module {
             return;
 
         mc.player.setPosition(destination.x, destination.y, destination.z);
-        mc.player.setVelocity(Vec3d.ZERO);
-        mc.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.Full(
+        mc.player.setDeltaMovement(Vec3d.ZERO);
+        mc.getConnection().sendPacket(new PlayerMoveC2SPacket.Full(
             destination.x, destination.y, destination.z,
-            mc.player.getYaw(), mc.player.getPitch(), false, false));
+            mc.player.getYRot(), mc.player.getXRot(), false, false));
         for (int i = 1; i < teleportPackets.get(); i++) {
-            mc.getNetworkHandler().sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(
+            mc.getConnection().sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(
                 destination.x, destination.y, destination.z, false, false));
         }
         cooldownTicksLeft = teleportCooldown.get();
@@ -1031,14 +1031,14 @@ public class Untouchable extends Module {
 
     private void rememberPositions() {
         previousPositions.clear();
-        for (PlayerEntity player : mc.world.getPlayers())
+        for (PlayerEntity player : mc.level.getPlayers())
             if (player != mc.player)
                 previousPositions.put(player.getId(), player.getEntityPos());
     }
 
     private void rememberPrimedSpears() {
         long now = System.currentTimeMillis();
-        for (PlayerEntity player : mc.world.getPlayers()) {
+        for (PlayerEntity player : mc.level.getPlayers()) {
             if (player == mc.player || isIgnoredPlayer(player) || !player.isUsingItem())
                 continue;
             ItemStack spear = player.getActiveItem();
@@ -1049,11 +1049,11 @@ public class Untouchable extends Module {
     }
 
     private void rememberChargingCreepers() {
-        if (mc.world == null)
+        if (mc.level == null)
             return;
 
         long now = System.currentTimeMillis();
-        for (Entity entity : mc.world.getEntities()) {
+        for (Entity entity : mc.level.getEntities()) {
             if (!(entity instanceof CreeperEntity creeper) || !creeper.isAlive())
                 continue;
             if (creeper.getFuseSpeed() > 0 || creeper.isIgnited() || creeper.isCharged())
@@ -1077,7 +1077,7 @@ public class Untouchable extends Module {
     }
 
     private Vec3d getObservedVelocity(Entity entity) {
-        Vec3d networkVelocity = entity.getVelocity();
+        Vec3d networkVelocity = entity.getDeltaMovement();
         Vec3d previous = previousPositions.get(entity.getId());
         if (previous == null)
             return networkVelocity;
@@ -1099,7 +1099,7 @@ public class Untouchable extends Module {
         if (forward == 0 && strafe == 0)
             return false;
 
-        double yaw = Math.toRadians(mc.player.getYaw());
+        double yaw = Math.toRadians(mc.player.getYRot());
         double sin = Math.sin(yaw);
         double cos = Math.cos(yaw);
         Vec3d inputDirection = new Vec3d(-sin * forward + cos * strafe, 0,
@@ -1123,15 +1123,15 @@ public class Untouchable extends Module {
     }
 
     private boolean isHoldingMace(PlayerEntity player) {
-        return player.getMainHandStack().isOf(Items.MACE)
-            || player.getOffHandStack().isOf(Items.MACE);
+        return player.getMainItemStack().isOf(Items.MACE)
+            || player.getOffhandItem().isOf(Items.MACE);
     }
 
     private ItemStack getHeldSpear(PlayerEntity player) {
-        ItemStack mainHand = player.getMainHandStack();
+        ItemStack mainHand = player.getMainItemStack();
         if (isSpear(mainHand))
             return mainHand;
-        ItemStack offHand = player.getOffHandStack();
+        ItemStack offHand = player.getOffhandItem();
         return isSpear(offHand) ? offHand : ItemStack.EMPTY;
     }
 
@@ -1262,10 +1262,10 @@ public class Untouchable extends Module {
         }
 
         private ItemStack getWeapon(PlayerEntity player) {
-            ItemStack mainHand = player.getMainHandStack();
+            ItemStack mainHand = player.getMainItemStack();
             if (this == SWORD && isSword(mainHand) || this == AXE && isAxe(mainHand))
                 return mainHand;
-            ItemStack offHand = player.getOffHandStack();
+            ItemStack offHand = player.getOffhandItem();
             if (this == SWORD && isSword(offHand) || this == AXE && isAxe(offHand))
                 return offHand;
             return ItemStack.EMPTY;

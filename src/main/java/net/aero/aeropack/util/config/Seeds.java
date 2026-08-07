@@ -56,7 +56,7 @@ public class Seeds extends System<Seeds> {
     public void setSeed(String rawSeed) {
         if (mc == null || mc.isIntegratedServerRunning()) return;
 
-        ServerInfo server = mc.getCurrentServerEntry();
+        ServerInfo server = mc.getCurrentServer();
         String verStr = server != null && server.version != null ? server.version.getString() : "unknown";
         setSeed(rawSeed, resolveCubiomesVersion(verStr));
     }

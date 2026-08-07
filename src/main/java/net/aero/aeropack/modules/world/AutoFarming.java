@@ -200,7 +200,7 @@ public class AutoFarming extends Module {
     private void onBreakBlock(BreakBlockEvent event) {
         if (!onlyReplant.get()) return;
 
-        BlockState state = mc.world.getBlockState(event.blockPos);
+        BlockState state = mc.level.getBlockState(event.blockPos);
         Block block = state.getBlock();
         Item seedItem = getCropSeed(block);
 
@@ -211,7 +211,7 @@ public class AutoFarming extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         actions = 0;
         tickCounter++;
@@ -246,7 +246,7 @@ public class AutoFarming extends Module {
         for (BlockPos pos : blocks) {
             if (actions >= bpt.get()) break;
 
-            BlockState state = mc.world.getBlockState(pos);
+            BlockState state = mc.level.getBlockState(pos);
             Block block = state.getBlock();
 
             if (tryTill(pos, block)) continue;
@@ -267,8 +267,8 @@ public class AutoFarming extends Module {
     private boolean tryTill(BlockPos pos, Block block) {
         if (!till.get()) return false;
         if (!isTillable(block)) return false;
-        if (!mc.world.getBlockState(pos.up()).isAir()) return false;
-        if (moist.get() && !isWaterNearby(mc.world, pos)) return false;
+        if (!mc.level.getBlockState(pos.up()).isAir()) return false;
+        if (moist.get() && !isWaterNearby(mc.level, pos)) return false;
 
         FindItemResult hoe = InvUtils.findInHotbar(stack -> stack.getItem() instanceof HoeItem);
         if (!hoe.found()) return false;
@@ -294,23 +294,23 @@ public class AutoFarming extends Module {
         if (block instanceof SweetBerryBushBlock) {
             if (rotate.get()) {
                 Rotations.rotate(Rotations.getYaw(pos), Rotations.getPitch(pos), -100, () -> {
-                    mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND,
+                    mc.gameMode.interactBlock(mc.player, Hand.MAIN_HAND,
                         new BlockHitResult(Vec3d.ofCenter(pos), Direction.UP, pos, false));
                     if (swingHand.get()) mc.player.swingHand(Hand.MAIN_HAND);
                 });
             } else {
-                mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND,
+                mc.gameMode.interactBlock(mc.player, Hand.MAIN_HAND,
                     new BlockHitResult(Vec3d.ofCenter(pos), Direction.UP, pos, false));
                 if (swingHand.get()) mc.player.swingHand(Hand.MAIN_HAND);
             }
         } else {
             if (rotate.get()) {
                 Rotations.rotate(Rotations.getYaw(pos), Rotations.getPitch(pos), -100, () -> {
-                    mc.interactionManager.updateBlockBreakingProgress(pos, Direction.UP);
+                    mc.gameMode.updateBlockBreakingProgress(pos, Direction.UP);
                     if (swingHand.get()) mc.player.swingHand(Hand.MAIN_HAND);
                 });
             } else {
-                mc.interactionManager.updateBlockBreakingProgress(pos, Direction.UP);
+                mc.gameMode.updateBlockBreakingProgress(pos, Direction.UP);
                 if (swingHand.get()) mc.player.swingHand(Hand.MAIN_HAND);
             }
         }
@@ -325,16 +325,16 @@ public class AutoFarming extends Module {
         int totalHeight = getTotalTallCropHeight(pos, block);
         if (totalHeight < tallCropMinHeight.get()) return false;
 
-        Block blockBelow = mc.world.getBlockState(pos.down()).getBlock();
+        Block blockBelow = mc.level.getBlockState(pos.down()).getBlock();
         if (!isSameTallCrop(block, blockBelow)) return false;
 
         if (rotate.get()) {
             Rotations.rotate(Rotations.getYaw(pos), Rotations.getPitch(pos), -100, () -> {
-                mc.interactionManager.updateBlockBreakingProgress(pos, Direction.UP);
+                mc.gameMode.updateBlockBreakingProgress(pos, Direction.UP);
                 if (tallCropSwingHand.get()) mc.player.swingHand(Hand.MAIN_HAND);
             });
         } else {
-            mc.interactionManager.updateBlockBreakingProgress(pos, Direction.UP);
+            mc.gameMode.updateBlockBreakingProgress(pos, Direction.UP);
             if (tallCropSwingHand.get()) mc.player.swingHand(Hand.MAIN_HAND);
         }
         actions++;
@@ -368,7 +368,7 @@ public class AutoFarming extends Module {
         int below = 0;
         BlockPos checkPos = pos.down();
         while (below < 16) {
-            Block b = mc.world.getBlockState(checkPos).getBlock();
+            Block b = mc.level.getBlockState(checkPos).getBlock();
             if (!isSameTallCrop(block, b)) break;
             below++;
             checkPos = checkPos.down();
@@ -377,7 +377,7 @@ public class AutoFarming extends Module {
         int above = 1;
         checkPos = pos.up();
         while (above < 16) {
-            Block b = mc.world.getBlockState(checkPos).getBlock();
+            Block b = mc.level.getBlockState(checkPos).getBlock();
             if (!isSameTallCrop(block, b)) break;
             above++;
             checkPos = checkPos.up();
@@ -388,7 +388,7 @@ public class AutoFarming extends Module {
 
     private boolean tryPlant(BlockPos pos, Block block) {
         if (!plant.get()) return false;
-        if (!mc.world.isAir(pos.up())) return false;
+        if (!mc.level.isAir(pos.up())) return false;
         if (!(block instanceof FarmlandBlock) && !(block instanceof SoulSandBlock)) return false;
 
         FindItemResult findItemResult = null;
@@ -452,7 +452,7 @@ public class AutoFarming extends Module {
             boolean wasSneaking = mc.player.isSneaking();
             mc.player.setSneaking(false);
             InvUtils.swap(item.slot(), true);
-            mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND,
+            mc.gameMode.interactBlock(mc.player, Hand.MAIN_HAND,
                 new BlockHitResult(Vec3d.ofCenter(pos), Direction.UP, pos, false));
             if (swingHand.get()) mc.player.swingHand(Hand.MAIN_HAND);
             InvUtils.swapBack();

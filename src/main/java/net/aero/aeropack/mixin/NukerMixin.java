@@ -108,7 +108,7 @@ public abstract class NukerMixin implements AeroShaderSource {
         aeropack$vcp.setColor(new Color(lc.r, lc.g, lc.b, 255));
 
         for (BlockPos pos : aeropack$shaderBlocks.keySet()) {
-            BlockState state = mc.world.getBlockState(pos);
+            BlockState state = mc.level.getBlockState(pos);
             if (state.isAir()) continue;
 
             aeropack$vcp.setOffset(pos.getX(), pos.getY(), pos.getZ());

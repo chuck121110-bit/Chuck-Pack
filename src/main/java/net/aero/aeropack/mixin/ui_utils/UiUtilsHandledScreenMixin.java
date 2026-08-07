@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
@@ -18,7 +18,7 @@ import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.input.KeyInput;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.c2s.play.ButtonClickC2SPacket;
@@ -174,7 +174,7 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
 
         fabricateOverlayInitialized = false;
 
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         int spacing = 4;
         int buttonHeight = 20;
         int buttonCount = UiUtils.getUiWidgetRows();
@@ -186,7 +186,7 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
         int nextY = UiUtils.addUiWidgets(mc, baseX, startY, spacing,
             this::addDrawableChild);
         uiUtilsChatField =
-            UiUtils.createChatField(mc, this.textRenderer, baseX, nextY + spacing);
+            UiUtils.createChatField(mc, this.font, baseX, nextY + spacing);
         addDrawableChild(uiUtilsChatField);
 
         initFabricateOverlay();
@@ -202,7 +202,7 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
         UiUtils.refreshLabels();
 
         ScreenHandler screenHandler = ((HandledScreen<?>) (Object) this).getScreenHandler();
-        UiUtils.renderSyncInfo(MinecraftClient.getInstance(), graphics, screenHandler);
+        UiUtils.renderSyncInfo(Minecraft.getInstance(), graphics, screenHandler);
 
         updateOverlayVisibility();
 
@@ -256,7 +256,7 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
         if (uiUtilsChatField != null && uiUtilsChatField.isFocused()) {
             if (keyInput.key() == 257) {
                 String msg = uiUtilsChatField.getText().trim();
-                MinecraftClient mc = MinecraftClient.getInstance();
+                Minecraft mc = Minecraft.getInstance();
                 if (!msg.isEmpty() && mc.player != null) {
                     mc.player.networkHandler.sendChatMessage(msg);
                 }
@@ -578,7 +578,7 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     @Unique
     private void drawLabel(DrawContext graphics, String text,
         TextFieldWidget field) {
-        graphics.drawTextWithShadow(this.textRenderer, text, field.getX(), field.getY() - LABEL_OFFSET,
+        graphics.drawTextWithShadow(this.font, text, field.getX(), field.getY() - LABEL_OFFSET,
             0xFFAAAAAA);
     }
 
@@ -644,7 +644,7 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
             return;
         }
 
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         int syncId = Integer.parseInt(overlayClickSyncIdField.getText());
         short slot = Short.parseShort(overlayClickSlotField.getText());
         byte button = Byte.parseByte(overlayClickButtonField.getText());
@@ -656,14 +656,14 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
         if (action == null)
             return;
 
-        if (mc.getNetworkHandler() == null || mc.player == null)
+        if (mc.getConnection() == null || mc.player == null)
             return;
 
         ScreenHandler screenHandler = mc.player.currentScreenHandler;
         if (screenHandler == null)
             return;
 
-        ClientPlayNetworkHandler networkHandler = mc.getNetworkHandler();
+        ClientPacketListener networkHandler = mc.getConnection();
         net.minecraft.screen.sync.ComponentChangesHash.ComponentHasher hashGenerator =
             networkHandler.getComponentHasher();
 
@@ -723,7 +723,7 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
             return;
         }
 
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         int syncId = Integer.parseInt(overlayButtonSyncIdField.getText());
         int buttonId = Integer.parseInt(overlayButtonIdField.getText());
         int timesToSend = Integer.parseInt(overlayButtonTimesField.getText());

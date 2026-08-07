@@ -4,7 +4,7 @@ import com.mojang.authlib.GameProfile;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import net.aero.aeropack.modules.misc.OppStats;
 import net.aero.aeropack.modules.misc.OppStats.OppRecord;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -69,7 +69,7 @@ public final class OppStatsScreen extends Screen {
         int listHeight = height - top - bottomPad;
         int leftPanelX = 16;
         int leftPanelW = Math.min(440, Math.max(220, width / 2 - 36));
-        list = new OppList(MinecraftClient.getInstance(), width / 2 - 20, listHeight,
+        list = new OppList(Minecraft.getInstance(), width / 2 - 20, listHeight,
             top, 24, module, showOnline, searchQuery);
         addDrawableChild(list);
 
@@ -486,11 +486,11 @@ public final class OppStatsScreen extends Screen {
     }
 
     private static int getLivePing(OppRecord rec) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (rec == null || rec.uuid == null || mc.getNetworkHandler() == null)
+        Minecraft mc = Minecraft.getInstance();
+        if (rec == null || rec.uuid == null || mc.getConnection() == null)
             return rec == null ? -1 : rec.ping;
 
-        PlayerListEntry info = mc.getNetworkHandler().getPlayerListEntry(rec.uuid);
+        PlayerListEntry info = mc.getConnection().getPlayerListEntry(rec.uuid);
         if (info != null)
             return info.getLatency();
 
@@ -503,9 +503,9 @@ public final class OppStatsScreen extends Screen {
         if (mojangSkin != null)
             return mojangSkin;
 
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.getNetworkHandler() != null) {
-            PlayerListEntry info = mc.getNetworkHandler().getPlayerListEntry(uuid);
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.getConnection() != null) {
+            PlayerListEntry info = mc.getConnection().getPlayerListEntry(uuid);
             if (info != null)
                 return info.getSkinTextures().body().texturePath();
         }
@@ -517,7 +517,7 @@ public final class OppStatsScreen extends Screen {
         if (uuid == null || !loadingMojangSkins.add(uuid))
             return;
 
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         CompletableFuture.supplyAsync(() -> {
             try {
                 return new GameProfile(uuid, null);
@@ -545,7 +545,7 @@ public final class OppStatsScreen extends Screen {
         private final OppStats module;
         private boolean showOnline;
 
-        public OppList(MinecraftClient mc, int width, int height, int top, int itemHeight,
+        public OppList(Minecraft mc, int width, int height, int top, int itemHeight,
             OppStats module, boolean showOnline, String searchQuery) {
             super(mc, width, height, top, itemHeight);
             this.module = module;
@@ -658,13 +658,13 @@ public final class OppStatsScreen extends Screen {
                 Identifier skin = resolveSkin(record.uuid);
                 context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED,
                     skin, x + 2, y + 2, 8, 8, 16, 16, 8, 8, 64, 64, 0xFFFFFFFF);
-                MinecraftClient mc = MinecraftClient.getInstance();
-                context.drawText(mc.textRenderer, Text.literal(record.name), x + 24, y + 2,
+                Minecraft mc = Minecraft.getInstance();
+                context.drawText(mc.font, Text.literal(record.name), x + 24, y + 2,
                     0xFFFFFFFF, false);
                 String pingText = record.online
                     ? "ping: " + na(getLivePing(record)) + " ms"
                     : "offline";
-                context.drawText(mc.textRenderer, Text.literal(pingText), x + 24, y + 12,
+                context.drawText(mc.font, Text.literal(pingText), x + 24, y + 12,
                     record.online ? 0xFF55FF55 : 0xFFFF7777, false);
             }
         }

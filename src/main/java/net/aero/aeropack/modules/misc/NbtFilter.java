@@ -164,13 +164,13 @@ public class NbtFilter extends Module {
 
     @EventHandler
     private void onInteractBlock(InteractBlockEvent event) {
-        if (!blockOverloadedContainers.get() || mc.player == null || mc.world == null)
+        if (!blockOverloadedContainers.get() || mc.player == null || mc.level == null)
             return;
 
         if (!(event.result instanceof BlockHitResult hit))
             return;
 
-        if (!(mc.world.getBlockEntity(hit.getBlockPos()) instanceof LockableContainerBlockEntity))
+        if (!(mc.level.getBlockEntity(hit.blockPosition()) instanceof LockableContainerBlockEntity))
             return;
 
         long total = getInventoryNbtSize();
@@ -930,11 +930,11 @@ public class NbtFilter extends Module {
         if (stack == null || stack.isEmpty())
             return 0;
 
-        if (mc.world == null)
+        if (mc.level == null)
             return Long.MAX_VALUE;
 
         RegistryByteBuf buf = new RegistryByteBuf(
-            Unpooled.buffer(), mc.world.getRegistryManager());
+            Unpooled.buffer(), mc.level.getRegistryManager());
         try {
             ItemStack.OPTIONAL_PACKET_CODEC.encode(buf, stack);
             return buf.writerIndex();

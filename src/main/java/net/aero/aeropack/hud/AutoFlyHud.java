@@ -10,7 +10,7 @@ import meteordevelopment.meteorclient.systems.hud.HudRenderer;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.meteorclient.utils.render.color.Color;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
@@ -110,7 +110,7 @@ public class AutoFlyHud extends HudElement
 	@Override
 	public void tick(HudRenderer renderer)
 	{
-		MinecraftClient mc = MinecraftClient.getInstance();
+		Minecraft mc = Minecraft.getInstance();
 
 		AutoFly af = Modules.get().get(AutoFly.class);
 		boolean active = af != null && af.isActive() && af.getDestination() != null && mc.player != null;
@@ -324,7 +324,7 @@ public class AutoFlyHud extends HudElement
 
 		if(autoCenter.get())
 		{
-			MinecraftClient mc = MinecraftClient.getInstance();
+			Minecraft mc = Minecraft.getInstance();
 			if(mc.getWindow() != null)
 			{
 				double sw = mc.getWindow().getWidth();

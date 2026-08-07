@@ -1,6 +1,6 @@
 package net.aero.aeropack.mixin.ui_utils;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screen.SleepingChatScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -27,7 +27,7 @@ public abstract class UiUtilsSleepingChatScreenMixin extends Screen {
         int startY = Math.max(5, (this.height - 20) / 2);
         addDrawableChild(
             ButtonWidget.builder(Text.literal("Client wake up"), b -> {
-                MinecraftClient mc = MinecraftClient.getInstance();
+                Minecraft mc = Minecraft.getInstance();
                 if (mc.player != null) {
                     mc.player.wakeUp();
                     mc.setScreen(null);

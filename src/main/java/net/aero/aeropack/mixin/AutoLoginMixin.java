@@ -1,13 +1,13 @@
 package net.aero.aeropack.mixin;
 
 import net.aero.aeropack.modules.misc.AutoLogin;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(ClientPlayNetworkHandler.class)
+@Mixin(ClientPacketListener.class)
 public class AutoLoginMixin {
 
     @Inject(method = "sendChatMessage", at = @At("HEAD"))

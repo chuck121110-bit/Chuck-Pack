@@ -40,7 +40,7 @@ import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkSection;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -289,8 +289,8 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.world != null) {
-            RegistryKey<World> dim = mc.world.getRegistryKey();
+        if (mc.level != null) {
+            RegistryKey<World> dim = mc.level.dimension();
 
             if (
                 (dim == World.OVERWORLD && !overworld.get()) ||
@@ -321,26 +321,26 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     }
 
     private void removeBoxesOutsideRenderDistance() {
-        Set<WorldChunk> chunkSet = new HashSet<>();
+        Set<LevelChunk> chunkSet = new HashSet<>();
         for (Chunk c : Utils.chunks(true)) {
-            if (c instanceof WorldChunk wc) chunkSet.add(wc);
+            if (c instanceof LevelChunk wc) chunkSet.add(wc);
         }
         removeBoxesOutsideRenderDistance(holes, chunkSet);
         removeBoxesOutsideRenderDistance(tunnels, chunkSet);
         removeBoxesOutsideRenderDistance(staircases, chunkSet);
     }
 
-    private void removeBoxesOutsideRenderDistance(Set<Box> boxSet, Set<WorldChunk> worldChunks) {
+    private void removeBoxesOutsideRenderDistance(Set<Box> boxSet, Set<LevelChunk> worldChunks) {
         boxSet.removeIf(box -> {
             BlockPos boxPos = new BlockPos((int) Math.floor(box.getCenter().x), (int) Math.floor(box.getCenter().y), (int) Math.floor(box.getCenter().z));
-            assert mc.world != null;
-            return !worldChunks.contains(mc.world.getChunk(boxPos));
+            assert mc.level != null;
+            return !worldChunks.contains(mc.level.getChunk(boxPos));
         });
     }
 
     @EventHandler
     private void onRender3D(Render3DEvent event) {
-        if (mc.world == null || mc.player == null) return;
+        if (mc.level == null || mc.player == null) return;
 
         if (renderMode.get() == AeroRenderMode.Shader) {
             renderShader(event);
@@ -404,7 +404,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     }
 
     private boolean isBoxVisible(Box box) {
-        Frustum frustum = mc.worldRenderer.getCapturedFrustum();
+        Frustum frustum = mc.levelRenderer.getCapturedFrustum();
         if (frustum == null) return true;
         return frustum.isVisible(box);
     }
@@ -457,7 +457,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
 
     private void renderBoxesShader(MeshBuilder mesh, Set<Box> boxSet, Color color) {
         Color shaderColor = new Color(color.r, color.g, color.b, 255);
-        Frustum frustum = frustumCulling.get() ? mc.worldRenderer.getCapturedFrustum() : null;
+        Frustum frustum = frustumCulling.get() ? mc.levelRenderer.getCapturedFrustum() : null;
         for (Box box : boxSet) {
             if (frustum != null && !frustum.isVisible(box)) continue;
             meshBox(mesh, box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ, shaderColor);
@@ -536,7 +536,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
                         BlockPos neighbor = pos.offset(dir);
                         if (!rendered.add(neighbor)) continue;
 
-                        BlockState state = mc.world.getBlockState(neighbor);
+                        BlockState state = mc.level.getBlockState(neighbor);
                         if (state.isAir()) continue;
 
                         vcp.setOffset(neighbor.getX(), neighbor.getY(), neighbor.getZ());
@@ -565,9 +565,9 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
 
     private void searchChunk(Chunk chunk, TChunk tChunk) {
         var sections = chunk.getSectionArray();
-        int Ymin = mc.world.getBottomY() + minY.get();
-        int Ymax = mc.world.getTopYInclusive() - maxY.get();
-        int Y = mc.world.getBottomY();
+        int Ymin = mc.level.getMinBuildHeight() + minY.get();
+        int Ymax = mc.level.getMaxBuildHeight() - maxY.get();
+        int Y = mc.level.getMinBuildHeight();
         for (ChunkSection section : sections) {
             if (section != null && !section.isEmpty()) {
                 for (int z = 0; z <= 16; z++) {
@@ -814,11 +814,11 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     }
 
     private boolean isPassableBlock(BlockPos pos) {
-        BlockState state = mc.world.getBlockState(pos);
+        BlockState state = mc.level.getBlockState(pos);
         if (airBlocks.get()) {
             return state.isAir();
         } else {
-            VoxelShape shape = state.getCollisionShape(mc.world, pos);
+            VoxelShape shape = state.getCollisionShape(mc.level, pos);
             return shape.isEmpty() || !VoxelShapes.fullCube().equals(shape);
         }
     }

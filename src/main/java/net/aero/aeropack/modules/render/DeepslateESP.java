@@ -32,7 +32,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -79,7 +79,7 @@ public class DeepslateESP extends Module implements AeroShaderSource {
         renderListDirty = true;
 
         for (Chunk c : Utils.chunks()) {
-            if (c instanceof WorldChunk wc) scanChunkAsync(wc);
+            if (c instanceof LevelChunk wc) scanChunkAsync(wc);
         }
     }
 
@@ -125,12 +125,12 @@ public class DeepslateESP extends Module implements AeroShaderSource {
         });
     }
 
-    private void scanChunkAsync(WorldChunk chunk) {
+    private void scanChunkAsync(LevelChunk chunk) {
         worker.submit(() -> scanChunk(chunk));
     }
 
-    private void scanChunk(WorldChunk chunk) {
-        if (!isActive() || mc.world == null) return;
+    private void scanChunk(LevelChunk chunk) {
+        if (!isActive() || mc.level == null) return;
 
         long key = chunk.getPos().toLong();
         Map<BlockPos, Boolean> map = new ConcurrentHashMap<>();
@@ -143,7 +143,7 @@ public class DeepslateESP extends Module implements AeroShaderSource {
         for (int x = startX; x <= endX; x++) {
             for (int z = startZ; z <= endZ; z++) {
                 int top = chunk.getHeightmap(Heightmap.Type.WORLD_SURFACE).get(x - startX, z - startZ);
-                for (int y = mc.world.getBottomY(); y < top; y++) {
+                for (int y = mc.level.getMinBuildHeight(); y < top; y++) {
                     scanPos.set(x, y, z);
                     BlockState state = chunk.getBlockState(scanPos);
                     if (state.getBlock() == Blocks.DEEPSLATE) {
@@ -169,7 +169,7 @@ public class DeepslateESP extends Module implements AeroShaderSource {
 
     @EventHandler
     private void onRender3D(Render3DEvent event) {
-        if (mc.world == null || mc.player == null) return;
+        if (mc.level == null || mc.player == null) return;
 
         if (renderListDirty) rebuildRenderList();
 
@@ -208,7 +208,7 @@ public class DeepslateESP extends Module implements AeroShaderSource {
 
         for (int i = 0; i < toRender.size(); i++) {
             BlockPos pos = toRender.get(i);
-            BlockState state = mc.world.getBlockState(pos);
+            BlockState state = mc.level.getBlockState(pos);
             if (state.isAir()) continue;
 
             vcp.setOffset(pos.getX(), pos.getY(), pos.getZ());

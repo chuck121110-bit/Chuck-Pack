@@ -92,7 +92,7 @@ public class OppStats extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.getNetworkHandler() == null)
+        if (mc.getConnection() == null)
             return;
 
         String keyNow = resolveServerKey();
@@ -108,7 +108,7 @@ public class OppStats extends Module {
 
         long now = System.currentTimeMillis();
         Set<UUID> onlineNow = new LinkedHashSet<>();
-        for (PlayerListEntry entry : mc.getNetworkHandler().getPlayerList()) {
+        for (PlayerListEntry entry : mc.getConnection().getPlayerList()) {
             UUID id = entry.getProfile().id();
             String name = entry.getProfile().name();
             if (ignoreNpcs.get() && isBotLikeIdentity(id, name))
@@ -145,17 +145,17 @@ public class OppStats extends Module {
         lastOnline.clear();
         lastOnline.addAll(onlineNow);
 
-        if (mc.world != null && mc.player != null) {
-            for (PlayerEntity p : mc.world.getPlayers()) {
+        if (mc.level != null && mc.player != null) {
+            for (PlayerEntity p : mc.level.getPlayers()) {
                 if (p == mc.player)
                     continue;
-                if (!onlineNow.contains(p.getUuid()))
+                if (!onlineNow.contains(p.getUUID()))
                     continue;
-                if (ignoreNpcs.get() && isBotLikeEntity(p.getUuid(), p.getName().getString()))
+                if (ignoreNpcs.get() && isBotLikeEntity(p.getUUID(), p.getName().getString()))
                     continue;
 
-                OppRecord rec = records.computeIfAbsent(p.getUuid(),
-                    k -> new OppRecord(p.getUuid(), p.getName().getString()));
+                OppRecord rec = records.computeIfAbsent(p.getUUID(),
+                    k -> new OppRecord(p.getUUID(), p.getName().getString()));
                 updateFromLivePlayer(rec, p, now);
                 dirty = true;
             }
@@ -172,8 +172,8 @@ public class OppStats extends Module {
         rec.health = p.getHealth();
         rec.absorption = p.getAbsorptionAmount();
         rec.armorValue = p.getArmor();
-        rec.mainHand = observeEquipment(rec, "Main hand", rec.mainHand, p.getMainHandStack(), now);
-        rec.offHand = observeEquipment(rec, "Off hand", rec.offHand, p.getOffHandStack(), now);
+        rec.mainHand = observeEquipment(rec, "Main hand", rec.mainHand, p.getMainItemStack(), now);
+        rec.offHand = observeEquipment(rec, "Off hand", rec.offHand, p.getOffhandItem(), now);
         rec.helmet = observeEquipment(rec, "Helmet", rec.helmet, p.getEquippedStack(EquipmentSlot.HEAD), now);
         rec.chest = observeEquipment(rec, "Chestplate", rec.chest, p.getEquippedStack(EquipmentSlot.CHEST), now);
         rec.legs = observeEquipment(rec, "Leggings", rec.legs, p.getEquippedStack(EquipmentSlot.LEGS), now);
@@ -195,11 +195,11 @@ public class OppStats extends Module {
     }
 
     private void bootstrapFromTablist() {
-        if (mc.getNetworkHandler() == null)
+        if (mc.getConnection() == null)
             return;
 
         long now = System.currentTimeMillis();
-        for (PlayerListEntry entry : mc.getNetworkHandler().getPlayerList()) {
+        for (PlayerListEntry entry : mc.getConnection().getPlayerList()) {
             UUID id = entry.getProfile().id();
             String name = entry.getProfile().name();
             if (ignoreNpcs.get() && isBotLikeIdentity(id, name))
@@ -378,7 +378,7 @@ public class OppStats extends Module {
     }
 
     private String resolveServerKey() {
-        ServerInfo info = mc.getCurrentServerEntry();
+        ServerInfo info = mc.getCurrentServer();
         if (info != null) {
             if (info.address != null && !info.address.isEmpty())
                 return info.address.replace(':', '_');

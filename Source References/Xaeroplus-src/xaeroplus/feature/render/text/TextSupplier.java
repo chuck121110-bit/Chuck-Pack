@@ -1,9 +1,0 @@
-package xaeroplus.feature.render.text;
-
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import net.minecraft.class_1937;
-import net.minecraft.class_5321;
-
-public interface TextSupplier {
-   Long2ObjectMap<Text> getText(final int windowRegionX, final int windowRegionZ, final int windowRegionSize, final class_5321<class_1937> dimension);
-}

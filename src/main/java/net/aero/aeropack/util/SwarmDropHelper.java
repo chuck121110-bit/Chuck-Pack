@@ -177,8 +177,8 @@ public class SwarmDropHelper {
     // ── Main drop method ──────────────────────────────────────────────────
 
     public static void dropByType(String type) {
-        net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
-        if (mc.player == null || mc.interactionManager == null) return;
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.player == null || mc.gameMode == null) return;
 
         if (mc.currentScreen != null) {
             mc.player.closeHandledScreen();
@@ -194,7 +194,7 @@ public class SwarmDropHelper {
                     if (inv.getStack(i).isEmpty()) continue;
                     int slotId = invToScreenSlot(i);
                     if (slotId < 0) continue;
-                    mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
+                    mc.gameMode.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
                         net.minecraft.screen.slot.SlotActionType.THROW, mc.player);
                     dropped++;
                 }
@@ -205,7 +205,7 @@ public class SwarmDropHelper {
                     if (stack.isEmpty()) continue;
                     if (!isJunk(stack)) continue;
                     int slotId = i < 9 ? i + 36 : i;
-                    mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
+                    mc.gameMode.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
                         net.minecraft.screen.slot.SlotActionType.THROW, mc.player);
                     dropped++;
                 }
@@ -216,7 +216,7 @@ public class SwarmDropHelper {
                     if (stack.isEmpty()) continue;
                     if (!isOre(stack)) continue;
                     int slotId = i < 9 ? i + 36 : i;
-                    mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
+                    mc.gameMode.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
                         net.minecraft.screen.slot.SlotActionType.THROW, mc.player);
                     dropped++;
                 }
@@ -224,7 +224,7 @@ public class SwarmDropHelper {
             case "hotbar" -> {
                 for (int i = 0; i < 9; i++) {
                     if (inv.getStack(i).isEmpty()) continue;
-                    mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, i + 36, 1,
+                    mc.gameMode.clickSlot(mc.player.currentScreenHandler.syncId, i + 36, 1,
                         net.minecraft.screen.slot.SlotActionType.THROW, mc.player);
                     dropped++;
                 }
@@ -235,7 +235,7 @@ public class SwarmDropHelper {
                     if (stack.isEmpty()) continue;
                     if (!isValuable(stack)) continue;
                     int slotId = i < 9 ? i + 36 : i;
-                    mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
+                    mc.gameMode.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
                         net.minecraft.screen.slot.SlotActionType.THROW, mc.player);
                     dropped++;
                 }

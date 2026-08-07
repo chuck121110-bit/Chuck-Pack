@@ -17,7 +17,7 @@ import net.aero.aeropack.util.config.Ore;
 import net.aero.aeropack.util.config.Seeds;
 import net.aero.aeropack.util.config.Seeds.Seed;
 import net.aero.aeropack.util.config.Seeds.SeedChangedEvent;
-import net.minecraft.client.world.ClientWorld;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
@@ -119,7 +119,7 @@ public class OreSim extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null || oreConfig == null) return;
+        if (mc.player == null || mc.level == null || oreConfig == null) return;
 
         detectWorldChange();
     }
@@ -157,17 +157,17 @@ public class OreSim extends Module {
         Seed seed = Seeds.get().getSeed();
         if (seed == null) return;
         worldSeed = seed;
-        oreConfig = Ore.getRegistry(PlayerUtils.getDimension());
+        oreConfig = Ore.getRegistry(PlayerUtils.dimensionType());
         chunkRenderers.clear();
-        if (mc.world != null) {
+        if (mc.level != null) {
             loadVisibleChunks();
         }
     }
 
     private void detectWorldChange() {
-        if (mc.world == null) return;
+        if (mc.level == null) return;
         String currentWorld = Utils.getWorldName();
-        RegistryKey<World> currentKey = mc.world.getRegistryKey();
+        RegistryKey<World> currentKey = mc.level.dimension();
         if (!Objects.equals(currentWorld, lastWorldName) || !Objects.equals(currentKey, lastWorldKey)) {
             lastWorldName = currentWorld;
             lastWorldKey = currentKey;
@@ -176,12 +176,12 @@ public class OreSim extends Module {
     }
 
     private void updateWorldTracking() {
-        if (mc.world == null) {
+        if (mc.level == null) {
             lastWorldName = null;
             lastWorldKey = null;
         } else {
             lastWorldName = Utils.getWorldName();
-            lastWorldKey = mc.world.getRegistryKey();
+            lastWorldKey = mc.level.dimension();
         }
     }
 
@@ -193,7 +193,7 @@ public class OreSim extends Module {
     }
 
     private void calculateChunk(Chunk chunk) {
-        if (chunk == null || mc.world == null || oreConfig == null || worldSeed == null) return;
+        if (chunk == null || mc.level == null || oreConfig == null || worldSeed == null) return;
 
         ChunkPos chunkPos = chunk.getPos();
         long chunkKey = chunkPos.toLong();
@@ -201,7 +201,7 @@ public class OreSim extends Module {
 
         Set<RegistryKey<Biome>> biomeKeys = new HashSet<>();
         ChunkPos.stream(chunkPos, 1).forEach(pos -> {
-            Chunk neighbour = mc.world.getChunk(pos.x, pos.z, ChunkStatus.BIOMES, false);
+            Chunk neighbour = mc.level.getChunk(pos.x, pos.z, ChunkStatus.BIOMES, false);
             if (neighbour == null) return;
             for (ChunkSection section : neighbour.getSectionArray()) {
                 section.getBiomeContainer().forEachValue(entry -> biomeKeys.add(entry.getKey().get()));
@@ -235,9 +235,9 @@ public class OreSim extends Module {
                 if (!getOresForBiome(biome).contains(ore)) continue;
 
                 if (ore.scattered) {
-                    positions.addAll(generateHidden(mc.world, random, origin, ore.size));
+                    positions.addAll(generateHidden(mc.level, random, origin, ore.size));
                 } else {
-                    positions.addAll(generateNormal(mc.world, random, origin, ore.size, ore.discardOnAirChance));
+                    positions.addAll(generateNormal(mc.level, random, origin, ore.size, ore.discardOnAirChance));
                 }
             }
 
@@ -258,7 +258,7 @@ public class OreSim extends Module {
         return oreConfig.values().stream().findAny().orElse(Collections.emptyList());
     }
 
-    private List<Vec3d> generateNormal(ClientWorld world, ChunkRandom random, BlockPos blockPos, int veinSize, float discardOnAir) {
+    private List<Vec3d> generateNormal(ClientLevel world, ChunkRandom random, BlockPos blockPos, int veinSize, float discardOnAir) {
         List<Vec3d> positions = new ArrayList<>();
         float angle = random.nextFloat() * (float) Math.PI;
         float spread = (float) veinSize / 8.0F;
@@ -286,7 +286,7 @@ public class OreSim extends Module {
         return positions;
     }
 
-    private List<Vec3d> generateVein(ClientWorld world, ChunkRandom random, int veinSize, double startX, double endX, double startZ, double endZ, double startY, double endY, int minX, int minY, int minZ, int sizeX, int sizeY, float discardOnAir) {
+    private List<Vec3d> generateVein(ClientLevel world, ChunkRandom random, int veinSize, double startX, double endX, double startZ, double endZ, double startY, double endY, int minX, int minY, int minZ, int sizeX, int sizeY, float discardOnAir) {
         BitSet bitSet = new BitSet(sizeX * sizeY * sizeX);
         BlockPos.Mutable mutable = new BlockPos.Mutable();
         double[] buffer = new double[veinSize * 4];
@@ -359,7 +359,7 @@ public class OreSim extends Module {
         return positions;
     }
 
-    private boolean shouldPlace(ClientWorld world, BlockPos pos, float discardOnAir, ChunkRandom random) {
+    private boolean shouldPlace(ClientLevel world, BlockPos pos, float discardOnAir, ChunkRandom random) {
         if (discardOnAir == 0 || (discardOnAir != 1.0F && random.nextFloat() >= discardOnAir)) return true;
         for (Direction direction : Direction.values()) {
             if (!world.getBlockState(pos.offset(direction)).isOpaque() && discardOnAir != 1.0F) return false;
@@ -367,7 +367,7 @@ public class OreSim extends Module {
         return true;
     }
 
-    private List<Vec3d> generateHidden(ClientWorld world, ChunkRandom random, BlockPos origin, int size) {
+    private List<Vec3d> generateHidden(ClientLevel world, ChunkRandom random, BlockPos origin, int size) {
         List<Vec3d> positions = new ArrayList<>();
         int limit = random.nextInt(size + 1);
         for (int i = 0; i < limit; i++) {

@@ -9,7 +9,7 @@ import meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmWorker;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import net.aero.aeropack.modules.combat.SwarmGuard;
 import net.aero.aeropack.swarm.IAutoSwarmConnect;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -36,12 +36,12 @@ public class SwarmWorkerMixin {
 
     @Inject(method = "tick", at = @At("HEAD"))
     private void aeropack$onTick(CallbackInfo ci) {
-        SwarmGuard.get().tick(MinecraftClient.getInstance());
+        SwarmGuard.get().tick(Minecraft.getInstance());
     }
 
     @Redirect(method = "run", at = @At(value = "INVOKE", target = "Lmeteordevelopment/meteorclient/commands/Commands;dispatch(Ljava/lang/String;)V"))
     private void aeropack$onDispatch(String command) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         String lower = command.toLowerCase().trim();
 
         // ── Aeropack-specific commands (handled here, never forwarded to Meteor) ──
@@ -118,7 +118,7 @@ public class SwarmWorkerMixin {
                 final int fSlot = slotIndex;
                 final boolean fDropAll = dropAll;
                 mc.execute(() -> {
-                    if (mc.player == null || mc.interactionManager == null) return;
+                    if (mc.player == null || mc.gameMode == null) return;
                     if (!workerName.equalsIgnoreCase(mc.player.getName().getString())) return;
                     if (fSlot < 0 || fSlot >= 41) return;
                     if (mc.player.getInventory().getStack(fSlot).isEmpty()) return;
@@ -130,7 +130,7 @@ public class SwarmWorkerMixin {
                     else if (fSlot == 40) screenSlot = 45;
                     else return;
 
-                    mc.interactionManager.clickSlot(
+                    mc.gameMode.clickSlot(
                         mc.player.currentScreenHandler.syncId,
                         screenSlot,
                         fDropAll ? 0 : 1,
@@ -170,7 +170,7 @@ public class SwarmWorkerMixin {
     // ── Sync handler ──────────────────────────────────────────────────────
 
     @Unique
-    private static void aeropack$handleSync(MinecraftClient mc, String payload) {
+    private static void aeropack$handleSync(Minecraft mc, String payload) {
         String nameList = payload;
         String configPart = null;
         String idsPart = null;
@@ -225,9 +225,9 @@ public class SwarmWorkerMixin {
             }
 
             String hostName = null;
-            if (mc.player != null && mc.world != null) {
+            if (mc.player != null && mc.level != null) {
                 double closest = Double.MAX_VALUE;
-                for (net.minecraft.entity.player.PlayerEntity p : mc.world.getPlayers()) {
+                for (net.minecraft.entity.player.PlayerEntity p : mc.level.getPlayers()) {
                     if (p == mc.player) continue;
                     double dist = mc.player.distanceTo(p);
                     if (dist < closest) {
@@ -246,7 +246,7 @@ public class SwarmWorkerMixin {
     // ── Server join handler ───────────────────────────────────────────────
 
     @Unique
-    private static void aeropack$handleServerJoin(MinecraftClient mc, String raw) {
+    private static void aeropack$handleServerJoin(Minecraft mc, String raw) {
         if (raw.isEmpty()) return;
 
         String address = raw;
@@ -329,13 +329,13 @@ public class SwarmWorkerMixin {
     // ── Impersonate kick ──────────────────────────────────────────────────
 
     @Unique
-    private static void aeropack$impersonateKick(MinecraftClient mc, String targetName) {
-        if (mc.player == null || mc.world == null || mc.getCurrentServerEntry() == null) {
+    private static void aeropack$impersonateKick(Minecraft mc, String targetName) {
+        if (mc.player == null || mc.level == null || mc.getCurrentServer() == null) {
             ChatUtils.error("Must be on a server to impersonate-kick.");
             return;
         }
 
-        net.minecraft.client.network.ServerInfo serverInfo = mc.getCurrentServerEntry();
+        net.minecraft.client.network.ServerInfo serverInfo = mc.getCurrentServer();
         String serverAddress = serverInfo.address;
 
         ChatUtils.infoPrefix("Swarm", "Impersonating (highlight)%s to get them kicked...", targetName);
@@ -471,7 +471,7 @@ public class SwarmWorkerMixin {
     // ── Inventory file writing ────────────────────────────────────────────
 
     @Unique
-    private static void aeropack$writeInventoryToFile(MinecraftClient mc) {
+    private static void aeropack$writeInventoryToFile(Minecraft mc) {
         if (mc.player == null) return;
 
         SwarmGuard.initInventoryDir();
@@ -491,7 +491,7 @@ public class SwarmWorkerMixin {
             sb.append("WORKER:").append(workerName).append("\n");
             sb.append("EMPTY:").append(emptyCount).append("\n");
 
-            net.minecraft.client.network.ServerInfo serverEntry = mc.getCurrentServerEntry();
+            net.minecraft.client.network.ServerInfo serverEntry = mc.getCurrentServer();
             if (serverEntry != null) {
                 sb.append("SERVER:").append(serverEntry.address).append("\n");
             }

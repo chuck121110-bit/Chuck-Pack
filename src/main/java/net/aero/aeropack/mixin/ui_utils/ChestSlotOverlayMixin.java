@@ -68,7 +68,7 @@ public abstract class ChestSlotOverlayMixin {
             int textX = x + slot.x + offsetX;
             int textY = y + slot.y + offsetY;
             String label = String.valueOf(index);
-            graphics.drawTextWithShadow(net.minecraft.client.MinecraftClient.getInstance().textRenderer, label, textX, textY, color);
+            graphics.drawTextWithShadow(net.minecraft.client.Minecraft.getInstance().font, label, textX, textY, color);
         }
     }
 }

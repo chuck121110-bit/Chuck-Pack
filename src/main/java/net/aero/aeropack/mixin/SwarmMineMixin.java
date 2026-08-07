@@ -86,7 +86,7 @@ public class SwarmMineMixin {
                                 return 0;
                             }
 
-                            net.minecraft.client.MinecraftClient.getInstance().execute(() -> {
+                            net.minecraft.client.Minecraft.getInstance().execute(() -> {
                                 PathManagers.get().stop();
                                 PathManagers.get().mine(blocks.toArray(new Block[0]));
                             });
@@ -165,7 +165,7 @@ public class SwarmMineMixin {
                     swarm.host.sendMessage(context.getInput());
                 } else if (swarm.isWorker()) {
                     int slot = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(context, "slot");
-                    net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+                    net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                     if (mc.player != null) {
                         mc.execute(() -> mc.player.getInventory().setSelectedSlot(slot - 1));
                     }
@@ -248,9 +248,9 @@ public class SwarmMineMixin {
             LiteralArgumentBuilder.<CommandSource>literal("kick").then(
                 RequiredArgumentBuilder.<CommandSource, String>argument("player", StringArgumentType.word())
                     .suggests((ctx, sb) -> {
-                        net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
-                        if (mc.world != null) {
-                            for (net.minecraft.entity.player.PlayerEntity p : mc.world.getPlayers()) {
+                        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                        if (mc.level != null) {
+                            for (net.minecraft.entity.player.PlayerEntity p : mc.level.getPlayers()) {
                                 if (p == mc.player) continue;
                                 sb.suggest(p.getName().getString());
                             }
@@ -287,7 +287,7 @@ public class SwarmMineMixin {
     // ── Server join helper ────────────────────────────────────────────────
 
     private static void aeropack$joinMinecraftServer(String addressInput) {
-        net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
 
         String host = addressInput;
         int port = 25565;
@@ -331,11 +331,11 @@ public class SwarmMineMixin {
     private static final java.util.Set<Integer> aeropack$usedIds = new java.util.HashSet<>();
 
     private static void aeropack$sendNames(Swarm swarm) {
-        net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
-        if (mc.player == null || mc.world == null) return;
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.player == null || mc.level == null) return;
 
         java.util.List<String> currentPlayers = new java.util.ArrayList<>();
-        for (net.minecraft.entity.player.PlayerEntity p : mc.world.getPlayers()) {
+        for (net.minecraft.entity.player.PlayerEntity p : mc.level.getPlayers()) {
             if (p == mc.player) continue;
             currentPlayers.add(p.getName().getString());
         }
@@ -381,13 +381,13 @@ public class SwarmMineMixin {
     }
 
     private static void aeropack$activateGuardOnWorker(String specifiedName) {
-        net.minecraft.client.MinecraftClient.getInstance().execute(() -> {
+        net.minecraft.client.Minecraft.getInstance().execute(() -> {
             String hostName = specifiedName;
             if (hostName == null) {
-                net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
-                if (mc.player != null && mc.world != null) {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                if (mc.player != null && mc.level != null) {
                     double closest = Double.MAX_VALUE;
-                    for (net.minecraft.entity.player.PlayerEntity p : mc.world.getPlayers()) {
+                    for (net.minecraft.entity.player.PlayerEntity p : mc.level.getPlayers()) {
                         if (p == mc.player) continue;
                         double dist = mc.player.distanceTo(p);
                         if (dist < closest) {

@@ -12,7 +12,7 @@ import xaero.map.element.HoveredMapElementHolder;
 import xaero.map.gui.IRightClickableElement;
 import xaero.map.gui.dropdown.rightclick.RightClickOption;
 import xaero.map.mods.gui.Waypoint;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screen.Screen;
 
 @Mixin(value = HoveredMapElementHolder.class, remap = false)
@@ -39,9 +39,9 @@ public abstract class HoveredMapElementHolderMixin {
             int minY = -64;
             int maxY = 319;
             String dim = "";
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc != null && mc.world != null && mc.world.getRegistryKey() != null) {
-                dim = mc.world.getRegistryKey().getValue().toString();
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null && mc.level != null && mc.level.dimension() != null) {
+                dim = mc.level.dimension().getValue().toString();
             }
 
             if (dim.equals("minecraft:the_nether") && (wy < minY || wy > 127)) {

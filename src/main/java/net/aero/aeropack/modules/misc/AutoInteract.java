@@ -65,17 +65,17 @@ public class AutoInteract extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         for (BlockPos blockPos : BlockPos.iterate(
-                mc.player.getBlockPos().add(-outerRange.get(), -outerRange.get(), -outerRange.get()),
-                mc.player.getBlockPos().add(outerRange.get(), outerRange.get(), outerRange.get())
+                mc.player.blockPosition().add(-outerRange.get(), -outerRange.get(), -outerRange.get()),
+                mc.player.blockPosition().add(outerRange.get(), outerRange.get(), outerRange.get())
         )) {
-            BlockState blockState = mc.world.getBlockState(blockPos);
+            BlockState blockState = mc.level.getBlockState(blockPos);
 
             if (blockState.getBlock() instanceof DoorBlock && blockState.get(DoorBlock.HALF) == DoubleBlockHalf.LOWER)
                 continue;
-            if (blockState.getBlock() instanceof DoorBlock && !DoorBlock.canOpenByHand(mc.world, blockPos))
+            if (blockState.getBlock() instanceof DoorBlock && !DoorBlock.canOpenByHand(mc.level, blockPos))
                 continue;
 
             if (blocks.get().contains(blockState.getBlock())) {

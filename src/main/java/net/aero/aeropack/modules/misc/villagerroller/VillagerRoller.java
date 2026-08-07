@@ -312,8 +312,8 @@ public class VillagerRoller extends Module {
             searchingEnchants.sort(Comparator.comparing(RollingEnchantment::getEnchantment));
         }
 
-        Optional<Registry<Enchantment>> reg = mc.world != null
-            ? mc.world.getRegistryManager().getOptional(RegistryKeys.ENCHANTMENT)
+        Optional<Registry<Enchantment>> reg = mc.level != null
+            ? mc.level.getRegistryManager().getOptional(RegistryKeys.ENCHANTMENT)
             : Optional.empty();
 
         for (int i = 0; i < searchingEnchants.size(); i++) {
@@ -412,8 +412,8 @@ public class VillagerRoller extends Module {
     }
 
     private List<RegistryEntry<Enchantment>> getEnchants(boolean onlyTradeable) {
-        if (mc.world == null) return Collections.emptyList();
-        Registry<Enchantment> reg = mc.world.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
+        if (mc.level == null) return Collections.emptyList();
+        Registry<Enchantment> reg = mc.level.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
         List<RegistryEntry<Enchantment>> available = new ArrayList<>();
         for (RegistryEntry<Enchantment> e : reg.streamEntries().toList()) {
             if (!onlyTradeable || e.isIn(EnchantmentTags.TRADEABLE)) available.add(e);
@@ -436,11 +436,11 @@ public class VillagerRoller extends Module {
             playerPos.distanceTo(villagerPos));
 
         if (entityHitResult == null) {
-            mc.interactionManager.interactEntity(mc.player, rollingVillager, Hand.MAIN_HAND);
+            mc.gameMode.interactEntity(mc.player, rollingVillager, Hand.MAIN_HAND);
         } else {
-            ActionResult result = mc.interactionManager.interactEntityAtLocation(mc.player, rollingVillager, entityHitResult, Hand.MAIN_HAND);
+            ActionResult result = mc.gameMode.interactEntityAtLocation(mc.player, rollingVillager, entityHitResult, Hand.MAIN_HAND);
             if (!result.isAccepted()) {
-                mc.interactionManager.interactEntity(mc.player, rollingVillager, Hand.MAIN_HAND);
+                mc.gameMode.interactEntity(mc.player, rollingVillager, Hand.MAIN_HAND);
             }
         }
         waitingForTradesTicks = 0;
@@ -473,7 +473,7 @@ public class VillagerRoller extends Module {
             if (sellItem.isOf(Items.ENCHANTED_BOOK) && sellItem.get(DataComponentTypes.STORED_ENCHANTMENTS) != null) {
                 for (Pair<RegistryEntry<Enchantment>, Integer> enchant : getEnchants(sellItem)) {
                     int enchantLevel = enchant.right();
-                    Registry<Enchantment> reg = mc.world.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
+                    Registry<Enchantment> reg = mc.level.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
                     String enchantIdString = enchant.left().getKey().map(k -> k.getValue().toString()).orElse("");
                     String enchantName = Names.get(enchant.left());
                     boolean found = false;
@@ -531,10 +531,10 @@ public class VillagerRoller extends Module {
     private void onStartBreakingBlock(StartBreakingBlockEvent event) {
         if (currentState == State.WAITING_FOR_TARGET_BLOCK) {
             rollingBlockPos = event.blockPos;
-            rollingBlock = mc.world.getBlockState(rollingBlockPos).getBlock();
+            rollingBlock = mc.level.getBlockState(rollingBlockPos).getBlock();
             currentState = State.WAITING_FOR_TARGET_VILLAGER;
             if (instantRebreak.get()) {
-                mc.getNetworkHandler().sendPacket(new net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket(
+                mc.getConnection().sendPacket(new net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket(
                     net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK,
                     rollingBlockPos, Direction.DOWN));
             }
@@ -551,10 +551,10 @@ public class VillagerRoller extends Module {
     }
 
     private ItemEntity findDroppedLectern() {
-        if (mc.world == null || mc.player == null) return null;
+        if (mc.level == null || mc.player == null) return null;
         double closestDist = 64.0;
         ItemEntity closest = null;
-        for (Entity entity : mc.world.getEntities()) {
+        for (Entity entity : mc.level.getEntities()) {
             if (entity instanceof ItemEntity itemEntity && itemEntity.getStack().isOf(Items.LECTERN)) {
                 double dist = mc.player.distanceTo(entity);
                 if (dist < closestDist) { closestDist = dist; closest = itemEntity; }
@@ -569,19 +569,19 @@ public class VillagerRoller extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         switch (currentState) {
             case ROLLING_BREAKING_BLOCK -> {
                 if (instantRebreak.get()) {
-                    mc.getNetworkHandler().sendPacket(new net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket(
+                    mc.getConnection().sendPacket(new net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket(
                         net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket.Action.START_DESTROY_BLOCK,
                         rollingBlockPos, Direction.DOWN));
-                    mc.getNetworkHandler().sendPacket(new net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket(
+                    mc.getConnection().sendPacket(new net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket(
                         net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket.Action.STOP_DESTROY_BLOCK,
                         rollingBlockPos, Direction.DOWN));
                 }
-                if (mc.world.getBlockState(rollingBlockPos).isOf(Blocks.AIR)) {
+                if (mc.level.getBlockState(rollingBlockPos).isOf(Blocks.AIR)) {
                     currentState = State.ROLLING_WAITING_FOR_VILLAGER_PROFESSION_CLEAR;
                     professionClearWaitTicks = 0;
                 } else if (!instantRebreak.get() && !BlockUtils.breakBlock(rollingBlockPos, true)) {
@@ -592,7 +592,7 @@ public class VillagerRoller extends Module {
             case ROLLING_WAITING_FOR_VILLAGER_PROFESSION_CLEAR -> {
                 professionClearWaitTicks++;
                 if (professionClearWaitTicks < 5) return;
-                if (mc.world.getBlockState(rollingBlockPos).isOf(Blocks.LECTERN)) {
+                if (mc.level.getBlockState(rollingBlockPos).isOf(Blocks.LECTERN)) {
                     if (cfDiscrepancy.get()) info("Block mining reverted?");
                     currentState = State.ROLLING_BREAKING_BLOCK;
                     return;
@@ -610,7 +610,7 @@ public class VillagerRoller extends Module {
                             currentState = State.RETRIEVING_LECTERN;
                             retrieveTicks = 0;
                             info("Lectern not in hotbar, pathfinding to pick it up...");
-                            pathfindToBlock(dropped.getBlockPos());
+                            pathfindToBlock(dropped.blockPosition());
                         } else {
                             placeFailed("Lectern not found in hotbar or nearby");
                         }
@@ -634,12 +634,12 @@ public class VillagerRoller extends Module {
                     currentState = State.ROLLING_BREAKING_BLOCK;
                     return;
                 }
-                if (mc.world.getBlockState(rollingBlockPos).isOf(Blocks.AIR)) {
+                if (mc.level.getBlockState(rollingBlockPos).isOf(Blocks.AIR)) {
                     if (cfDiscrepancy.get()) info("Lectern placement reverted by server");
                     currentState = State.ROLLING_PLACING_BLOCK;
                     return;
                 }
-                if (!mc.world.getBlockState(rollingBlockPos).isOf(Blocks.LECTERN)) {
+                if (!mc.level.getBlockState(rollingBlockPos).isOf(Blocks.LECTERN)) {
                     if (cfDiscrepancy.get()) info("Placed wrong block?!");
                     currentState = State.ROLLING_BREAKING_BLOCK;
                     return;
@@ -675,7 +675,7 @@ public class VillagerRoller extends Module {
                         placeFailed("Lost track of dropped lectern, giving up");
                         currentState = State.ROLLING_PLACING_BLOCK;
                     } else {
-                        pathfindToBlock(dropped.getBlockPos());
+                        pathfindToBlock(dropped.blockPosition());
                         retrieveTicks = 0;
                     }
                 }

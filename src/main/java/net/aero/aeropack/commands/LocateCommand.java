@@ -53,7 +53,7 @@ public class LocateCommand extends Command {
                     Cubiomes.StructureType feature = parseFeature(StringArgumentType.getString(ctx, "feature"));
                 if (mc.player == null) return SINGLE_SUCCESS;
 
-                BlockPos playerPos = mc.player.getBlockPos();
+                BlockPos playerPos = mc.player.blockPosition();
                 Seed seed = Seeds.get().getSeed();
                 if (seed == null) throw NOT_FOUND.create(feature);
 

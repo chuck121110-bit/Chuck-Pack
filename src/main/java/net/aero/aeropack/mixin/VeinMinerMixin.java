@@ -62,7 +62,7 @@ public abstract class VeinMinerMixin implements AeroShaderSource {
         aeropack$mesh.begin();
         for (Object obj : blocks) {
             BlockPos pos = ((VeinMinerMyBlockAccessor) obj).aeropack$getBlockPos();
-            BlockState state = mc.world.getBlockState(pos);
+            BlockState state = mc.level.getBlockState(pos);
             if (state.isAir()) continue;
 
             Color lc = lineColor.get();

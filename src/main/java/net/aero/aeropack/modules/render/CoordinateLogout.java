@@ -94,7 +94,7 @@ public class CoordinateLogout extends Module {
     @EventHandler
     private void onTick(meteordevelopment.meteorclient.events.world.TickEvent.Pre event) {
         if (disconnected) return;
-        if (mc.player == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.getConnection() == null) return;
 
         double dx = mc.player.getX() - targetX.get();
         double dy = mc.player.getY() - targetY.get();
@@ -187,7 +187,7 @@ public class CoordinateLogout extends Module {
         } catch (Exception ignored) {}
 
         try {
-            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
             if (mc.player != null && mc.player.networkHandler != null) {
                 mc.player.networkHandler.onDisconnect(new DisconnectS2CPacket(Text.literal(reason)));
             }

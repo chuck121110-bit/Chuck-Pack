@@ -296,7 +296,7 @@ public class AutoLogin extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         if (initialized) {
             loginStartTime = -1;
@@ -305,10 +305,10 @@ public class AutoLogin extends Module {
         }
 
         if (shouldContinueProcessing) {
-            if (loginStartTime == -1) loginStartTime = mc.world.getTime();
+            if (loginStartTime == -1) loginStartTime = mc.level.getTime();
             boolean hasRemainingAutoLogins = false;
             for (BaseAutoLogin autoLogin : List.copyOf(autoLogins)) {
-                if (mc.world.getTime() < loginStartTime + autoLogin.delay.get()) {
+                if (mc.level.getTime() < loginStartTime + autoLogin.delay.get()) {
                     hasRemainingAutoLogins = true;
                     continue;
                 }

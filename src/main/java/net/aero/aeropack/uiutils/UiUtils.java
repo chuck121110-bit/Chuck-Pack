@@ -1,13 +1,13 @@
 package net.aero.aeropack.uiutils;
 
 import java.util.function.Consumer;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.text.Text;
@@ -42,7 +42,7 @@ public final class UiUtils {
         return ROWS;
     }
 
-    public static int addUiWidgets(MinecraftClient mc, int x, int startY, int spacing,
+    public static int addUiWidgets(Minecraft mc, int x, int startY, int spacing,
                                    Consumer<ClickableWidget> addWidget) {
         int y = startY;
         int halfGap = 4;
@@ -86,8 +86,8 @@ public final class UiUtils {
             Text.literal("Disconnect & send packets"),
             b -> {
                 sendDelayedPackets();
-                if (mc.getNetworkHandler() != null)
-                    mc.getNetworkHandler().getConnection().disconnect(
+                if (mc.getConnection() != null)
+                    mc.getConnection().getConnection().disconnect(
                         Text.literal("Disconnecting (UI-UTILS)"));
                 UiUtils.chatIfEnabled("Disconnected and sent delayed packets");
             }).dimensions(x, y, BTN_WIDTH, BTN_HEIGHT).build());
@@ -106,7 +106,7 @@ public final class UiUtils {
             b -> {
                 if (mc.currentScreen != null) {
                     String title = mc.currentScreen.getTitle().getString();
-                    mc.keyboard.setClipboard(title);
+                    mc.keyboardHandler().setClipboard(title);
                     UiUtils.chatIfEnabled("Copied GUI title: " + title);
                 }
             }).dimensions(x, y, BTN_WIDTH, BTN_HEIGHT).build());
@@ -135,7 +135,7 @@ public final class UiUtils {
         addWidget.accept(ButtonWidget.builder(
             Text.literal("Resync Inv"),
             b -> {
-                if (mc.player != null && mc.getNetworkHandler() != null) {
+                if (mc.player != null && mc.getConnection() != null) {
                     mc.player.currentScreenHandler = mc.player.playerScreenHandler;
                     mc.setScreen(null);
                     UiUtils.chatIfEnabled("Resynced inventory");
@@ -145,8 +145,8 @@ public final class UiUtils {
         addWidget.accept(ButtonWidget.builder(
             Text.literal("Disconnect"),
             b -> {
-                if (mc.getNetworkHandler() != null) {
-                    mc.getNetworkHandler().getConnection().disconnect(
+                if (mc.getConnection() != null) {
+                    mc.getConnection().getConnection().disconnect(
                         Text.literal("Disconnecting (UI-UTILS)"));
                     UiUtils.chatIfEnabled("Disconnected");
                 }
@@ -234,7 +234,7 @@ public final class UiUtils {
         addWidget.accept(ButtonWidget.builder(
             Text.literal("How to Use"),
             b -> {
-                MinecraftClient.getInstance().setScreen(
+                Minecraft.getInstance().setScreen(
                     new net.aero.aeropack.gui.screens.UiUtilsDocumentationScreen(
                         meteordevelopment.meteorclient.gui.GuiThemes.get()));
             }).dimensions(x, y, BTN_WIDTH, BTN_HEIGHT).build());
@@ -243,7 +243,7 @@ public final class UiUtils {
         return y;
     }
 
-    public static TextFieldWidget createChatField(MinecraftClient mc, TextRenderer textRenderer,
+    public static TextFieldWidget createChatField(Minecraft mc, TextRenderer textRenderer,
                                                    int x, int y) {
         TextFieldWidget field = new TextFieldWidget(textRenderer, x, y, 200, 20, Text.literal("")) {
             @Override
@@ -264,17 +264,17 @@ public final class UiUtils {
         return field;
     }
 
-    public static void renderSyncInfo(MinecraftClient mc, DrawContext graphics,
+    public static void renderSyncInfo(Minecraft mc, DrawContext graphics,
                                       ScreenHandler screenHandler) {
         if (screenHandler == null) return;
-        TextRenderer textRenderer = mc.textRenderer;
+        TextRenderer textRenderer = mc.font;
         String info = "SyncID: " + screenHandler.syncId + " Rev: " + screenHandler.getRevision()
                 + " Slots: " + screenHandler.slots.size();
         graphics.drawTextWithShadow(textRenderer, info, 4, 4, 0xFFFFFF);
     }
 
     public static void chatIfEnabled(String message) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
             try {
                 var mod = meteordevelopment.meteorclient.systems.modules.Modules.get().get(
@@ -309,7 +309,7 @@ public final class UiUtils {
         }
     }
 
-    public static Runnable getFabricatePacketRunnable(MinecraftClient mc, boolean delay,
+    public static Runnable getFabricatePacketRunnable(Minecraft mc, boolean delay,
                                                      Packet<?> packet) {
         lastFabricatedPacket = packet;
         if (delay) {
@@ -318,14 +318,14 @@ public final class UiUtils {
             };
         } else {
             return () -> {
-                ClientPlayNetworkHandler handler = mc.getNetworkHandler();
+                ClientPacketListener handler = mc.getConnection();
                 if (handler != null) handler.sendPacket(packet);
             };
         }
     }
 
     private static void sendDelayedPackets() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         for (Packet<?> pkt : UiUtilsState.delayedUiPackets) {
             sendPacket(pkt);
         }
@@ -333,8 +333,8 @@ public final class UiUtils {
     }
 
     private static void sendPacket(Packet<?> packet) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        ClientPlayNetworkHandler handler = mc.getNetworkHandler();
+        Minecraft mc = Minecraft.getInstance();
+        ClientPacketListener handler = mc.getConnection();
         if (handler != null) handler.sendPacket(packet);
     }
 }

@@ -11,7 +11,7 @@ import meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmConnection
 import meteordevelopment.meteorclient.utils.entity.Target;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.meteorclient.utils.player.Rotations;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.mob.CreeperEntity;
@@ -144,9 +144,9 @@ public class SwarmGuard extends Module {
         this.lastFollowedHostName = null;
         this.inventoryTickCounter = 0;
         this.workerAlertStates.clear();
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            if (mc.getNetworkHandler() != null) {
+            if (mc.getConnection() != null) {
                 mc.player.networkHandler.sendChatMessage("#cancel");
             }
             if (PathManagers.get().isPathing()) {
@@ -158,10 +158,10 @@ public class SwarmGuard extends Module {
     // ── Host-side inventory management ────────────────────────────────────
 
     public static void sendInventoryCommandToAllWorkers(String cmd) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         Swarm swarm = Modules.get().get(Swarm.class);
         if (swarm == null || !swarm.isActive() || !swarm.isHost()) return;
-        if (mc.world == null) return;
+        if (mc.level == null) return;
 
         SwarmConnection[] conns = swarm.host.getConnections();
         for (SwarmConnection conn : conns) {
@@ -180,8 +180,8 @@ public class SwarmGuard extends Module {
         } catch (IOException ignored) {}
     }
 
-    public void hostTick(MinecraftClient mc) {
-        if (mc.player == null || mc.world == null) return;
+    public void hostTick(Minecraft mc) {
+        if (mc.player == null || mc.level == null) return;
 
         Swarm swarm = Modules.get().get(Swarm.class);
         if (swarm == null || !swarm.isActive() || !swarm.isHost()) return;
@@ -240,8 +240,8 @@ public class SwarmGuard extends Module {
 
     // ── Worker tick (guard AI) ────────────────────────────────────────────
 
-    public void tick(MinecraftClient mc) {
-        if (!active || mc.player == null || mc.world == null) return;
+    public void tick(Minecraft mc) {
+        if (!active || mc.player == null || mc.level == null) return;
 
         Swarm swarm = Modules.get().get(Swarm.class);
         if (swarm == null || !swarm.isActive() || !swarm.isWorker()) return;
@@ -283,11 +283,11 @@ public class SwarmGuard extends Module {
         }
     }
 
-    private Entity detectHostFightTarget(MinecraftClient mc, PlayerEntity host) {
+    private Entity detectHostFightTarget(Minecraft mc, PlayerEntity host) {
         Entity best = null;
         double closestDist = 4.0;
 
-        for (Entity entity : mc.world.getEntities()) {
+        for (Entity entity : mc.level.getEntities()) {
             if (entity == host || entity == mc.player) continue;
             if (!(entity instanceof LivingEntity living) || living.isDead() || !living.isAlive()) continue;
             if (living.hurtTime <= 0) continue;
@@ -306,7 +306,7 @@ public class SwarmGuard extends Module {
         return best;
     }
 
-    private void attackTarget(MinecraftClient mc, Entity target, PlayerEntity host) {
+    private void attackTarget(Minecraft mc, Entity target, PlayerEntity host) {
         if (target == host) return;
         if (PathManagers.get().isPathing() && tickCounter % 10 != 0) return;
 
@@ -318,17 +318,17 @@ public class SwarmGuard extends Module {
                     Rotations.getYaw(target),
                     Rotations.getPitch(target, Target.Body)
                 );
-                mc.interactionManager.attackEntity(mc.player, target);
+                mc.gameMode.attackEntity(mc.player, target);
                 mc.player.swingHand(Hand.MAIN_HAND);
             }
         } else {
             if (tickCounter % 10 == 0) {
-                PathManagers.get().moveTo(target.getBlockPos());
+                PathManagers.get().moveTo(target.blockPosition());
             }
         }
     }
 
-    private void detectAndSetRetaliation(MinecraftClient mc, PlayerEntity host) {
+    private void detectAndSetRetaliation(Minecraft mc, PlayerEntity host) {
         PlayerEntity attacker = detectAttacker(mc, mc.player);
         if (attacker != null && !Friends.get().isFriend(attacker) && attacker != host) {
             setRetaliationTarget(attacker);
@@ -341,14 +341,14 @@ public class SwarmGuard extends Module {
         }
     }
 
-    private PlayerEntity detectAttacker(MinecraftClient mc, PlayerEntity target) {
+    private PlayerEntity detectAttacker(Minecraft mc, PlayerEntity target) {
         if (target.hurtTime > 0) {
             LivingEntity lastAttacker = target.getAttacker();
             if (lastAttacker instanceof PlayerEntity player) return player;
 
             double closestDist = Double.MAX_VALUE;
             PlayerEntity closest = null;
-            for (PlayerEntity p : mc.world.getPlayers()) {
+            for (PlayerEntity p : mc.level.getPlayers()) {
                 if (p == target || p == mc.player) continue;
                 double dist = p.distanceTo(target);
                 if (dist < 3.5 && dist < closestDist) {
@@ -367,9 +367,9 @@ public class SwarmGuard extends Module {
     }
 
     public void applyRetaliation(String attackerName) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.world == null) return;
-        for (PlayerEntity p : mc.world.getPlayers()) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        for (PlayerEntity p : mc.level.getPlayers()) {
             if (p.getName().getString().equalsIgnoreCase(attackerName)) {
                 setRetaliationTarget(p);
                 return;
@@ -378,11 +378,11 @@ public class SwarmGuard extends Module {
         retaliationTicks = 0;
     }
 
-    private PlayerEntity findHost(MinecraftClient mc) {
+    private PlayerEntity findHost(Minecraft mc) {
         if (hostPlayerName == null || hostPlayerName.isEmpty()) return null;
         String safe = hostPlayerName.replaceAll("\u00a7.", "");
 
-        for (PlayerEntity player : mc.world.getPlayers()) {
+        for (PlayerEntity player : mc.level.getPlayers()) {
             if (player == mc.player) continue;
             if (player.getName().getString().replaceAll("\u00a7.", "").equalsIgnoreCase(safe)) return player;
         }
@@ -408,11 +408,11 @@ public class SwarmGuard extends Module {
         return base / Math.max(distFromHost, 0.5);
     }
 
-    private Entity findHighestThreat(MinecraftClient mc, PlayerEntity host) {
+    private Entity findHighestThreat(Minecraft mc, PlayerEntity host) {
         Entity best = null;
         double bestScore = Double.NEGATIVE_INFINITY;
 
-        for (Entity entity : mc.world.getEntities()) {
+        for (Entity entity : mc.level.getEntities()) {
             if (entity == mc.player) continue;
             if (entity == host) continue;
             if (!(entity instanceof LivingEntity living) || living.isDead() || !living.isAlive()) continue;
@@ -440,10 +440,10 @@ public class SwarmGuard extends Module {
 
     private String lastFollowedHostName = null;
 
-    private void followHost(MinecraftClient mc, PlayerEntity host) {
+    private void followHost(Minecraft mc, PlayerEntity host) {
         String hostName = host.getName().getString();
         if (!hostName.equals(lastFollowedHostName)) {
-            if (mc.player != null && mc.getNetworkHandler() != null) {
+            if (mc.player != null && mc.getConnection() != null) {
                 mc.player.networkHandler.sendChatMessage("#follow player " + hostName);
             }
             lastFollowedHostName = hostName;

@@ -111,7 +111,7 @@ public class PlayerTriangulate extends Module {
     }
 
     private void addOrUpdateWaypoint(UUID uuid, String playerName, double wx, double wz) {
-        if (!createWaypoints.get() || mc == null || mc.world == null || mc.getNetworkHandler() == null) return;
+        if (!createWaypoints.get() || mc == null || mc.level == null || mc.getConnection() == null) return;
 
         String wpName = playerName + " (Triangulated)";
 
@@ -135,7 +135,7 @@ public class PlayerTriangulate extends Module {
         Waypoint waypoint = new Waypoint.Builder()
                 .name(wpName)
                 .pos(newPos)
-                .dimension(PlayerUtils.getDimension())
+                .dimension(PlayerUtils.dimensionType())
                 .build();
 
         waypoints.add(waypoint);
@@ -145,8 +145,8 @@ public class PlayerTriangulate extends Module {
 
     @EventHandler
     private void onPreTick(TickEvent.Pre event) {
-        if (mc.getNetworkHandler() != null && mc.getNetworkHandler().getPlayerList() != null) {
-            for (PlayerListEntry entry : mc.getNetworkHandler().getPlayerList()) {
+        if (mc.getConnection() != null && mc.getConnection().getPlayerList() != null) {
+            for (PlayerListEntry entry : mc.getConnection().getPlayerList()) {
                 UUID uuid = entry.getProfile().id();
                 if (uuid != null) {
                     Text displayName = entry.getDisplayName();
@@ -159,7 +159,7 @@ public class PlayerTriangulate extends Module {
             }
         }
 
-        mc.getNetworkHandler().getWaypointHandler().forEachWaypoint(mc.player, waypoint -> {
+        mc.getConnection().getWaypointHandler().forEachWaypoint(mc.player, waypoint -> {
             UUID currentUuid = waypoint.getSource().left().orElse(null);
             if (currentUuid == null) return;
 

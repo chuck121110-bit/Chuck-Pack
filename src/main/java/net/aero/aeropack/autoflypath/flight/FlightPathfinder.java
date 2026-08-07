@@ -17,12 +17,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-import net.minecraft.client.world.ClientChunkManager;
+import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.BlockState;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.PalettedContainer;
 import net.minecraft.util.math.Vec3d;
@@ -48,7 +48,7 @@ public final class FlightPathfinder
 	private final ExecutorService executor;
 	private final ExecutorService packExecutor;
 	private volatile NetherBiomeRisk biomeRisk;
-	private volatile Supplier<ClientChunkManager> chunkSource;
+	private volatile Supplier<ClientChunkCache> chunkSource;
 
 	private static final double CONTINUE_PROBE = 24.0;
 	private static final double[][] CONTINUE_ROTS = {{1.0, 0.0}, {0.819, 0.574},
@@ -131,16 +131,16 @@ public final class FlightPathfinder
 		return this.grid;
 	}
 
-	public void setChunkSource(Supplier<ClientChunkManager> source)
+	public void setChunkSource(Supplier<ClientChunkCache> source)
 	{
 		this.chunkSource = source;
 	}
 
-	public void queueForPacking(WorldChunk chunkIn)
+	public void queueForPacking(LevelChunk chunkIn)
 	{
-		SoftReference<WorldChunk> ref = new SoftReference<WorldChunk>(chunkIn);
+		SoftReference<LevelChunk> ref = new SoftReference<LevelChunk>(chunkIn);
 		this.packExecutor.execute(() -> {
-			WorldChunk chunk = (WorldChunk)ref.get();
+			LevelChunk chunk = (LevelChunk)ref.get();
 			if(chunk != null)
 			{
 				this.packRealChunk(chunk);
@@ -163,7 +163,7 @@ public final class FlightPathfinder
 			Math.max(1, maxDistanceBlocks >> 4)));
 	}
 
-	private void packRealChunk(WorldChunk chunk)
+	private void packRealChunk(LevelChunk chunk)
 	{
 		try
 		{
@@ -171,7 +171,7 @@ public final class FlightPathfinder
 			long[] hazard = this.grid.newChunkBits();
 			int gridMinY = this.grid.minY();
 			int gridHeight = this.grid.height();
-			int chunkMinY = chunk.getBottomY();
+			int chunkMinY = chunk.getMinBuildHeight();
 			ChunkSection[] sections = chunk.getSectionArray();
 
 			for(int i = 0; i < sections.length; ++i)
@@ -229,7 +229,7 @@ public final class FlightPathfinder
 			this.noGoZones.add(zone.clone());
 	}
 
-	private void packRealChunkSync(WorldChunk chunk)
+	private void packRealChunkSync(LevelChunk chunk)
 	{
 		try
 		{
@@ -237,7 +237,7 @@ public final class FlightPathfinder
 			long[] hazard = this.grid.newChunkBits();
 			int gridMinY = this.grid.minY();
 			int gridHeight = this.grid.height();
-			int chunkMinY = chunk.getBottomY();
+			int chunkMinY = chunk.getMinBuildHeight();
 			ChunkSection[] sections = chunk.getSectionArray();
 
 			for(int i = 0; i < sections.length; ++i)
@@ -291,17 +291,17 @@ public final class FlightPathfinder
 		BlockPos dst)
 	{
 		return CompletableFuture.supplyAsync(() -> {
-			Supplier<ClientChunkManager> chunkSrc = this.chunkSource;
+			Supplier<ClientChunkCache> chunkSrc = this.chunkSource;
 			LazyThetaStar.ChunkEnsurer ensurer =
 				this.generator == null ? null : (cx, cz) -> {
 					if(!this.grid.hasChunk(cx, cz))
 					{
 						if(chunkSrc != null)
 						{
-							ClientChunkManager mgr = chunkSrc.get();
+							ClientChunkCache mgr = chunkSrc.get();
 							if(mgr != null)
 							{
-								WorldChunk chunk = (WorldChunk)mgr.getChunk(cx, cz);
+								LevelChunk chunk = (LevelChunk)mgr.getChunk(cx, cz);
 								if(chunk != null && !chunk.isEmpty())
 								{
 									this.packRealChunkSync(chunk);

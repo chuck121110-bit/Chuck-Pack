@@ -34,22 +34,22 @@ public class AntiSocial extends Module {
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (disconnected) return;
-        if (mc.player == null || mc.getNetworkHandler() == null) return;
+        if (mc.player == null || mc.getConnection() == null) return;
 
         String myName = mc.player.getName().getString();
         double px = mc.player.getX();
         double py = mc.player.getY();
         double pz = mc.player.getZ();
 
-        Collection<PlayerListEntry> players = mc.getNetworkHandler().getPlayerList();
+        Collection<PlayerListEntry> players = mc.getConnection().getPlayerList();
         if (players == null) return;
 
         for (PlayerListEntry entry : players) {
             String name = entry.getProfile().name();
             if (name.equals(myName)) continue;
 
-            if (mc.world != null) {
-                for (PlayerEntity player : mc.world.getPlayers()) {
+            if (mc.level != null) {
+                for (PlayerEntity player : mc.level.getPlayers()) {
                     if (player.getName().getString().equals(name)) {
                         if (Friends.get().isFriend(player)) break;
 

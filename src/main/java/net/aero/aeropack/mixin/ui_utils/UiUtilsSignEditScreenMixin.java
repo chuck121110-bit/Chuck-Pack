@@ -1,6 +1,6 @@
 package net.aero.aeropack.mixin.ui_utils;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.AbstractSignEditScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -24,7 +24,7 @@ public abstract class UiUtilsSignEditScreenMixin extends Screen {
         if (!UiUtilsState.isUiEnabled())
             return;
 
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         int spacing = 4;
         int buttonHeight = 20;
         int totalHeight = buttonHeight * 2 + spacing;
@@ -38,8 +38,8 @@ public abstract class UiUtilsSignEditScreenMixin extends Screen {
 
         addDrawableChild(
             ButtonWidget.builder(Text.literal("Disconnect"), b -> {
-                if (mc.getNetworkHandler() != null)
-                    mc.getNetworkHandler().getConnection().disconnect(
+                if (mc.getConnection() != null)
+                    mc.getConnection().getConnection().disconnect(
                         Text.literal("Disconnecting (UI-UTILS)"));
             }).dimensions(baseX, startY + buttonHeight + spacing, 115, 20).build());
     }

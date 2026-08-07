@@ -100,10 +100,10 @@ public class JumpFlight extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         if (!targetYInitialized) {
-            targetYLevel = mc.player.getBlockPos().getY();
+            targetYLevel = mc.player.blockPosition().getY();
             targetYInitialized = true;
         }
 
@@ -123,7 +123,7 @@ public class JumpFlight extends Module {
             }
         }
 
-        if (mc.player.getBlockPos().getY() <= targetYLevel) {
+        if (mc.player.blockPosition().getY() <= targetYLevel) {
             mc.player.jump();
         }
     }

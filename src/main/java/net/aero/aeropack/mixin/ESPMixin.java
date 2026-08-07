@@ -1,6 +1,6 @@
 package net.aero.aeropack.mixin;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.util.math.Box;
@@ -16,7 +16,7 @@ public abstract class ESPMixin {
 
     @Inject(method = "shouldSkip(Lnet/minecraft/entity/Entity;)Z", at = @At("HEAD"), cancellable = true)
     private void aeropack$frustumCullEntity(Entity entity, CallbackInfoReturnable<Boolean> cir) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         Entity camera = mc.getCameraEntity();
         if (camera == null) return;
 
@@ -34,8 +34,8 @@ public abstract class ESPMixin {
         double dy = nearestY - camY;
         double dz = nearestZ - camZ;
 
-        double yaw = Math.toRadians(camera.getYaw());
-        double pitch = Math.toRadians(camera.getPitch());
+        double yaw = Math.toRadians(camera.getYRot());
+        double pitch = Math.toRadians(camera.getXRot());
 
         double forwardX = -Math.sin(yaw) * Math.cos(pitch);
         double forwardY = -Math.sin(pitch);

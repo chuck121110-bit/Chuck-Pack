@@ -11,7 +11,7 @@ import meteordevelopment.meteorclient.utils.world.Dimension;
 import net.aero.aeropack.mixin.CountPlacementModifierAccessor;
 import net.aero.aeropack.mixin.HeightRangePlacementModifierAccessor;
 import net.aero.aeropack.mixin.RarityFilterPlacementModifierAccessor;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.registry.BuiltinRegistries;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
@@ -110,9 +110,9 @@ public class Ore {
         var biomes = new ArrayList<>(dimensionOptions.chunkGenerator().getBiomeSource().getBiomes());
 
         HeightContext heightContext;
-        if (MinecraftClient.getInstance().world != null) {
-            int bottom = MinecraftClient.getInstance().world.getBottomY();
-            int logical = MinecraftClient.getInstance().world.getDimension().logicalHeight();
+        if (Minecraft.getInstance().level != null) {
+            int bottom = Minecraft.getInstance().level.getMinBuildHeight();
+            int logical = Minecraft.getInstance().level.dimensionType().logicalHeight();
             heightContext = new HeightContext(dimensionOptions.chunkGenerator(), HeightLimitView.create(bottom, logical));
         } else {
             heightContext = new HeightContext(dimensionOptions.chunkGenerator(), HeightLimitView.create(-64, 384));

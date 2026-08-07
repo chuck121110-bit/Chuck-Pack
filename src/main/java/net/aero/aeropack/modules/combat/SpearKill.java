@@ -311,7 +311,7 @@ public class SpearKill extends Module {
 
     @EventHandler
     private void onPreTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         currentlyCharging = isUsingSpear();
 
@@ -391,14 +391,14 @@ public class SpearKill extends Module {
 
     @EventHandler
     private void onRender(Render3DEvent event) {
-        if (mc.player == null || mc.world == null) return;
+        if (mc.player == null || mc.level == null) return;
 
         if (mode.get() == Mode.Lunge) {
             if (currentlyCharging) {
                 if (killTarget == null) killTarget = target();
                 if (killTarget != null && !killTarget.isAlive()) {
                     if (stopOnTarget.get()) {
-                        mc.player.setVelocity(0, 0, 0);
+                        mc.player.setDeltaMovement(0, 0, 0);
                         mc.player.setSprinting(false);
                     }
                     killTarget = null;
@@ -423,17 +423,17 @@ public class SpearKill extends Module {
         if (currentlyCharging && blinkLunge.get() && killTarget != null && flushCooldown == 0) {
             if (blinkChargeTicks >= blinkLungeTicks.get()) {
                 rotateToTarget(killTarget);
-                Vec3d viewDir = Vec3d.fromPolar(mc.player.getPitch(), mc.player.getYaw());
+                Vec3d viewDir = Vec3d.fromPolar(mc.player.getXRot(), mc.player.getYRot());
                 mc.player.setSprinting(true);
-                mc.player.setVelocity(viewDir.multiply(blinkLungeStrength.get()));
+                mc.player.setDeltaMovement(viewDir.multiply(blinkLungeStrength.get()));
             }
         }
     }
 
     private void doLunge() {
-        int readyTicks = mc.player.getActiveHand() == Hand.MAIN_HAND
-            ? getReadyTicks(mc.player.getMainHandStack().getItem())
-            : getReadyTicks(mc.player.getOffHandStack().getItem());
+        int readyTicks = mc.player.getUseItemHand() == Hand.MAIN_HAND
+            ? getReadyTicks(mc.player.getMainItemStack().getItem())
+            : getReadyTicks(mc.player.getOffhandItem().getItem());
 
         rotateToTarget(killTarget);
 
@@ -445,7 +445,7 @@ public class SpearKill extends Module {
             if (atTarget) {
                 if (stopOnTarget.get()) {
                     killTarget = null;
-                    mc.player.setVelocity(0, 0, 0);
+                    mc.player.setDeltaMovement(0, 0, 0);
                     mc.player.setSprinting(false);
                 }
                 firstPhase = false;
@@ -462,7 +462,7 @@ public class SpearKill extends Module {
                 case DirectionBased -> {
                     viewDir = killTarget.getBoundingBox().getCenter().subtract(mc.player.getEntityPos()).normalize();
                     mc.player.setSprinting(true);
-                    mc.player.setVelocity(viewDir.multiply(speed));
+                    mc.player.setDeltaMovement(viewDir.multiply(speed));
                 }
                 case FromAbove -> {
                     if (!firstPhase || aboveTargetPos == null) {
@@ -479,7 +479,7 @@ public class SpearKill extends Module {
                         viewDir = aboveTargetPos.subtract(pp).normalize();
                     }
                     mc.player.setSprinting(true);
-                    mc.player.setVelocity(viewDir.multiply(speed));
+                    mc.player.setDeltaMovement(viewDir.multiply(speed));
                 }
                 case Auto_FromAboveFirst -> {
                     if (!firstPhase || aboveTargetPos == null) {
@@ -500,14 +500,14 @@ public class SpearKill extends Module {
                         viewDir = aboveTargetPos.subtract(pp).normalize();
                     }
                     mc.player.setSprinting(true);
-                    mc.player.setVelocity(viewDir.multiply(speed));
+                    mc.player.setDeltaMovement(viewDir.multiply(speed));
                 }
             }
         }
     }
 
     private boolean isAbovePathValid(Vec3d abovePos, Entity target) {
-        if (mc.world == null || abovePos == null) return false;
+        if (mc.level == null || abovePos == null) return false;
         Vec3d targetCenter = target.getBoundingBox().getCenter();
 
         if (isInvalid(abovePos)) return false;
@@ -537,12 +537,12 @@ public class SpearKill extends Module {
     private final Map<Vec3d, Boolean> positionCache = new HashMap<>();
 
     private boolean isInvalid(Vec3d pos) {
-        if (mc.world == null) return true;
-        double clampedY = MathHelper.clamp(pos.y, mc.world.getBottomY(), mc.world.getTopYInclusive() - 1);
+        if (mc.level == null) return true;
+        double clampedY = MathHelper.clamp(pos.y, mc.level.getMinBuildHeight(), mc.level.getMaxBuildHeight() - 1);
         if (clampedY != pos.y) return true;
 
         BlockPos floored = BlockPos.ofFloored(pos);
-        if (mc.world.getChunk(floored.getX() >> 4, floored.getZ() >> 4) == null) return true;
+        if (mc.level.getChunk(floored.getX() >> 4, floored.getZ() >> 4) == null) return true;
         if (positionCache.containsKey(pos)) return positionCache.get(pos);
 
         Entity entity = mc.player;
@@ -556,7 +556,7 @@ public class SpearKill extends Module {
                 mutablePos.setY(floored.getY() + y);
                 for (int z = -1; z <= 1; z++) {
                     mutablePos.setZ(floored.getZ() + z);
-                    BlockState state = mc.world.getBlockState(mutablePos);
+                    BlockState state = mc.level.getBlockState(mutablePos);
                     if (state.isOf(Blocks.LAVA) || state.isOf(Blocks.FIRE) || state.isOf(Blocks.SOUL_FIRE)
                         || state.isOf(Blocks.MAGMA_BLOCK) || state.isOf(Blocks.CAMPFIRE)
                         || state.isOf(Blocks.SWEET_BERRY_BUSH) || state.isOf(Blocks.POWDER_SNOW)) {
@@ -567,14 +567,14 @@ public class SpearKill extends Module {
             }
         }
 
-        for (Entity e : mc.world.getOtherEntities(entity, box)) {
+        for (Entity e : mc.level.getOtherEntities(entity, box)) {
             if (e.isCollidable(entity)) {
                 positionCache.put(pos, true);
                 return true;
             }
         }
 
-        boolean collides = mc.world.getBlockCollisions(entity, box).iterator().hasNext();
+        boolean collides = mc.level.getBlockCollisions(entity, box).iterator().hasNext();
         positionCache.put(pos, collides);
         return collides;
     }
@@ -602,9 +602,9 @@ public class SpearKill extends Module {
         Vec3d toTarget = targetPos.subtract(playerPos).normalize();
         float yaw = (float) (Math.toDegrees(Math.atan2(toTarget.z, toTarget.x)) - 90.0);
         float pitch = (float) -Math.toDegrees(Math.asin(toTarget.y));
-        mc.player.setYaw(yaw);
+        mc.player.setYRot(yaw);
         mc.player.setHeadYaw(yaw);
-        mc.player.setPitch(pitch);
+        mc.player.setXRot(pitch);
     }
 
     @EventHandler
@@ -625,7 +625,7 @@ public class SpearKill extends Module {
 
     @EventHandler
     private void onReceivePacket(PacketEvent.Receive event) {
-        if (mc.world == null) return;
+        if (mc.level == null) return;
         if (!(event.packet instanceof PlayerPositionLookS2CPacket)) return;
         if (mode.get() == Mode.Blink && isBlinking) {
             synchronized (packets) { packets.clear(); }
@@ -657,8 +657,8 @@ public class SpearKill extends Module {
 
     private boolean isSamePacket(PlayerMoveC2SPacket a, PlayerMoveC2SPacket b) {
         return a.isOnGround() == b.isOnGround()
-            && a.getYaw(-1) == b.getYaw(-1)
-            && a.getPitch(-1) == b.getPitch(-1)
+            && a.getYRot(-1) == b.getYRot(-1)
+            && a.getXRot(-1) == b.getXRot(-1)
             && a.getX(-1) == b.getX(-1)
             && a.getY(-1) == b.getY(-1)
             && a.getZ(-1) == b.getZ(-1);
@@ -684,7 +684,7 @@ public class SpearKill extends Module {
                 Vec3d horizontalDir = new Vec3d(direction.x, 0, direction.z).normalize();
                 if (horizontalDir.length() > 0.01) {
                     Vec3d targetPos = startPos.subtract(horizontalDir.multiply(boost));
-                    HitResult hit = mc.world.raycast(new RaycastContext(
+                    HitResult hit = mc.level.raycast(new RaycastContext(
                         startPos, targetPos,
                         RaycastContext.ShapeType.COLLIDER,
                         RaycastContext.FluidHandling.NONE,
@@ -700,12 +700,12 @@ public class SpearKill extends Module {
             if (sendStartPos != null) {
                 mc.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.Full(
                     sendStartPos.x, sendStartPos.y, sendStartPos.z,
-                    mc.player.getYaw(), mc.player.getPitch(), false, false));
+                    mc.player.getYRot(), mc.player.getXRot(), false, false));
             }
 
             mc.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.Full(
                 currentPos.x, currentPos.y, currentPos.z,
-                mc.player.getYaw(), mc.player.getPitch(),
+                mc.player.getYRot(), mc.player.getXRot(),
                 mc.player.isOnGround(), mc.player.horizontalCollision));
 
             packets.clear();
@@ -714,19 +714,19 @@ public class SpearKill extends Module {
     }
 
     private Entity target() {
-        if (mc.player == null || mc.world == null) return null;
+        if (mc.player == null || mc.level == null) return null;
         if (mc.crosshairTarget instanceof EntityHitResult hit) {
             if (isValidTarget(hit.getEntity())) return hit.getEntity();
         }
         double range = maxRange.get();
         Vec3d eyePos = mc.player.getEyePos();
         Vec3d lookVec = mc.player.getRotationVec(1.0f);
-        HitResult blockHit = mc.world.raycast(new RaycastContext(eyePos,
+        HitResult blockHit = mc.level.raycast(new RaycastContext(eyePos,
             eyePos.add(lookVec.multiply(range)), RaycastContext.ShapeType.COLLIDER,
             RaycastContext.FluidHandling.NONE, mc.player));
         double rayLength = blockHit.getType() == HitResult.Type.MISS ? range :
             eyePos.distanceTo(blockHit.getPos());
-        List<Entity> candidates = mc.world.getOtherEntities(mc.player,
+        List<Entity> candidates = mc.level.getOtherEntities(mc.player,
             mc.player.getBoundingBox().stretch(lookVec.multiply(rayLength)),
             e -> e instanceof LivingEntity && e.isAlive() && e != mc.player);
         candidates.sort(Comparator.comparingDouble(e -> eyePos.squaredDistanceTo(e.getBoundingBox().getCenter())));
@@ -741,10 +741,10 @@ public class SpearKill extends Module {
     }
 
     private boolean canSeeTarget(Entity target) {
-        if (mc.player == null || mc.world == null) return false;
+        if (mc.player == null || mc.level == null) return false;
         Vec3d eyePos = mc.player.getEyePos();
         Vec3d targetCenter = target.getBoundingBox().getCenter();
-        HitResult result = mc.world.raycast(new RaycastContext(
+        HitResult result = mc.level.raycast(new RaycastContext(
             eyePos, targetCenter,
             RaycastContext.ShapeType.COLLIDER,
             RaycastContext.FluidHandling.NONE, mc.player));

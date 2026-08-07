@@ -97,7 +97,7 @@ public abstract class BlockESPMixin implements AeroShaderSource {
                     }
 
                     BlockPos pos = new BlockPos(bx, by, bz);
-                    BlockState state = mc.world.getBlockState(pos);
+                    BlockState state = mc.level.getBlockState(pos);
                     if (state.isAir()) continue;
 
                     ESPBlockData blockData = blockConfigs.get().get(state.getBlock());

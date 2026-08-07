@@ -38,7 +38,7 @@
     "CountPlacementModifierAccessor",
     "HeightRangePlacementModifierAccessor",
     "RarityFilterPlacementModifierAccessor",
-    "ClientPlayerEntityAccessor",
+    "LocalPlayerAccessor",
     "PlayerMoveC2SPacketAccessor",
     "NoRotateMixin",
     "KillAuraMixin"

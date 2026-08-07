@@ -13,5 +13,5 @@
   "accessWidener": "aeropack.accesswidener",
   "mixins": ["aeropack.mixins.json"],
   "custom": { "meteor-client:color": "0,200,160" },
-  "depends": { "java": ">=21", "minecraft": ">=${mc_version}", "meteor-client": "*", "xaeroworldmap": "*" }
+  "depends": { "java": ">=21", "minecraft": ">=26.1", "meteor-client": "*" }
 }

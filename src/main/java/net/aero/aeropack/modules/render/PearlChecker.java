@@ -140,11 +140,11 @@ public class PearlChecker extends Module {
 
     @EventHandler
     private void onRender2D(Render2DEvent event) {
-        if (mc.world == null) return;
+        if (mc.level == null) return;
 
         TextRenderer text = TextRenderer.get();
 
-        for (Entity e : mc.world.getEntities()) {
+        for (Entity e : mc.level.getEntities()) {
             if (!(e instanceof EnderPearlEntity pearl)) continue;
 
             Entity owner = pearl.getOwner();
@@ -188,23 +188,23 @@ public class PearlChecker extends Module {
 
     @EventHandler
     private void onEntityAdded(EntityAddedEvent event) {
-        if (!isActive() || mc.world == null) return;
+        if (!isActive() || mc.level == null) return;
         if (!(event.entity instanceof EnderPearlEntity pearl)) return;
 
-        pearlStartPos.putIfAbsent(pearl.getUuid(), pearl.getEntityPos());
+        pearlStartPos.putIfAbsent(pearl.getUUID(), pearl.getEntityPos());
 
         Entity owner = pearl.getOwner();
         if (!(owner instanceof PlayerEntity player)) return;
         if (notifyIgnoreSelf.get() && player == mc.player) return;
 
-        if (notify.get() && !announcedThrown.contains(pearl.getUuid())) {
+        if (notify.get() && !announcedThrown.contains(pearl.getUUID())) {
             String name = player.getGameProfile().name();
             ChatUtils.info("(highlight)%s(default) threw a pearl at (highlight)%d, %d, %d(default) ~%.1fm away from you.",
                 name,
-                pearl.getBlockPos().getX(), pearl.getBlockPos().getY(), pearl.getBlockPos().getZ(),
+                pearl.blockPosition().getX(), pearl.blockPosition().getY(), pearl.blockPosition().getZ(),
                 PlayerUtils.distanceTo(pearl)
             );
-            announcedThrown.add(pearl.getUuid());
+            announcedThrown.add(pearl.getUUID());
         }
     }
 
@@ -212,7 +212,7 @@ public class PearlChecker extends Module {
     private void onEntityRemoved(EntityRemovedEvent event) {
         if (!(event.entity instanceof EnderPearlEntity pearl)) return;
 
-        if (isActive() && notifyLand.get() && announcedThrown.contains(pearl.getUuid())) {
+        if (isActive() && notifyLand.get() && announcedThrown.contains(pearl.getUUID())) {
             Entity owner = pearl.getOwner();
             String ownerName = null;
             if (owner instanceof PlayerEntity p) ownerName = p.getGameProfile().name();
@@ -223,19 +223,19 @@ public class PearlChecker extends Module {
 
             if (ownerName != null) {
                 double fromDist = PlayerUtils.distanceTo(pearl);
-                Vec3d start = pearlStartPos.get(pearl.getUuid());
+                Vec3d start = pearlStartPos.get(pearl.getUUID());
                 if (start != null) {
                     double travelled = start.distanceTo(pearl.getEntityPos());
                     ChatUtils.info("(highlight)%s's(default) pearl landed at (highlight)%d, %d, %d(default) ~%.1fm away, travelled (highlight)%.1fm(default).",
                         ownerName,
-                        pearl.getBlockPos().getX(), pearl.getBlockPos().getY(), pearl.getBlockPos().getZ(),
+                        pearl.blockPosition().getX(), pearl.blockPosition().getY(), pearl.blockPosition().getZ(),
                         fromDist,
                         travelled
                     );
                 } else {
                     ChatUtils.info("(highlight)%s's(default) pearl landed at (highlight)%d, %d, %d(default) ~%.1fm away.",
                         ownerName,
-                        pearl.getBlockPos().getX(), pearl.getBlockPos().getY(), pearl.getBlockPos().getZ(),
+                        pearl.blockPosition().getX(), pearl.blockPosition().getY(), pearl.blockPosition().getZ(),
                         fromDist
                     );
                 }
@@ -247,11 +247,11 @@ public class PearlChecker extends Module {
 
     @EventHandler
     private void onRender3D(Render3DEvent event) {
-        if (!predictLanding.get() || mc.world == null) return;
+        if (!predictLanding.get() || mc.level == null) return;
 
         Color color = new Color(predictColor.get());
 
-        for (Entity e : mc.world.getEntities()) {
+        for (Entity e : mc.level.getEntities()) {
             if (!(e instanceof EnderPearlEntity pearl)) continue;
 
             if (!simulator.set(pearl)) continue;
@@ -277,7 +277,7 @@ public class PearlChecker extends Module {
 
             event.renderer.box(box, new Color(color.r, color.g, color.b, Math.max(25, color.a / 4)), color, meteordevelopment.meteorclient.renderer.ShapeMode.Both, 0);
 
-            if (notifyPredict.get() && announcedThrown.contains(pearl.getUuid()) && !predictedAnnounced.contains(pearl.getUuid())) {
+            if (notifyPredict.get() && announcedThrown.contains(pearl.getUUID()) && !predictedAnnounced.contains(pearl.getUUID())) {
                 Entity owner = pearl.getOwner();
                 String ownerName = null;
                 if (owner instanceof PlayerEntity p) ownerName = p.getGameProfile().name();
@@ -295,7 +295,7 @@ public class PearlChecker extends Module {
                             (int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z),
                             dist
                         );
-                        predictedAnnounced.add(pearl.getUuid());
+                        predictedAnnounced.add(pearl.getUUID());
                     }
                 }
             }
