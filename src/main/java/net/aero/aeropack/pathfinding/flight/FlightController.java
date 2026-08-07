@@ -1257,7 +1257,7 @@ public final class FlightController
 			{
 				Vec3 off = d.scale(mag);
 				if(!this.level().noBlockCollision((Entity)this.player(),
-					box.move(off.x, off.y, off.z)))
+					AABB.move(off.x, off.y, off.z)))
 					continue;
 				this.player().setPos(playerPos.x + off.x, playerPos.y + off.y,
 					playerPos.z + off.z);
@@ -1998,7 +1998,7 @@ public final class FlightController
 		for(double d = 0.1; d <= probe; d += 0.1)
 		{
 			Vec3 off = dir.scale(d);
-			AABB moved = box.move(off.x, off.y, off.z).inflate(0.05);
+			AABB moved = AABB.move(off.x, off.y, off.z).inflate(0.05);
 			if(this.level().noBlockCollision((Entity)this.player(), moved)
 				&& !this.boxIntersectsBurnHazard(moved.inflate(0.05)))
 				continue;
@@ -2013,12 +2013,12 @@ public final class FlightController
 		{
 			return false;
 		}
-		int minX = (int)Math.floor(box.minX);
-		int maxX = (int)Math.floor(box.maxX);
-		int minY = (int)Math.floor(box.minY);
-		int maxY = (int)Math.floor(box.maxY);
-		int minZ = (int)Math.floor(box.minZ);
-		int maxZ = (int)Math.floor(box.maxZ);
+		int minX = (int)Math.floor(AABB.minX);
+		int maxX = (int)Math.floor(AABB.maxX);
+		int minY = (int)Math.floor(AABB.minY);
+		int maxY = (int)Math.floor(AABB.maxY);
+		int minZ = (int)Math.floor(AABB.minZ);
+		int maxZ = (int)Math.floor(AABB.maxZ);
 		for(int x = minX; x <= maxX; ++x)
 		{
 			for(int y = minY; y <= maxY; ++y)

@@ -2,6 +2,7 @@ package net.aero.aeropack.util;
 
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.component.DataComponents;
 
 import java.util.Set;
 
@@ -118,8 +119,8 @@ public class SwarmDropHelper {
     // ── Armor ─────────────────────────────────────────────────────────────
 
     public static boolean isArmor(ItemStack stack) {
-        if (!stack.contains(net.minecraft.component.DataComponents.EQUIPPABLE)) return false;
-        net.minecraft.component.type.EquippableComponent equip = stack.get(net.minecraft.component.DataComponents.EQUIPPABLE);
+        if (!stack.has(DataComponents.EQUIPPABLE)) return false;
+        var equip = stack.get(DataComponents.EQUIPPABLE);
         net.minecraft.world.entity.EquipmentSlot slot = equip.slot();
         return slot == net.minecraft.world.entity.EquipmentSlot.HEAD
             || slot == net.minecraft.world.entity.EquipmentSlot.CHEST
@@ -130,7 +131,7 @@ public class SwarmDropHelper {
     // ── Tools & weapons ───────────────────────────────────────────────────
 
     public static boolean isTool(ItemStack stack) {
-        if (stack.contains(net.minecraft.component.DataComponents.TOOL)) return true;
+        if (stack.has(DataComponents.TOOL)) return true;
         Item item = stack.getItem();
         return item == net.minecraft.world.item.Items.BOW
             || item == net.minecraft.world.item.Items.CROSSBOW
@@ -141,13 +142,13 @@ public class SwarmDropHelper {
     // ── Food ──────────────────────────────────────────────────────────────
 
     public static boolean isFood(ItemStack stack) {
-        return stack.contains(net.minecraft.component.DataComponents.FOOD);
+        return stack.has(DataComponents.FOOD);
     }
 
     // ── Enchanted items ───────────────────────────────────────────────────
 
     public static boolean isEnchanted(ItemStack stack) {
-        if (stack.hasEnchantments()) return true;
+        if (stack.isEnchanted()) return true;
         if (stack.getItem() == net.minecraft.world.item.Items.ENCHANTED_BOOK) return true;
         return false;
     }
@@ -178,9 +179,9 @@ public class SwarmDropHelper {
 
     public static void dropByType(String type) {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-        if (mc.player == null || mc.GameType == null) return;
+        if (mc.player == null || mc.gameMode == null) return;
 
-        if (mc.currentScreen != null) {
+        if (mc.screen != null) {
             mc.player.closeContainer();
             mc.setScreen(null);
         }
@@ -190,53 +191,45 @@ public class SwarmDropHelper {
 
         switch (type) {
             case "all" -> {
-                for (int i = 0; i < inv.size(); i++) {
-                    if (inv.getStack(i).isEmpty()) continue;
-                    int slotId = invToScreenSlot(i);
-                    if (slotId < 0) continue;
-                    mc.GameType.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
-                        net.minecraft.world.inventory.ClickAction.THROW, mc.player);
+                for (int i = inv.getContainerSize() - 1; i >= 0; i--) {
+                    ItemStack stack = inv.getItem(i);
+                    if (stack.isEmpty()) continue;
+                    mc.player.drop(inv.removeItem(i, stack.getCount()), false);
                     dropped++;
                 }
             }
             case "junk" -> {
-                for (int i = 0; i < 36; i++) {
-                    ItemStack stack = inv.getStack(i);
+                for (int i = inv.getContainerSize() - 1; i >= 0; i--) {
+                    ItemStack stack = inv.getItem(i);
                     if (stack.isEmpty()) continue;
                     if (!isJunk(stack)) continue;
-                    int slotId = i < 9 ? i + 36 : i;
-                    mc.GameType.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
-                        net.minecraft.world.inventory.ClickAction.THROW, mc.player);
+                    mc.player.drop(inv.removeItem(i, stack.getCount()), false);
                     dropped++;
                 }
             }
             case "ores" -> {
-                for (int i = 0; i < 36; i++) {
-                    ItemStack stack = inv.getStack(i);
+                for (int i = inv.getContainerSize() - 1; i >= 0; i--) {
+                    ItemStack stack = inv.getItem(i);
                     if (stack.isEmpty()) continue;
                     if (!isOre(stack)) continue;
-                    int slotId = i < 9 ? i + 36 : i;
-                    mc.GameType.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
-                        net.minecraft.world.inventory.ClickAction.THROW, mc.player);
+                    mc.player.drop(inv.removeItem(i, stack.getCount()), false);
                     dropped++;
                 }
             }
             case "hotbar" -> {
                 for (int i = 0; i < 9; i++) {
-                    if (inv.getStack(i).isEmpty()) continue;
-                    mc.GameType.clickSlot(mc.player.currentScreenHandler.syncId, i + 36, 1,
-                        net.minecraft.world.inventory.ClickAction.THROW, mc.player);
+                    ItemStack stack = inv.getItem(i);
+                    if (stack.isEmpty()) continue;
+                    mc.player.drop(inv.removeItem(i, stack.getCount()), false);
                     dropped++;
                 }
             }
             case "valuables" -> {
-                for (int i = 0; i < 36; i++) {
-                    ItemStack stack = inv.getStack(i);
+                for (int i = inv.getContainerSize() - 1; i >= 0; i--) {
+                    ItemStack stack = inv.getItem(i);
                     if (stack.isEmpty()) continue;
                     if (!isValuable(stack)) continue;
-                    int slotId = i < 9 ? i + 36 : i;
-                    mc.GameType.clickSlot(mc.player.currentScreenHandler.syncId, slotId, 1,
-                        net.minecraft.world.inventory.ClickAction.THROW, mc.player);
+                    mc.player.drop(inv.removeItem(i, stack.getCount()), false);
                     dropped++;
                 }
             }

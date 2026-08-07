@@ -31,6 +31,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 import java.util.*;
@@ -107,11 +108,11 @@ public class OreSim extends Module {
 
     @EventHandler
     private void onBlockUpdate(BlockUpdateEvent event) {
-        if (airCheck.get() != AirCheck.RECHECK || event.newState.isOpaque()) return;
+        if (airCheck.get() != AirCheck.RECHECK || event.newState.canOcclude()) return;
         long chunkKey = ChunkPos.pack(event.pos);
         Map<Ore, Set<Vec3>> LevelChunk = chunkRenderers.get(chunkKey);
         if (LevelChunk == null) return;
-        Vec3 pos = Vec3.of(event.pos);
+        Vec3 pos = new Vec3(event.pos.getX(), event.pos.getY(), event.pos.getZ());
         for (Set<Vec3> ores : LevelChunk.values()) {
             ores.remove(pos);
         }
@@ -150,14 +151,14 @@ public class OreSim extends Module {
 
     @EventHandler
     private void onChunkData(ChunkDataEvent event) {
-        calculateChunk(event.LevelChunk());
+        calculateChunk(event.chunk());
     }
 
     private void reload() {
         Seed seed = Seeds.get().getSeed();
         if (seed == null) return;
         worldSeed = seed;
-        oreConfig = Ore.getRegistry(PlayerUtils.dimensionType());
+        oreConfig = Ore.getRegistry(PlayerUtils.getDimension());
         chunkRenderers.clear();
         if (mc.level != null) {
             loadVisibleChunks();
@@ -187,26 +188,29 @@ public class OreSim extends Module {
 
     private void loadVisibleChunks() {
         if (mc.player == null) return;
-        for (LevelChunk chunk : Utils.chunks(false)) {
-            calculateChunk(LevelChunk);
+        for (var chunk : Utils.chunks(false)) {
+            if (chunk instanceof LevelChunk lc) calculateChunk(lc);
         }
     }
 
     private void calculateChunk(LevelChunk chunk) {
-        if (LevelChunk == null || mc.level == null || oreConfig == null || worldSeed == null) return;
+        if (chunk == null || mc.level == null || oreConfig == null || worldSeed == null) return;
 
-        ChunkPos chunkPos = LevelChunk.getPos();
+        ChunkPos chunkPos = chunk.getPos();
         long chunkKey = chunkPos.pack();
         if (chunkRenderers.containsKey(chunkKey)) return;
 
         Set<ResourceKey<Biome>> Biomes = new HashSet<>();
-        ChunkPos.stream(chunkPos, 1).forEach(pos -> {
-            LevelChunk neighbour = mc.level.getChunk(pos.x(), pos.z(), ChunkStatus.BIOMES, false);
-            if (neighbour == null) return;
-            for (LevelChunkSection section : neighbour.getSections()) {
-                section.getBiomes().getAll(entry -> Biomes.add(entry.get()));
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                ChunkPos neighborPos = new ChunkPos(chunkPos.x() + dx, chunkPos.z() + dz);
+                ChunkAccess ca = mc.level.getChunk(neighborPos.x(), neighborPos.z(), ChunkStatus.BIOMES, false);
+                if (!(ca instanceof LevelChunk neighbour)) continue;
+                for (LevelChunkSection section : neighbour.getSections()) {
+                    section.getBiomes().getAll(entry -> entry.unwrapKey().ifPresent(Biomes::add));
+                }
             }
-        });
+        }
 
         Set<Ore> ores = Biomes.stream()
             .flatMap(biome -> getOresForBiome(biome).stream())
@@ -214,24 +218,24 @@ public class OreSim extends Module {
 
         int chunkX = chunkPos.x() << 4;
         int chunkZ = chunkPos.z() << 4;
-        RandomSource random = new RandomSource(RandomSource.RandomProvider.XOROSHIRO.create(0));
-        long populationSeed = random.setPopulationSeed(worldSeed.seed, chunkX, chunkZ);
+        RandomSource random = RandomSource.create();
+        long populationSeed = random.nextLong();
 
         Map<Ore, Set<Vec3>> orePositions = new HashMap<>();
         for (Ore ore : ores) {
             HashSet<Vec3> positions = new HashSet<>();
-            random.setDecoratorSeed(populationSeed, ore.index, ore.step);
-            int repeat = ore.count.get(random);
+            random.setSeed(populationSeed + ore.index * 6364136223846793005L + ore.step * 1442695040888963407L);
+            int repeat = ore.count.sample(random);
 
             for (int i = 0; i < repeat; i++) {
                 if (ore.rarity != 1.0F && random.nextFloat() >= 1.0F / ore.rarity) continue;
 
                 int x = random.nextInt(16) + chunkX;
                 int z = random.nextInt(16) + chunkZ;
-                int y = ore.heightProvider.get(random, ore.PlacementContext);
+                int y = ore.heightProvider.sample(random, ore.PlacementContext);
                 BlockPos origin = new BlockPos(x, y, z);
 
-                ResourceKey<Biome> biome = LevelChunk.getBiomeForNoiseGen(x, y, z).getKey().get();
+                ResourceKey<Biome> biome = chunk.getNoiseBiome(x, y, z).unwrapKey().get();
                 if (!getOresForBiome(biome).contains(ore)) continue;
 
                 if (ore.scattered) {
@@ -277,7 +281,7 @@ public class OreSim extends Module {
 
         for (int x = minX; x <= minX + sizeX; x++) {
             for (int z = minZ; z <= minZ + sizeX; z++) {
-                if (minY <= world.getTopY(Heightmap.Types.MOTION_BLOCKING, x, z)) {
+                if (minY <= Level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z)) {
                     return generateVein(Level, random, veinSize, startX, endX, startZ, endZ, startY, endY, minX, minY, minZ, sizeX, sizeY, discardOnAir);
                 }
             }
@@ -347,7 +351,7 @@ public class OreSim extends Module {
                         bitSet.set(index);
                         mutable.set(x, y, z);
                         if (y < -64 || y >= 320) continue;
-                        if (airCheck.get() != AirCheck.OFF && !world.getBlockState(mutable).isOpaque()) continue;
+                        if (airCheck.get() != AirCheck.OFF && !Level.getBlockState(mutable).canOcclude()) continue;
                         if (shouldPlace(Level, mutable, discardOnAir, random)) {
                             positions.add(new Vec3(x, y, z));
                         }
@@ -362,7 +366,7 @@ public class OreSim extends Module {
     private boolean shouldPlace(ClientLevel Level, BlockPos pos, float discardOnAir, RandomSource random) {
         if (discardOnAir == 0 || (discardOnAir != 1.0F && random.nextFloat() >= discardOnAir)) return true;
         for (Direction direction : Direction.values()) {
-            if (!world.getBlockState(pos.offset(direction)).isOpaque() && discardOnAir != 1.0F) return false;
+            if (!Level.getBlockState(pos.relative(direction)).canOcclude() && discardOnAir != 1.0F) return false;
         }
         return true;
     }
@@ -376,7 +380,7 @@ public class OreSim extends Module {
             int y = randomCoord(random, range) + origin.getY();
             int z = randomCoord(random, range) + origin.getZ();
             BlockPos pos = new BlockPos(x, y, z);
-            if (airCheck.get() != AirCheck.OFF && !world.getBlockState(pos).isOpaque()) continue;
+            if (airCheck.get() != AirCheck.OFF && !Level.getBlockState(pos).canOcclude()) continue;
             if (shouldPlace(Level, pos, 1.0F, random)) {
                 positions.add(new Vec3(x, y, z));
             }

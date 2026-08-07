@@ -6,6 +6,7 @@ import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import net.aero.aeropack.modules.movement.AutoFly;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
 import net.minecraft.network.protocol.game.ClientboundLoginPacket;
@@ -57,6 +58,6 @@ public class SetbackDetector
 			af.onGlobalSetback(now);
 		}
 
-		ChatUtils.sendMsg(Component.literal("[WARNING] Setback detected.").styled(style -> style.withColor(net.minecraft.Component.TextColor.fromRgb(0x615AFF))));
+		ChatUtils.sendMsg(Component.literal("[WARNING] Setback detected.").withStyle(style -> style.withColor(TextColor.fromRgb(0x615AFF))));
 	}
 }

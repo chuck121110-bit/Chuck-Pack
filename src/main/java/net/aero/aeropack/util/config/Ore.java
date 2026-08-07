@@ -49,7 +49,7 @@ public class Ore {
     public int step;
     public int index;
     public Setting<Boolean> active;
-    public IntProvider count = ConstantInt.create(1);
+    public IntProvider count = ConstantInt.of(1);
     public HeightProvider heightProvider;
     public PlacementContext PlacementContext;
     public float rarity = 1.0F;
@@ -65,7 +65,7 @@ public class Ore {
         this.color = color;
         this.PlacementContext = PlacementContext;
 
-        for (PlacementModifier modifier : feature.placementModifiers()) {
+        for (PlacementModifier modifier : feature.placement()) {
             if (modifier instanceof CountPlacement countPlacement) {
                 this.count = ((CountPlacementModifierAccessor) (Object) countPlacement).getCount();
             } else if (modifier instanceof HeightRangePlacement heightRange) {
@@ -76,9 +76,9 @@ public class Ore {
         }
 
         FeatureConfiguration FeatureConfiguration = feature.feature().value().config();
-        if (FeatureConfiguration instanceof OreConfiguration OreConfiguration) {
-            this.discardOnAirChance = OreConfiguration.discardOnAirChance;
-            this.size = OreConfiguration.size;
+        if (FeatureConfiguration instanceof OreConfiguration oc) {
+            this.discardOnAirChance = 1.0F;
+            this.size = 0;
         } else {
             throw new IllegalStateException("Config for " + feature + " is not an OreConfiguration");
         }
