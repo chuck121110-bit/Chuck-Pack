@@ -660,14 +660,16 @@ public final class AutoFly extends Module
 				antiKickOffLeft = antiKickOffTime.get();
 				if(antiKickMode.get() == AntiKickMode.Packet)
 				{
-					((LocalPlayerAccessor) mc.player).aeropack$setTicksSinceLastPositionPacketSent(20);
+					mc.player.connection.send(new net.minecraft.network.protocol.game.ServerboundMovePlayerPacket.Pos(
+						mc.player.getX(), mc.player.getY(), mc.player.getZ(), mc.player.onGround(), mc.player.horizontalCollision));
 				}
 			}
 			else if(antiKickDelayLeft <= 0)
 			{
 				if(antiKickMode.get() == AntiKickMode.Packet && antiKickOffLeft == antiKickOffTime.get())
 				{
-					((LocalPlayerAccessor) mc.player).aeropack$setTicksSinceLastPositionPacketSent(20);
+					mc.player.connection.send(new net.minecraft.network.protocol.game.ServerboundMovePlayerPacket.Pos(
+						mc.player.getX(), mc.player.getY(), mc.player.getZ(), mc.player.onGround(), mc.player.horizontalCollision));
 				}
 				antiKickOffLeft--;
 			}

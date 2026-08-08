@@ -17,16 +17,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class ChestSlotOverlayMixin {
 
     @Shadow
-    protected int x;
+    protected int leftPos;
 
     @Shadow
-    protected int y;
+    protected int topPos;
 
     @Shadow
-    protected int backgroundWidth;
+    protected int imageWidth;
 
     @Shadow
-    protected int backgroundHeight;
+    protected int imageHeight;
 
     @Shadow
     public abstract AbstractContainerMenu getMenu();
@@ -59,14 +59,14 @@ public abstract class ChestSlotOverlayMixin {
                 continue;
 
             if (hoverOnly) {
-                int sx = x + slot.x;
-                int sy = y + slot.y;
+                int sx = leftPos + slot.x;
+                int sy = topPos + slot.y;
                 if (!(mouseX >= sx && mouseX < sx + 16 && mouseY >= sy
                     && mouseY < sy + 16))
                     continue;
             }
-            int textX = x + slot.x + offsetX;
-            int textY = y + slot.y + offsetY;
+            int textX = leftPos + slot.x + offsetX;
+            int textY = topPos + slot.y + offsetY;
             String label = String.valueOf(index);
             graphics.text(net.minecraft.client.Minecraft.getInstance().font, label, textX, textY, color);
         }

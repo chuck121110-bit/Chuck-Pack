@@ -1,0 +1,20 @@
+package net.aero.aeropack.theme.gui.themes.base;
+
+public enum ModuleIndicatorPosition {
+    None("None"),
+    Left("Left"),
+    Right("Right"),
+    Top("Top"),
+    Bottom("Bottom");
+
+    private final String title;
+
+    ModuleIndicatorPosition(String title) {
+        this.title = title;
+    }
+
+    @Override
+    public String toString() {
+        return title;
+    }
+}

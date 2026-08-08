@@ -49,13 +49,13 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
     private Button uiUtilsQueueButton;
 
     @Shadow
-    protected int x;
+    protected int leftPos;
 
     @Shadow
-    protected int y;
+    protected int topPos;
 
     @Shadow
-    protected int backgroundWidth;
+    protected int imageWidth;
 
     @Unique
     private boolean fabricateOverlayInitialized;
@@ -491,8 +491,8 @@ public abstract class UiUtilsHandledScreenMixin extends Screen {
 
     @Unique
     private void layoutFabricateOverlay() {
-        int overlayX = this.x + this.backgroundWidth + 8;
-        int overlayY = this.y;
+        int overlayX = this.leftPos + this.imageWidth + 8;
+        int overlayY = this.topPos;
         if (UiUtilsState.fabricateOverlayX >= 0)
             overlayX = Mth.clamp(UiUtilsState.fabricateOverlayX, 0,
                 this.width - OVERLAY_WIDTH);

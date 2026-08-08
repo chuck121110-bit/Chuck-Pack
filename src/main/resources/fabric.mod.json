@@ -11,7 +11,7 @@
   "environment": "client",
   "entrypoints": { "meteor": ["net.aero.aeropack.AeroPack"] },
   "accessWidener": "aeropack.accesswidener",
-  "mixins": ["aeropack.mixins.json"],
+  "mixins": ["aeropack.mixins.json", "aeropack-theme.mixins.json"],
   "custom": { "meteor-client:color": "0,200,160" },
   "depends": { "java": ">=21", "minecraft": ">=26.1", "meteor-client": "*" }
 }

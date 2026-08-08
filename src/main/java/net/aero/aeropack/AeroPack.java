@@ -5,7 +5,9 @@ import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
+import net.aero.aeropack.modules.combat.ImprovedAutoArmor;
 import net.aero.aeropack.modules.combat.MaceDamage;
+import net.aero.aeropack.modules.combat.SelfTrap;
 import net.aero.aeropack.modules.combat.SpearKill;
 import net.aero.aeropack.modules.combat.Untouchable;
 import net.aero.aeropack.modules.misc.AiChat;
@@ -94,6 +96,8 @@ public class AeroPack extends MeteorAddon {
         addModule(new UiUtilsMod());
         addModule(new OreSim());
         addModule(new VillagerRoller());
+        addModule(new SelfTrap());
+        addModule(new ImprovedAutoArmor());
 
         meteordevelopment.meteorclient.commands.Commands.add(
             new net.aero.aeropack.commands.SeedCommand()
@@ -130,6 +134,10 @@ public class AeroPack extends MeteorAddon {
         }
 
         AeroPackConfigModifier.get();
+
+        meteordevelopment.meteorclient.gui.GuiThemes.add(
+            new net.aero.aeropack.theme.gui.themes.base.BaseGuiTheme()
+        );
 
         LOG.info("Aero Pack ready.");
     }
