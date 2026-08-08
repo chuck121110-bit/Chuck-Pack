@@ -1,7 +1,5 @@
 package net.aero.aeropack.theme.gui.themes.base.widgets;
 
-import net.aero.aeropack.theme.gui.renderer.BlurRendererAccess;
-import net.aero.aeropack.theme.gui.renderer.WorldFramebufferCapture;
 import net.aero.aeropack.theme.gui.themes.base.BaseWidget;
 import meteordevelopment.meteorclient.gui.renderer.GuiRenderer;
 import meteordevelopment.meteorclient.gui.widgets.WWidget;
@@ -30,16 +28,7 @@ public class WBaseWindow extends WWindow implements BaseWidget {
         if (scissor) renderer.scissorStart(x, y, width, (height - header.height) * animProgress + header.height);
 
         if (expanded || animProgress > 0) {
-            if (theme().widgetBlurStrength.get() > 0 && WorldFramebufferCapture.getInstance() != null) {
-                ((BlurRendererAccess) renderer).blurredQuad(
-                    x, y + header.height,
-                    width, height - header.height,
-                    WorldFramebufferCapture.getInstance().getBlurredTexture(),
-                    theme().backgroundColor.get()
-                );
-            } else {
-                renderer.quad(x, y + header.height, width, height - header.height, theme().backgroundColor.get());
-            }
+            renderer.quad(x, y + header.height, width, height - header.height, theme().backgroundColor.get());
         }
 
         super.render(renderer, mouseX, mouseY, delta);
@@ -73,17 +62,7 @@ public class WBaseWindow extends WWindow implements BaseWidget {
 
         @Override
         protected void onRender(GuiRenderer renderer, double mouseX, double mouseY, double delta) {
-            // Apply blur behind the header if enabled
-            if (theme().widgetBlurStrength.get() > 0 && WorldFramebufferCapture.getInstance() != null) {
-                ((BlurRendererAccess) renderer).blurredQuad(
-                    x, y,
-                    width, height,
-                    WorldFramebufferCapture.getInstance().getBlurredTexture(),
-                    theme().accentColor.get()
-                );
-            } else {
-                renderer.quad(this, theme().accentColor.get());
-            }
+            renderer.quad(this, theme().accentColor.get());
         }
     }
 }

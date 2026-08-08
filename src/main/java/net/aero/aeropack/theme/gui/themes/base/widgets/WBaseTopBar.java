@@ -1,7 +1,5 @@
 package net.aero.aeropack.theme.gui.themes.base.widgets;
 
-import net.aero.aeropack.theme.gui.renderer.BlurRendererAccess;
-import net.aero.aeropack.theme.gui.renderer.WorldFramebufferCapture;
 import net.aero.aeropack.theme.gui.themes.base.BaseWidget;
 import meteordevelopment.meteorclient.gui.renderer.GuiRenderer;
 import meteordevelopment.meteorclient.gui.tabs.Tab;
@@ -46,17 +44,7 @@ public class WBaseTopBar extends WTopBar implements BaseWidget {
             boolean isActiveTab = screen instanceof TabScreen && ((TabScreen) screen).tab == myTab;
             Color color = getButtonColor(pressed || isActiveTab, mouseOver);
 
-            // Apply blur behind the tab button if enabled
-            if (theme().widgetBlurStrength.get() > 0 && WorldFramebufferCapture.getInstance() != null) {
-                ((BlurRendererAccess) renderer).blurredQuad(
-                    x, y,
-                    width, height,
-                    WorldFramebufferCapture.getInstance().getBlurredTexture(),
-                    color
-                );
-            } else {
-                renderer.quad(x, y, width, height, color);
-            }
+            renderer.quad(x, y, width, height, color);
             renderer.text(myTab.name, x + pad, y + pad, getNameColor(), false);
         }
     }
