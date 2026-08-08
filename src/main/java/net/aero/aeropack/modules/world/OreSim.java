@@ -232,7 +232,7 @@ public class OreSim extends Module {
 
                 int x = random.nextInt(16) + chunkX;
                 int z = random.nextInt(16) + chunkZ;
-                int y = ore.heightProvider.sample(random, ore.PlacementContext);
+                int y = ore.heightProvider.sample(random, ore.placementCtx);
                 BlockPos origin = new BlockPos(x, y, z);
 
                 ResourceKey<Biome> biome = chunk.getNoiseBiome(x, y, z).unwrapKey().get();
