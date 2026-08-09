@@ -398,7 +398,7 @@ public final class AutoFly extends Module
 	private int currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
 	private int setbackPhase = 0;
 	private long cooldownStartMs = 0;
-	private static final long COOLDOWN_MS = 5000;
+	private static final long COOLDOWN_MS = 1000;
 	private long lastRampUpMs = 0;
 	public int setbackDisplayTicks = 0;
 	private boolean jumpWasPressed = false;
@@ -973,11 +973,13 @@ public final class AutoFly extends Module
 		{
 			if(now - cooldownStartMs >= COOLDOWN_MS)
 			{
-				setbackPhase = 2;
+				setbackPhase = 0;
 				recentSetbacks.clear();
+				currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
+				syncConfig();
 				if(speedDebug.get())
 				{
-					info("[SpeedDebug] Quiet period over, watching for setbacks...");
+					info("[SpeedDebug] Cooldown over, resuming ramp-up");
 				}
 			}
 		}
@@ -985,11 +987,13 @@ public final class AutoFly extends Module
 		{
 			if(now - cooldownStartMs >= COOLDOWN_MS)
 			{
-				setbackPhase = 2;
+				setbackPhase = 0;
 				recentSetbacks.clear();
+				currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
+				syncConfig();
 				if(speedDebug.get())
 				{
-					info("[SpeedDebug] Quiet period over, watching for setbacks...");
+					info("[SpeedDebug] Continuous cooldown over, resuming ramp-up");
 				}
 			}
 		}
@@ -1399,7 +1403,6 @@ public final class AutoFly extends Module
 		pathFlightConfig.flightDebug = pathDebug.get();
 		pathFlightConfig.flightVerbose = verboseDebug.get();
 		pathFlightConfig.flightCruiseHeight = 120;
-		pathFlightConfig.flightPredictTerrain = !pathFlightConfig.waitChunks;
 
 		if(mc.level != null && mc.level.dimension() != null)
 		{
@@ -1417,6 +1420,7 @@ public final class AutoFly extends Module
 				pathFlightConfig.waitChunks = waitChunksOverworld.get();
 			}
 		}
+		pathFlightConfig.flightPredictTerrain = !pathFlightConfig.waitChunks;
 		net.aero.aeropack.util.config.Seeds.Seed storedSeed = net.aero.aeropack.util.config.Seeds.get().getSeed();
 		pathFlightConfig.flightSeed = storedSeed != null ? storedSeed.seed : 0L;
 	}

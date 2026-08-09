@@ -3,8 +3,14 @@ package net.aero.aeropack.modules.misc;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.meteorclient.utils.misc.Keybind;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
+import meteordevelopment.orbit.EventHandler;
+import meteordevelopment.meteorclient.events.world.TickEvent;
+import net.aero.aeropack.uiutils.UiUtils;
 import net.aero.aeropack.uiutils.UiUtilsState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 
 public class UiUtilsMod extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
@@ -74,6 +80,15 @@ public class UiUtilsMod extends Module {
         .build()
     );
 
+    public final Setting<Keybind> restoreScreenKey = sgGeneral.add(new KeybindSetting.Builder()
+        .name("restore-screen-key")
+        .description("Key to restore the last saved GUI.")
+        .defaultValue(Keybind.fromKey(0x56)) // V key
+        .build()
+    );
+
+    private boolean restoreKeyDown;
+
     public UiUtilsMod() {
         super(Categories.Misc, "UI-Utils", "Slot overlay, packet fabrication, and UI quality-of-life.");
     }
@@ -91,6 +106,24 @@ public class UiUtilsMod extends Module {
         UiUtilsState.delayUiPackets = false;
         UiUtilsState.delayedUiPackets.clear();
         UiUtilsState.shouldEditSign = false;
+        restoreKeyDown = false;
+    }
+
+    @EventHandler
+    private void onTick(TickEvent.Pre event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+
+        UiUtils.refreshLabels();
+
+        Keybind key = restoreScreenKey.get();
+        boolean down = key != null && key.isSet() && key.isPressed();
+        if (down && !restoreKeyDown) {
+            if (mc.screen instanceof AbstractContainerScreen<?>) {
+                UiUtils.restoreScreen(mc);
+            }
+        }
+        restoreKeyDown = down;
     }
 
     public boolean isLogToChat() {
@@ -121,5 +154,9 @@ public class UiUtilsMod extends Module {
 
     public int getFabricateOverlayBgAlpha() {
         return fabricateOverlayBgAlpha.get();
+    }
+
+    public Keybind getRestoreKey() {
+        return restoreScreenKey.get();
     }
 }

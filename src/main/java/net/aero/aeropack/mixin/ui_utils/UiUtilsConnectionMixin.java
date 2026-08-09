@@ -3,7 +3,6 @@ package net.aero.aeropack.mixin.ui_utils;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
 import io.netty.channel.ChannelFutureListener;
-import net.aero.aeropack.uiutils.UiUtils;
 import net.aero.aeropack.uiutils.UiUtilsState;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,21 +26,14 @@ public class UiUtilsConnectionMixin {
 
         boolean isUiPacket = packet instanceof ServerboundContainerClickPacket
             || packet instanceof ServerboundContainerButtonClickPacket;
-        if (isUiPacket) {
-            UiUtils.chatIfEnabled(
-                "Sending UI packet: " + packet.getClass().getSimpleName());
-        }
 
         if (!UiUtilsState.sendUiPackets && isUiPacket) {
-            UiUtils.chatIfEnabled("Canceled UI packet (sendUiPackets=false)");
             ci.cancel();
             return;
         }
 
         if (UiUtilsState.delayUiPackets && isUiPacket) {
             UiUtilsState.delayedUiPackets.add(packet);
-            UiUtils.chatIfEnabled("Delayed UI packet (queued "
-                + UiUtilsState.delayedUiPackets.size() + ")");
             ci.cancel();
             return;
         }

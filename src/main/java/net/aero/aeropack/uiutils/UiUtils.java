@@ -1,340 +1,969 @@
 package net.aero.aeropack.uiutils;
 
+import java.util.Locale;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.WeakHashMap;
 import java.util.function.Consumer;
+import com.google.gson.Gson;
+import com.mojang.serialization.JsonOps;
+import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.network.HashedPatchMap;
+import net.minecraft.network.HashedStack;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ServerboundContainerButtonClickPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.util.Mth;
+import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class UiUtils {
+    public static final String VERSION = "2.4.0";
     public static final Logger LOGGER = LoggerFactory.getLogger("AeroPack/UI-Utils");
-
-    public static int spamCount = 1;
-    public static Packet<?> lastFabricatedPacket = null;
-
-    private static Button spamButtonRef;
-    private static Button queueButtonRef;
-
-    private static int spamButtonX;
-    private static int spamButtonY;
-    private static int spamButtonWidth;
-    private static int queueButtonX;
-    private static int queueButtonY;
-    private static int queueButtonWidth;
+    private static final WeakHashMap<Button, Boolean> queueCounterButtons = new WeakHashMap<>();
 
     private UiUtils() {
     }
 
-    private static final int BTN_WIDTH = 160;
-    private static final int HALF_BTN_WIDTH = 78;
-    private static final int BTN_HEIGHT = 20;
-    private static final int ROWS = 14;
+    public static void chatIfEnabled(String msg) {
+        try {
+            if (!UiUtilsState.isUiEnabled())
+                return;
+            Minecraft mc = Minecraft.getInstance();
+            var mod = meteordevelopment.meteorclient.systems.modules.Modules.get()
+                .get(net.aero.aeropack.modules.misc.UiUtilsMod.class);
+            if (mod != null && mod.isLogToChat() && mc.player != null)
+                mc.player.sendSystemMessage(Component.literal("[UI-Utils] " + msg));
+        } catch (Throwable t) {
+        }
+    }
+
+    public static void renderSyncInfo(Minecraft mc,
+        GuiGraphicsExtractor graphics, AbstractContainerMenu menu) {
+        if (menu == null)
+            return;
+
+        graphics.text(mc.font, "Sync Id: " + menu.containerId, 200, 5,
+            0xFFFFFF);
+        graphics.text(mc.font, "Revision: " + menu.getStateId(), 200, 35,
+            0xFFFFFF);
+    }
 
     public static int getUiWidgetRows() {
-        return ROWS;
+        return 13;
     }
 
-    public static int addUiWidgets(Minecraft mc, int x, int startY, int spacing,
-                                   Consumer<AbstractWidget> addWidget) {
-        int y = startY;
-        int halfGap = 4;
+    public static boolean saveCurrentGuiToSlot(Minecraft mc, String slot) {
+        if (mc.player == null)
+            return false;
 
-        addWidget.accept(Button.builder(
-            Component.literal("Close without packet"),
-            b -> {
-                mc.setScreen(null);
-                UiUtils.chatIfEnabled("Closed screen without packet");
-            }).bounds(x, y, BTN_WIDTH, BTN_HEIGHT).build());
-        y += BTN_HEIGHT + spacing;
-
-        addWidget.accept(Button.builder(
-            Component.literal("Send packets: " + UiUtilsState.sendUiPackets),
-            b -> {
-                UiUtilsState.sendUiPackets = !UiUtilsState.sendUiPackets;
-                b.setMessage(Component.literal("Send packets: " + UiUtilsState.sendUiPackets));
-                UiUtils.chatIfEnabled("sendUiPackets=" + UiUtilsState.sendUiPackets);
-            }).bounds(x, y, BTN_WIDTH, BTN_HEIGHT).build());
-        y += BTN_HEIGHT + spacing;
-
-        addWidget.accept(Button.builder(
-            Component.literal("Delay packets: " + UiUtilsState.delayUiPackets),
-            b -> {
-                UiUtilsState.delayUiPackets = !UiUtilsState.delayUiPackets;
-                b.setMessage(Component.literal("Delay packets: " + UiUtilsState.delayUiPackets));
-                UiUtils.chatIfEnabled("delayUiPackets=" + UiUtilsState.delayUiPackets);
-            }).bounds(x, y, BTN_WIDTH, BTN_HEIGHT).build());
-        y += BTN_HEIGHT + spacing;
-
-        addWidget.accept(Button.builder(
-            Component.literal("Leave & send packets"),
-            b -> {
-                sendDelayedPackets();
-                mc.setScreen(null);
-                UiUtils.chatIfEnabled("Left screen and sent delayed packets");
-            }).bounds(x, y, BTN_WIDTH, BTN_HEIGHT).build());
-        y += BTN_HEIGHT + spacing;
-
-        addWidget.accept(Button.builder(
-            Component.literal("Disconnect & send packets"),
-            b -> {
-                sendDelayedPackets();
-                if (mc.getConnection() != null)
-                    mc.getConnection().getConnection().disconnect(
-                        Component.literal("Disconnecting (UI-UTILS)"));
-                UiUtils.chatIfEnabled("Disconnected and sent delayed packets");
-            }).bounds(x, y, BTN_WIDTH, BTN_HEIGHT).build());
-        y += BTN_HEIGHT + spacing;
-
-        addWidget.accept(Button.builder(
-            Component.literal("Fabricate packet"),
-            b -> {
-                UiUtilsState.fabricateOverlayOpen = !UiUtilsState.fabricateOverlayOpen;
-                UiUtils.chatIfEnabled("Fabricate overlay: " + UiUtilsState.fabricateOverlayOpen);
-            }).bounds(x, y, BTN_WIDTH, BTN_HEIGHT).build());
-        y += BTN_HEIGHT + spacing;
-
-        addWidget.accept(Button.builder(
-            Component.literal("Copy GUI Title JSON"),
-            b -> {
-                if (mc.screen != null) {
-                    String title = mc.screen.getTitle().getString();
-                    mc.keyboardHandler.setClipboard(title);
-                    UiUtils.chatIfEnabled("Copied GUI title: " + title);
-                }
-            }).bounds(x, y, BTN_WIDTH, BTN_HEIGHT).build());
-        y += BTN_HEIGHT + spacing;
-
-        Button queueBtn = Button.builder(
-            Component.literal("Queue: " + UiUtilsState.delayedUiPackets.size()),
-            b -> {}).bounds(x + HALF_BTN_WIDTH + halfGap, y, HALF_BTN_WIDTH, BTN_HEIGHT).build();
-        queueButtonRef = queueBtn;
-        queueButtonX = x + HALF_BTN_WIDTH + halfGap;
-        queueButtonY = y;
-        queueButtonWidth = HALF_BTN_WIDTH;
-
-        addWidget.accept(Button.builder(
-            Component.literal("Clear Queue"),
-            b -> {
-                int count = UiUtilsState.delayedUiPackets.size();
-                UiUtilsState.delayedUiPackets.clear();
-                queueBtn.setMessage(Component.literal("Queue: 0"));
-                UiUtils.chatIfEnabled("Cleared " + count + " queued packets");
-            }).bounds(x, y, HALF_BTN_WIDTH, BTN_HEIGHT).build());
-
-        addWidget.accept(queueBtn);
-        y += BTN_HEIGHT + spacing;
-
-        addWidget.accept(Button.builder(
-            Component.literal("Resync Inv"),
-            b -> {
-                if (mc.player != null && mc.getConnection() != null) {
-                    mc.player.containerMenu = mc.player.inventoryMenu;
-                    mc.setScreen(null);
-                    UiUtils.chatIfEnabled("Resynced inventory");
-                }
-            }).bounds(x, y, HALF_BTN_WIDTH, BTN_HEIGHT).build());
-
-        addWidget.accept(Button.builder(
-            Component.literal("Disconnect"),
-            b -> {
-                if (mc.getConnection() != null) {
-                    mc.getConnection().getConnection().disconnect(
-                        Component.literal("Disconnecting (UI-UTILS)"));
-                    UiUtils.chatIfEnabled("Disconnected");
-                }
-            }).bounds(x + HALF_BTN_WIDTH + halfGap, y, HALF_BTN_WIDTH, BTN_HEIGHT).build());
-        y += BTN_HEIGHT + spacing;
-
-        int spamTotalWidth = BTN_WIDTH;
-        int minusWidth = 20;
-        int plusWidth = 20;
-        int spamBtnWidth = spamTotalWidth - minusWidth - halfGap - plusWidth - halfGap;
-
-        Button localSpamButton = Button.builder(
-            Component.literal("Spam (x" + spamCount + ")"),
-            b -> {
-                for (int i = 0; i < spamCount; i++) {
-                    if (lastFabricatedPacket != null) {
-                        if (!UiUtilsState.sendUiPackets) {
-                            UiUtils.chatIfEnabled("Send packets is off, packet not sent");
-                            continue;
-                        }
-                        if (UiUtilsState.delayUiPackets) {
-                            UiUtilsState.delayedUiPackets.add(lastFabricatedPacket);
-                        } else {
-                            sendPacket(lastFabricatedPacket);
-                        }
-                    }
-                }
-                if (UiUtilsState.delayUiPackets) {
-                    queueBtn.setMessage(Component.literal("Queue: " + UiUtilsState.delayedUiPackets.size()));
-                }
-                UiUtils.chatIfEnabled("Spammed " + spamCount + " packets");
-            }).bounds(x + minusWidth + halfGap, y, spamBtnWidth, BTN_HEIGHT).build();
-        final Button spamBtn = localSpamButton;
-        spamButtonRef = spamBtn;
-        spamButtonX = x + minusWidth + halfGap;
-        spamButtonY = y;
-        spamButtonWidth = spamBtnWidth;
-
-        addWidget.accept(Button.builder(
-            Component.literal("-"),
-            b -> {
-                spamCount = Math.max(1, spamCount - 1);
-                spamBtn.setMessage(Component.literal("Spam (x" + spamCount + ")"));
-                UiUtils.chatIfEnabled("Spam count: " + spamCount);
-            }).bounds(x, y, minusWidth, BTN_HEIGHT).build());
-
-        addWidget.accept(spamBtn);
-
-        addWidget.accept(Button.builder(
-            Component.literal("+"),
-            b -> {
-                spamCount = Math.min(64, spamCount + 1);
-                spamBtn.setMessage(Component.literal("Spam (x" + spamCount + ")"));
-                UiUtils.chatIfEnabled("Spam count: " + spamCount);
-            }).bounds(x + minusWidth + halfGap + spamBtnWidth + halfGap, y, plusWidth, BTN_HEIGHT).build());
-        y += BTN_HEIGHT + spacing;
-
-        addWidget.accept(Button.builder(
-            Component.literal("Send One"),
-            b -> {
-                if (!UiUtilsState.delayedUiPackets.isEmpty()) {
-                    Packet<?> pkt = UiUtilsState.delayedUiPackets.remove(0);
-                    sendPacket(pkt);
-                    queueBtn.setMessage(Component.literal("Queue: " + UiUtilsState.delayedUiPackets.size()));
-                    UiUtils.chatIfEnabled("Sent 1 packet, " + UiUtilsState.delayedUiPackets.size() + " remaining");
-                } else {
-                    UiUtils.chatIfEnabled("Queue is empty");
-                }
-            }).bounds(x, y, HALF_BTN_WIDTH, BTN_HEIGHT).build());
-
-        addWidget.accept(Button.builder(
-            Component.literal("Pop Last"),
-            b -> {
-                if (!UiUtilsState.delayedUiPackets.isEmpty()) {
-                    UiUtilsState.delayedUiPackets.remove(
-                        UiUtilsState.delayedUiPackets.size() - 1);
-                    queueBtn.setMessage(Component.literal("Queue: " + UiUtilsState.delayedUiPackets.size()));
-                    UiUtils.chatIfEnabled("Popped last, " + UiUtilsState.delayedUiPackets.size() + " remaining");
-                } else {
-                    UiUtils.chatIfEnabled("Queue is empty");
-                }
-            }).bounds(x + HALF_BTN_WIDTH + halfGap, y, HALF_BTN_WIDTH, BTN_HEIGHT).build());
-        y += BTN_HEIGHT + spacing;
-
-        addWidget.accept(Button.builder(
-            Component.literal("How to Use"),
-            b -> {
-                Minecraft.getInstance().setScreen(
-                    new net.aero.aeropack.gui.screens.UiUtilsDocumentationScreen(
-                        meteordevelopment.meteorclient.gui.GuiThemes.get()));
-            }).bounds(x, y, BTN_WIDTH, BTN_HEIGHT).build());
-        y += BTN_HEIGHT + spacing;
-
-        return y;
+        String key = slot.toLowerCase(Locale.ROOT);
+        UiUtilsState.storedScreen = mc.screen;
+        UiUtilsState.storedMenu = mc.player.containerMenu;
+        UiUtilsState.savedScreens.put(key, mc.screen);
+        UiUtilsState.savedMenus.put(key, mc.player.containerMenu);
+        return true;
     }
 
-    public static EditBox createChatField(Minecraft mc, Font Font,
-                                                   int x, int y) {
-        EditBox field = new EditBox(Font, x, y, 200, 20, Component.literal("")) {
-            @Override
-            public void setFocused(boolean focused) {
-                super.setFocused(focused);
-                if (focused) setSuggestion(null);
-                else if (getValue().isEmpty()) setSuggestion("Chat ...");
+    public static boolean loadGuiFromSlot(Minecraft mc, String slot) {
+        if (mc.player == null)
+            return false;
+
+        String key = slot.toLowerCase(Locale.ROOT);
+        Screen screen = UiUtilsState.savedScreens.get(key);
+        AbstractContainerMenu menu = UiUtilsState.savedMenus.get(key);
+        if (screen == null || menu == null)
+            return false;
+
+        mc.setScreen(screen);
+        mc.player.containerMenu = menu;
+        UiUtilsState.storedScreen = screen;
+        UiUtilsState.storedMenu = menu;
+        return true;
+    }
+
+    public static int sendQueuedPackets(Minecraft mc, int times) {
+        if (mc.getConnection() == null || times < 1
+            || UiUtilsState.delayedUiPackets.isEmpty())
+            return 0;
+
+        boolean prevDelay = UiUtilsState.delayUiPackets;
+        UiUtilsState.delayUiPackets = false;
+        int sent = 0;
+        for (int i = 0; i < times; i++)
+            for (Packet<?> packet : UiUtilsState.delayedUiPackets) {
+                mc.getConnection().send(packet);
+                sent++;
             }
-
-            @Override
-            public void setValue(String Component) {
-                super.setValue(Component);
-                if (isFocused() || !Component.isEmpty()) setSuggestion(null);
-                else setSuggestion("Chat ...");
-            }
-        };
-        field.setSuggestion("Chat ...");
-        return field;
+        UiUtilsState.delayUiPackets = prevDelay;
+        return sent;
     }
 
-    public static void renderSyncInfo(Minecraft mc, GuiGraphicsExtractor graphics,
-                                      AbstractContainerMenu AbstractContainerMenu) {
-        if (AbstractContainerMenu == null) return;
-        Font Font = mc.font;
-        String info = "SyncID: " + AbstractContainerMenu.containerId + " Rev: " + AbstractContainerMenu.getStateId()
-                + " Slots: " + AbstractContainerMenu.slots.size();
-        graphics.text(Font, Component.literal(info), 4, 4, 0xFFFFFF, true);
+    public static boolean sendOneQueuedPacket(Minecraft mc) {
+        if (mc.getConnection() == null
+            || UiUtilsState.delayedUiPackets.isEmpty())
+            return false;
+
+        boolean prevDelay = UiUtilsState.delayUiPackets;
+        UiUtilsState.delayUiPackets = false;
+        Packet<?> packet = UiUtilsState.delayedUiPackets.remove(0);
+        mc.getConnection().send(packet);
+        UiUtilsState.delayUiPackets = prevDelay;
+        return true;
     }
 
-    public static void chatIfEnabled(String message) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
+    public static boolean popLastQueuedPacket() {
+        if (UiUtilsState.delayedUiPackets.isEmpty())
+            return false;
+
+        UiUtilsState.delayedUiPackets
+            .remove(UiUtilsState.delayedUiPackets.size() - 1);
+        return true;
+    }
+
+    public static int clearQueuedPackets() {
+        int count = UiUtilsState.delayedUiPackets.size();
+        UiUtilsState.delayedUiPackets.clear();
+        return count;
+    }
+
+    public static void refreshQueueCounterButtons() {
+        String text = "Queue: " + UiUtilsState.delayedUiPackets.size();
+        queueCounterButtons.keySet().removeIf(button -> button == null);
+        for (Button button : queueCounterButtons.keySet())
+            button.setMessage(Component.literal(text));
+    }
+
+    public static void refreshLabels() {
+        refreshQueueCounterButtons();
+    }
+
+    public static void toggleUiUtils(Minecraft mc) {
+        UiUtilsState.enabled = !UiUtilsState.enabled;
+        if (mc.player != null)
+            mc.player.sendSystemMessage(Component.literal("UI-Utils is now "
+                + (UiUtilsState.enabled ? "enabled" : "disabled") + "."));
+    }
+
+    public static void restoreScreen(Minecraft mc) {
+        if (UiUtilsState.storedScreen != null
+            && UiUtilsState.storedMenu != null && mc.player != null) {
+            mc.setScreen(UiUtilsState.storedScreen);
+            mc.player.containerMenu = UiUtilsState.storedMenu;
             try {
-                var mod = meteordevelopment.meteorclient.systems.modules.Modules.get().get(
-                    net.aero.aeropack.modules.misc.UiUtilsMod.class);
-                if (mod != null && mod.isLogToChat()) {
-                    mc.player.sendSystemMessage(Component.literal("[UI-Utils] " + message));
-                }
+                String title =
+                    UiUtilsState.storedScreen.getTitle().getString();
+                int sid = UiUtilsState.storedMenu.containerId;
+                int rev = UiUtilsState.storedMenu.getStateId();
+                chatIfEnabled("Loaded GUI: title=\"" + title + "\", syncId="
+                    + sid + ", revision=" + rev);
             } catch (Throwable ignored) {
             }
         }
     }
 
-    public static void refreshLabels() {
-        if (spamButtonRef != null) {
-            spamButtonRef.setMessage(Component.literal("Spam (x" + spamCount + ")"));
-        }
-        if (queueButtonRef != null) {
-            queueButtonRef.setMessage(Component.literal("Queue: " + UiUtilsState.delayedUiPackets.size()));
-        }
+    public static boolean tryResyncInventory(AbstractContainerMenu menu) {
+        String[] methods = {"broadcastFullState", "sendAllDataToRemote",
+            "broadcastChanges", "syncState"};
+        for (String name : methods)
+            try {
+                java.lang.reflect.Method method =
+                    menu.getClass().getMethod(name);
+                method.invoke(menu);
+                return true;
+            } catch (ReflectiveOperationException ignored) {
+            }
+
+        return false;
     }
 
-    public static void renderLabels(GuiGraphicsExtractor graphics, Font Font) {
+    public static int addUiWidgets(Minecraft mc, int baseX, int baseY,
+        int spacing, Consumer<AbstractWidget> adder) {
+        final int fullWidth = 160;
+        final int halfWidth = (fullWidth - spacing) / 2;
+        final String defaultSlot = "default";
+
+        adder.accept(
+            Button.builder(Component.literal("Close without packet"), b -> {
+                mc.setScreen(null);
+                chatIfEnabled("Closed GUI without packet");
+            }).bounds(baseX, baseY, fullWidth, 20).build());
+        int y = baseY + 20 + spacing;
+
+        adder.accept(Button.builder(Component.literal("De-sync"), b -> {
+            if (mc.getConnection() != null && mc.player != null)
+                mc.getConnection().send(new ServerboundContainerClosePacket(
+                    mc.player.containerMenu.containerId));
+            else
+                LOGGER.warn(
+                    "Minecraft connection or player was null while using 'De-sync'.");
+            chatIfEnabled("De-synced (sent close packet)");
+        }).bounds(baseX, y, fullWidth, 20).build());
+        y += 20 + spacing;
+
+        adder.accept(Button.builder(
+            Component.literal("Send packets: " + UiUtilsState.sendUiPackets),
+            b -> {
+                UiUtilsState.sendUiPackets = !UiUtilsState.sendUiPackets;
+                b.setMessage(Component
+                    .literal("Send packets: " + UiUtilsState.sendUiPackets));
+                chatIfEnabled("Send packets: " + UiUtilsState.sendUiPackets);
+            }).bounds(baseX, y, fullWidth, 20).build());
+        y += 20 + spacing;
+
+        adder.accept(Button.builder(
+            Component.literal("Delay packets: " + UiUtilsState.delayUiPackets),
+            b -> {
+                UiUtilsState.delayUiPackets = !UiUtilsState.delayUiPackets;
+                b.setMessage(Component
+                    .literal("Delay packets: " + UiUtilsState.delayUiPackets));
+                if (!UiUtilsState.delayUiPackets
+                    && !UiUtilsState.delayedUiPackets.isEmpty()
+                    && mc.getConnection() != null) {
+                    for (Packet<?> packet : UiUtilsState.delayedUiPackets)
+                        mc.getConnection().send(packet);
+                    if (mc.player != null)
+                        mc.player.sendSystemMessage(Component.literal(
+                            "Sent " + UiUtilsState.delayedUiPackets.size()
+                                + " packets."));
+                    UiUtilsState.delayedUiPackets.clear();
+                }
+                chatIfEnabled("Delay packets: " + UiUtilsState.delayUiPackets);
+            }).bounds(baseX, y, fullWidth, 20).build());
+        y += 20 + spacing;
+
+        adder.accept(
+            Button.builder(Component.literal("Leave & send packets"), b -> {
+                int sent = sendQueuedPackets(mc, 1);
+                UiUtilsState.delayUiPackets = false;
+                UiUtilsState.delayedUiPackets.clear();
+                mc.setScreen(null);
+                chatIfEnabled(
+                    "Left GUI and sent queued packets (" + sent + ")");
+            }).bounds(baseX, y, fullWidth, 20).build());
+        y += 20 + spacing;
+
+        adder.accept(Button
+            .builder(Component.literal("Disconnect & send packets"), b -> {
+                int sent = sendQueuedPackets(mc, 1);
+                UiUtilsState.delayUiPackets = false;
+                UiUtilsState.delayedUiPackets.clear();
+                if (mc.getConnection() != null)
+                    mc.getConnection().getConnection().disconnect(
+                        Component.literal("Disconnecting (UI-UTILS)"));
+                else
+                    LOGGER.warn(
+                        "Minecraft connection was null while disconnecting.");
+                chatIfEnabled(
+                    "Disconnected and sent queued packets (" + sent + ")");
+            }).bounds(baseX, y, fullWidth, 20).build());
+        y += 20 + spacing;
+
+        adder
+            .accept(Button.builder(Component.literal("Fabricate packet"), b -> {
+                if (mc.screen instanceof AbstractContainerScreen) {
+                    UiUtilsState.fabricateOverlayOpen =
+                        !UiUtilsState.fabricateOverlayOpen;
+                    chatIfEnabled("Fabricate overlay: "
+                        + (UiUtilsState.fabricateOverlayOpen ? "opened"
+                            : "closed"));
+                } else {
+                    AbstractContainerMenu menu =
+                        mc.player != null ? mc.player.containerMenu : null;
+                    int syncId = menu != null ? menu.containerId : 0;
+                    int revision = menu != null ? menu.getStateId() : 0;
+                    UiUtilsState.skipNextContainerRemoval = true;
+                    mc.setScreen(new FabricatePacketScreen(mc.screen,
+                        syncId, revision));
+                }
+            }).bounds(baseX, y, fullWidth, 20).build());
+        y += 20 + spacing;
+
+        adder.accept(
+            Button.builder(Component.literal("Copy GUI Title JSON"), b -> {
+                try {
+                    if (mc.screen == null)
+                        throw new IllegalStateException(
+                            "Minecraft screen was null.");
+                    String json =
+                        new Gson()
+                            .toJson(
+                                ComponentSerialization.CODEC
+                                    .encodeStart(JsonOps.INSTANCE,
+                                        mc.screen.getTitle())
+                                    .getOrThrow());
+                    mc.keyboardHandler.setClipboard(json);
+                    chatIfEnabled("Copied GUI title JSON to clipboard");
+                } catch (IllegalStateException e) {
+                    LOGGER.error("Error while copying title JSON to clipboard",
+                        e);
+                    chatIfEnabled("Failed to copy GUI title JSON");
+                }
+            }).bounds(baseX, y, fullWidth, 20).build());
+        y += 20 + spacing;
+
+        adder.accept(Button.builder(Component.literal("Save GUI"), b -> {
+            if (saveCurrentGuiToSlot(mc, defaultSlot))
+                chatIfEnabled("Saved GUI to slot \"" + defaultSlot + "\"");
+        }).bounds(baseX, y, halfWidth, 20).build());
+
+        adder.accept(Button.builder(Component.literal("Load GUI"), b -> {
+            if (loadGuiFromSlot(mc, defaultSlot))
+                chatIfEnabled("Loaded GUI from slot \"" + defaultSlot + "\"");
+            else
+                chatIfEnabled("No saved GUI in slot \"" + defaultSlot + "\"");
+        }).bounds(baseX + halfWidth + spacing, y, halfWidth, 20).build());
+        y += 20 + spacing;
+
+        adder.accept(Button.builder(Component.literal("Clear Queue"), b -> {
+            int cleared = clearQueuedPackets();
+            chatIfEnabled("Cleared queued packets (" + cleared + ")");
+        }).bounds(baseX, y, halfWidth, 20).build());
+
+        Button queueButton = Button.builder(
+            Component.literal("Queue: " + UiUtilsState.delayedUiPackets.size()),
+            b -> b.setMessage(Component
+                .literal("Queue: " + UiUtilsState.delayedUiPackets.size())))
+            .bounds(baseX + halfWidth + spacing, y, halfWidth, 20).build();
+        adder.accept(queueButton);
+        queueCounterButtons.put(queueButton, Boolean.TRUE);
+        y += 20 + spacing;
+
+        adder.accept(Button.builder(Component.literal("Resync Inv"), b -> {
+            if (mc.player != null && tryResyncInventory(mc.player.containerMenu))
+                chatIfEnabled("Inventory resynced");
+            else
+                chatIfEnabled("Failed to resync inventory");
+        }).bounds(baseX, y, halfWidth, 20).build());
+
+        adder.accept(Button.builder(Component.literal("Disconnect"), b -> {
+            if (mc.getConnection() != null)
+                mc.getConnection().getConnection()
+                    .disconnect(Component.literal("Disconnecting (UI-UTILS)"));
+            else
+                LOGGER
+                    .warn("Minecraft connection was null while disconnecting.");
+        }).bounds(baseX + halfWidth + spacing, y, halfWidth, 20).build());
+        y += 20 + spacing;
+
+        Button spamButton = Button.builder(
+            Component.literal("Spam (x" + UiUtilsState.spamCount + ")"), b -> {
+                int sent = sendQueuedPackets(mc, UiUtilsState.spamCount);
+                chatIfEnabled("Spammed queued packets (" + sent + ")");
+            }).bounds(baseX + 32, y, fullWidth - 64, 20).build();
+        adder.accept(Button.builder(Component.literal("-"), b -> {
+            if (UiUtilsState.spamCount > 1)
+                UiUtilsState.spamCount--;
+            spamButton.setMessage(
+                Component.literal("Spam (x" + UiUtilsState.spamCount + ")"));
+        }).bounds(baseX, y, 30, 20).build());
+        adder.accept(spamButton);
+        adder.accept(Button.builder(Component.literal("+"), b -> {
+            if (UiUtilsState.spamCount < 100)
+                UiUtilsState.spamCount++;
+            spamButton.setMessage(
+                Component.literal("Spam (x" + UiUtilsState.spamCount + ")"));
+        }).bounds(baseX + fullWidth - 30, y, 30, 20).build());
+        y += 20 + spacing;
+
+        adder.accept(Button.builder(Component.literal("Send One"), b -> {
+            boolean sent = sendOneQueuedPacket(mc);
+            chatIfEnabled(
+                sent ? "Sent one queued packet" : "No queued packets to send");
+        }).bounds(baseX, y, halfWidth, 20).build());
+
+        adder.accept(Button.builder(Component.literal("Pop Last"), b -> {
+            boolean popped = popLastQueuedPacket();
+            chatIfEnabled(popped ? "Removed last queued packet"
+                : "No queued packets to remove");
+        }).bounds(baseX + halfWidth + spacing, y, halfWidth, 20).build());
+        return y + 20;
     }
 
-    public static boolean isInteger(String str) {
-        if (str == null || str.isEmpty()) return false;
+    public static EditBox createChatField(Minecraft mc, Font font, int x, int y) {
+        EditBox field =
+            new EditBox(font, x, y, 160, 20, Component.literal("Chat ...")) {
+                @Override
+                public boolean keyPressed(KeyEvent keyEvent) {
+                    if (keyEvent.key() == GLFW.GLFW_KEY_ENTER
+                        || keyEvent.key() == GLFW.GLFW_KEY_KP_ENTER) {
+                        String text = getValue();
+                        if (text != null && !text.isEmpty()) {
+                            if (UiUtilsCommandSystem.isUiUtilsCommand(text)) {
+                                String command =
+                                    UiUtilsCommandSystem.extractCommandBody(text);
+                                String result =
+                                    UiUtilsCommandSystem.execute(command);
+                                if (mc.player != null && !result.isEmpty())
+                                    for (String line : result.split("\n"))
+                                        mc.player.sendSystemMessage(
+                                            Component.literal(line));
+                                setValue("");
+                                return false;
+                            }
+
+                            if (mc.getConnection() != null && mc.player != null) {
+                                if (text.startsWith("/"))
+                                    mc.getConnection().sendCommand(
+                                        text.replaceFirst(java.util.regex.Pattern.quote("/"), ""));
+                                else
+                                    mc.getConnection().sendChat(text);
+                            } else
+                                LOGGER.warn(
+                                    "Minecraft player/connection was null while sending chat.");
+                        }
+                        setValue("");
+                    }
+                    return super.keyPressed(keyEvent);
+                }
+            };
+        field.setMaxLength(256);
+        field.setHint(Component.literal("Chat ..."));
+        return field;
+    }
+
+    public static Runnable getFabricatePacketRunnable(Minecraft mc,
+        boolean delay, Packet<?> packet) {
+        Runnable toRun;
+        if (delay) {
+            toRun = () -> {
+                if (mc.getConnection() == null) {
+                    LOGGER.warn(
+                        "Minecraft connection was null while sending packets.");
+                    return;
+                }
+                UiUtilsState.delayedUiPackets.add(packet);
+            };
+        } else {
+            toRun = () -> {
+                if (mc.getConnection() == null) {
+                    LOGGER.warn(
+                        "Minecraft connection was null while sending packets.");
+                    return;
+                }
+                mc.getConnection().send(packet);
+            };
+        }
+        return toRun;
+    }
+
+    public static boolean isInteger(String string) {
         try {
-            Integer.parseInt(str);
+            Integer.parseInt(string);
             return true;
-        } catch (NumberFormatException e) {
+        } catch (Exception e) {
             return false;
         }
     }
 
-    public static Runnable getFabricatePacketRunnable(Minecraft mc, boolean delay,
-                                                     Packet<?> packet) {
-        lastFabricatedPacket = packet;
-        if (delay) {
-            return () -> {
-                UiUtilsState.delayedUiPackets.add(packet);
-            };
-        } else {
-            return () -> {
-                ClientPacketListener handler = mc.getConnection();
-                if (handler != null) handler.send(packet);
-            };
-        }
+    public static void queueTask(Runnable runnable, long delayMs) {
+        Timer timer = new Timer();
+        TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                Minecraft.getInstance().execute(runnable);
+            }
+        };
+        timer.schedule(task, delayMs);
     }
 
-    private static void sendDelayedPackets() {
-        Minecraft mc = Minecraft.getInstance();
-        for (Packet<?> pkt : UiUtilsState.delayedUiPackets) {
-            sendPacket(pkt);
-        }
-        UiUtilsState.delayedUiPackets.clear();
-    }
+    private static final class FabricatePacketScreen extends Screen {
+        private static final int FIELD_WIDTH = 110;
+        private static final int ROW_SPACING = 36;
+        private static final int LABEL_OFFSET = 10;
+        private static final int CONTENT_TOP_OFFSET = 12;
+        private static final int PANEL_WIDTH = 260;
+        private static final int PANEL_HEIGHT = 320;
+        private static final int PANEL_PADDING = 16;
+        private static final int PANEL_BORDER = 4;
+        private static final int MODE_BUTTON_WIDTH = 110;
+        private static final int MODE_BUTTON_GAP = 10;
+        private static final int DELAY_BUTTON_WIDTH = 90;
+        private static final int TIMES_FIELD_WIDTH = 50;
+        private static final int STATUS_DURATION_MS = 1500;
+        private static final int STATUS_SUCCESS = 0xFF55FF55;
+        private static final int STATUS_ERROR = 0xFFFF5555;
 
-    private static void sendPacket(Packet<?> packet) {
-        Minecraft mc = Minecraft.getInstance();
-        ClientPacketListener handler = mc.getConnection();
-        if (handler != null) handler.send(packet);
+        private final Screen parent;
+        private PacketMode selectedMode = PacketMode.CLICK_SLOT;
+        private final int initialSyncId;
+        private final int initialRevision;
+        private int panelX;
+        private int panelY;
+
+        private Button clickSlotModeButton;
+        private Button buttonClickModeButton;
+
+        private EditBox clickSyncIdField;
+        private EditBox clickRevisionField;
+        private EditBox clickSlotField;
+        private EditBox clickButtonField;
+        private CycleButton<ContainerInput> clickActionButton;
+        private CycleButton<Boolean> clickDelayToggle;
+        private EditBox clickTimesField;
+        private Button clickSendButton;
+
+        private EditBox buttonSyncIdField;
+        private EditBox buttonIdField;
+        private CycleButton<Boolean> buttonDelayToggle;
+        private EditBox buttonTimesField;
+        private Button buttonSendButton;
+
+        private Component statusMessage;
+        private int statusColor;
+
+        private enum PacketMode {
+            CLICK_SLOT,
+            BUTTON_CLICK
+        }
+
+        private FabricatePacketScreen(Screen parent, int syncId, int revision) {
+            super(Component.literal("Fabricate Packet"));
+            this.parent = parent;
+            this.initialSyncId = syncId;
+            this.initialRevision = revision;
+        }
+
+        @Override
+        protected void init() {
+            super.init();
+            panelX = (width - PANEL_WIDTH) / 2;
+            panelY = (height - PANEL_HEIGHT) / 2;
+            clampPanelPosition();
+
+            clickSlotModeButton = Button
+                .builder(Component.literal("Click Slot"),
+                    b -> switchMode(PacketMode.CLICK_SLOT))
+                .bounds(0, 0, MODE_BUTTON_WIDTH, 20).build();
+            buttonClickModeButton = Button
+                .builder(Component.literal("Button Click"),
+                    b -> switchMode(PacketMode.BUTTON_CLICK))
+                .bounds(0, 0, MODE_BUTTON_WIDTH, 20).build();
+            addRenderableWidget(clickSlotModeButton);
+            addRenderableWidget(buttonClickModeButton);
+
+            clickSyncIdField = new EditBox(font, 0, 0, FIELD_WIDTH, 20,
+                Component.literal("Sync Id"));
+            clickSyncIdField.setValue(String.valueOf(initialSyncId));
+            addRenderableWidget(clickSyncIdField);
+
+            clickRevisionField = new EditBox(font, 0, 0, FIELD_WIDTH, 20,
+                Component.literal("Revision"));
+            clickRevisionField.setValue(String.valueOf(initialRevision));
+            addRenderableWidget(clickRevisionField);
+
+            clickSlotField = new EditBox(font, 0, 0, FIELD_WIDTH, 20,
+                Component.literal("Slot"));
+            clickSlotField.setValue("0");
+            addRenderableWidget(clickSlotField);
+
+            clickButtonField = new EditBox(font, 0, 0, FIELD_WIDTH, 20,
+                Component.literal("Button"));
+            clickButtonField.setValue("0");
+            addRenderableWidget(clickButtonField);
+
+            clickActionButton = CycleButton
+                .<ContainerInput>builder(
+                    action -> Component.literal(action.name()),
+                    () -> ContainerInput.PICKUP)
+                .withValues(ContainerInput.values()).create(0, 0, FIELD_WIDTH,
+                    20, Component.literal("Action"), (button, value) -> {});
+            addRenderableWidget(clickActionButton);
+
+            clickDelayToggle =
+                CycleButton.onOffBuilder(false).create(0, 0, DELAY_BUTTON_WIDTH,
+                    20, Component.literal("Delay"), (button, value) -> {});
+            addRenderableWidget(clickDelayToggle);
+
+            clickTimesField = new EditBox(font, 0, 0, TIMES_FIELD_WIDTH, 20,
+                Component.literal("Times to send"));
+            clickTimesField.setValue("1");
+            addRenderableWidget(clickTimesField);
+
+            clickSendButton =
+                Button.builder(Component.literal("Send"), b -> sendClickSlot())
+                    .bounds(0, 0, 90, 20).build();
+            addRenderableWidget(clickSendButton);
+
+            buttonSyncIdField = new EditBox(font, 0, 0, FIELD_WIDTH, 20,
+                Component.literal("Sync Id"));
+            buttonSyncIdField.setValue(String.valueOf(initialSyncId));
+            addRenderableWidget(buttonSyncIdField);
+
+            buttonIdField = new EditBox(font, 0, 0, FIELD_WIDTH, 20,
+                Component.literal("Button Id"));
+            buttonIdField.setValue("0");
+            addRenderableWidget(buttonIdField);
+
+            buttonDelayToggle =
+                CycleButton.onOffBuilder(false).create(0, 0, DELAY_BUTTON_WIDTH,
+                    20, Component.literal("Delay"), (button, value) -> {});
+            addRenderableWidget(buttonDelayToggle);
+
+            buttonTimesField = new EditBox(font, 0, 0, TIMES_FIELD_WIDTH, 20,
+                Component.literal("Times to send"));
+            buttonTimesField.setValue("1");
+            addRenderableWidget(buttonTimesField);
+
+            buttonSendButton = Button
+                .builder(Component.literal("Send"), b -> sendButtonClick())
+                .bounds(0, 0, 90, 20).build();
+            addRenderableWidget(buttonSendButton);
+
+            layoutWidgets();
+            switchMode(PacketMode.CLICK_SLOT);
+        }
+
+        @Override
+        public void extractRenderState(GuiGraphicsExtractor graphics,
+            int mouseX, int mouseY, float partialTicks) {
+            super.extractRenderState(graphics, mouseX, mouseY, partialTicks);
+            drawFieldLabels(graphics);
+            graphics.centeredText(font, title, width / 2, 20, 0xFFFFFFFF);
+            if (statusMessage != null)
+                graphics.centeredText(font, statusMessage, width / 2,
+                    height - 25, statusColor);
+        }
+
+        @Override
+        public void extractBackground(GuiGraphicsExtractor graphics, int mouseX,
+            int mouseY, float partialTicks) {
+            super.extractBackground(graphics, mouseX, mouseY, partialTicks);
+            drawPanel(graphics);
+        }
+
+        private void drawFieldLabels(GuiGraphicsExtractor graphics) {
+            int labelColor = 0xFFAAAAAA;
+            if (selectedMode == PacketMode.CLICK_SLOT) {
+                drawFieldLabel(graphics, "Sync Id", clickSyncIdField.getX(),
+                    clickSyncIdField.getY(), labelColor);
+                drawFieldLabel(graphics, "Revision", clickRevisionField.getX(),
+                    clickRevisionField.getY(), labelColor);
+                drawFieldLabel(graphics, "Slot", clickSlotField.getX(),
+                    clickSlotField.getY(), labelColor);
+                drawFieldLabel(graphics, "Button", clickButtonField.getX(),
+                    clickButtonField.getY(), labelColor);
+            } else {
+                drawFieldLabel(graphics, "Sync Id", buttonSyncIdField.getX(),
+                    buttonSyncIdField.getY(), labelColor);
+                drawFieldLabel(graphics, "Button Id", buttonIdField.getX(),
+                    buttonIdField.getY(), labelColor);
+            }
+        }
+
+        private void drawFieldLabel(GuiGraphicsExtractor graphics, String text,
+            int x, int y, int color) {
+            graphics.text(font, text, x, y - LABEL_OFFSET, color);
+        }
+
+        private void drawPanel(GuiGraphicsExtractor graphics) {
+            int x0 = panelX - PANEL_BORDER;
+            int y0 = panelY - PANEL_BORDER;
+            int x1 = panelX + PANEL_WIDTH + PANEL_BORDER;
+            int y1 = panelY + PANEL_HEIGHT + PANEL_BORDER;
+            graphics.fill(x0, y0, x1, y1, 0x90000000);
+            graphics.fill(panelX, panelY, panelX + PANEL_WIDTH,
+                panelY + PANEL_HEIGHT, 0xE0202030);
+        }
+
+        @Override
+        public void onClose() {
+            minecraft.setScreen(parent);
+        }
+
+        @Override
+        public boolean isPauseScreen() {
+            return false;
+        }
+
+        private void switchMode(PacketMode mode) {
+            selectedMode = mode;
+            updateModeButtons();
+            updateFieldVisibility();
+        }
+
+        private void updateModeButtons() {
+            clickSlotModeButton.setMessage(Component.literal("Click Slot"
+                + (selectedMode == PacketMode.CLICK_SLOT ? " \u2713" : "")));
+            buttonClickModeButton.setMessage(Component.literal("Button Click"
+                + (selectedMode == PacketMode.BUTTON_CLICK ? " \u2713" : "")));
+        }
+
+        private void updateFieldVisibility() {
+            boolean showClick = selectedMode == PacketMode.CLICK_SLOT;
+            clickSyncIdField.visible = showClick;
+            clickRevisionField.visible = showClick;
+            clickSlotField.visible = showClick;
+            clickButtonField.visible = showClick;
+            clickActionButton.visible = showClick;
+            clickDelayToggle.visible = showClick;
+            clickTimesField.visible = showClick;
+            clickSendButton.visible = showClick;
+            if (!showClick) {
+                clickSyncIdField.setFocused(false);
+                clickRevisionField.setFocused(false);
+                clickSlotField.setFocused(false);
+                clickButtonField.setFocused(false);
+                clickActionButton.setFocused(false);
+                clickDelayToggle.setFocused(false);
+                clickTimesField.setFocused(false);
+            }
+
+            boolean showButton = selectedMode == PacketMode.BUTTON_CLICK;
+            buttonSyncIdField.visible = showButton;
+            buttonIdField.visible = showButton;
+            buttonDelayToggle.visible = showButton;
+            buttonTimesField.visible = showButton;
+            buttonSendButton.visible = showButton;
+            if (!showButton) {
+                buttonSyncIdField.setFocused(false);
+                buttonIdField.setFocused(false);
+                buttonDelayToggle.setFocused(false);
+                buttonTimesField.setFocused(false);
+            }
+        }
+
+        private void layoutWidgets() {
+            clampPanelPosition();
+            int modeGroupWidth = MODE_BUTTON_WIDTH * 2 + MODE_BUTTON_GAP;
+            int modeStartX = panelX + (PANEL_WIDTH - modeGroupWidth) / 2;
+            int modeY = panelY + 22;
+            clickSlotModeButton.setX(modeStartX);
+            clickSlotModeButton.setY(modeY);
+            buttonClickModeButton
+                .setX(modeStartX + MODE_BUTTON_WIDTH + MODE_BUTTON_GAP);
+            buttonClickModeButton.setY(modeY);
+
+            int inputX = panelX + (PANEL_WIDTH - FIELD_WIDTH) / 2;
+            int y = modeY + 32 + CONTENT_TOP_OFFSET;
+            clickSyncIdField.setX(inputX);
+            clickSyncIdField.setY(y);
+            y += ROW_SPACING;
+            clickRevisionField.setX(inputX);
+            clickRevisionField.setY(y);
+            y += ROW_SPACING;
+            clickSlotField.setX(inputX);
+            clickSlotField.setY(y);
+            y += ROW_SPACING;
+            clickButtonField.setX(inputX);
+            clickButtonField.setY(y);
+            y += ROW_SPACING;
+            clickActionButton.setX(inputX);
+            clickActionButton.setY(y);
+            y += ROW_SPACING;
+            int delayTotal = DELAY_BUTTON_WIDTH + 8 + TIMES_FIELD_WIDTH;
+            int delayX = panelX + (PANEL_WIDTH - delayTotal) / 2;
+            clickDelayToggle.setX(delayX);
+            clickDelayToggle.setY(y);
+            clickTimesField.setX(delayX + DELAY_BUTTON_WIDTH + 8);
+            clickTimesField.setY(y);
+            y += ROW_SPACING;
+            clickSendButton.setX(panelX + (PANEL_WIDTH - 90) / 2);
+            clickSendButton.setY(y);
+
+            int buttonY = modeY + 32 + CONTENT_TOP_OFFSET;
+            buttonSyncIdField.setX(inputX);
+            buttonSyncIdField.setY(buttonY);
+            buttonY += ROW_SPACING;
+            buttonIdField.setX(inputX);
+            buttonIdField.setY(buttonY);
+            buttonY += ROW_SPACING;
+            buttonDelayToggle.setX(delayX);
+            buttonDelayToggle.setY(buttonY);
+            buttonTimesField.setX(delayX + DELAY_BUTTON_WIDTH + 8);
+            buttonTimesField.setY(buttonY);
+            buttonY += ROW_SPACING;
+            buttonSendButton.setX(panelX + (PANEL_WIDTH - 90) / 2);
+            buttonSendButton.setY(buttonY);
+        }
+
+        private void clampPanelPosition() {
+            panelX = Mth.clamp(panelX, 8, Math.max(width - PANEL_WIDTH - 8, 8));
+            panelY =
+                Mth.clamp(panelY, 8, Math.max(height - PANEL_HEIGHT - 8, 8));
+        }
+
+        private void sendClickSlot() {
+            if (!UiUtils.isInteger(clickSyncIdField.getValue())
+                || !UiUtils.isInteger(clickRevisionField.getValue())
+                || !UiUtils.isInteger(clickSlotField.getValue())
+                || !UiUtils.isInteger(clickButtonField.getValue())
+                || !UiUtils.isInteger(clickTimesField.getValue())) {
+                showStatus(Component.literal("Invalid arguments!"),
+                    STATUS_ERROR);
+                return;
+            }
+
+            int syncId = Integer.parseInt(clickSyncIdField.getValue());
+            short slot = Short.parseShort(clickSlotField.getValue());
+            byte button = Byte.parseByte(clickButtonField.getValue());
+            int timesToSend = Integer.parseInt(clickTimesField.getValue());
+            if (timesToSend < 1) {
+                showStatus(Component.literal("Invalid arguments!"),
+                    STATUS_ERROR);
+                return;
+            }
+
+            ContainerInput action = clickActionButton.getValue();
+            if (action == null) {
+                showStatus(Component.literal("Invalid arguments!"),
+                    STATUS_ERROR);
+                return;
+            }
+
+            if (minecraft.getConnection() == null || minecraft.player == null) {
+                showStatus(
+                    Component.literal("You must be connected to a server!"),
+                    STATUS_ERROR);
+                return;
+            }
+
+            AbstractContainerMenu menu = minecraft.player.containerMenu;
+            if (menu == null) {
+                showStatus(Component.literal("No open container!"),
+                    STATUS_ERROR);
+                return;
+            }
+
+            HashedPatchMap.HashGenerator hashGenerator =
+                minecraft.getConnection().decoratedHashOpsGenenerator();
+            java.util.List<net.minecraft.world.item.ItemStack> beforeStacks =
+                new java.util.ArrayList<>(menu.slots.size());
+            for (int i = 0; i < menu.slots.size(); i++)
+                beforeStacks.add(menu.slots.get(i).getItem().copy());
+            net.minecraft.world.item.ItemStack carriedBeforeStack =
+                menu.getCarried().copy();
+
+            menu.clicked(slot, button, action, minecraft.player);
+
+            int revision = menu.getStateId();
+
+            Int2ObjectMap<HashedStack> diffSlots = new Int2ObjectArrayMap<>();
+            StringBuilder diffLog = new StringBuilder();
+            for (int i = 0; i < menu.slots.size(); i++) {
+                net.minecraft.world.item.ItemStack beforeStack =
+                    beforeStacks.get(i);
+                net.minecraft.world.item.ItemStack afterStack =
+                    menu.slots.get(i).getItem();
+                boolean changed;
+                if (beforeStack.isEmpty() && afterStack.isEmpty())
+                    changed = false;
+                else if (beforeStack.isEmpty() != afterStack.isEmpty())
+                    changed = true;
+                else
+                    changed = beforeStack.getItem() != afterStack.getItem()
+                        || beforeStack.getCount() != afterStack.getCount();
+                if (changed) {
+                    HashedStack afterHashed =
+                        HashedStack.create(afterStack, hashGenerator);
+                    diffSlots.put(i, afterHashed);
+                    diffLog.append("[").append(i).append(": ")
+                        .append(beforeStack.isEmpty() ? "empty"
+                            : beforeStack.getItem().toString() + "x"
+                                + beforeStack.getCount())
+                        .append(" -> ")
+                        .append(afterStack.isEmpty() ? "empty"
+                            : afterStack.getItem().toString() + "x"
+                                + afterStack.getCount())
+                        .append("] ");
+                }
+            }
+
+            HashedStack cursor =
+                HashedStack.create(menu.getCarried(), hashGenerator);
+
+            ServerboundContainerClickPacket packet =
+                new ServerboundContainerClickPacket(syncId, revision, slot,
+                    button, action, diffSlots, cursor);
+
+            try {
+                LOGGER.info(
+                    "Fabricate ClickSlot: syncId={}, revision={}, slot={}, button={}, action={}, times={}, diffSlots={}",
+                    syncId, revision, slot, button, action, timesToSend,
+                    diffSlots.size());
+                chatIfEnabled("ClickSlot: slot=" + slot + ", action=" + action
+                    + ", diff=" + diffSlots.size());
+                Runnable toRun = getFabricatePacketRunnable(minecraft,
+                    clickDelayToggle.getValue(), packet);
+                for (int i = 0; i < timesToSend; i++)
+                    toRun.run();
+            } catch (Exception e) {
+                showStatus(
+                    Component.literal("You must be connected to a server!"),
+                    STATUS_ERROR);
+                return;
+            }
+
+            showStatus(Component.literal("Sent successfully!"), STATUS_SUCCESS);
+        }
+
+        private void sendButtonClick() {
+            if (!UiUtils.isInteger(buttonSyncIdField.getValue())
+                || !UiUtils.isInteger(buttonIdField.getValue())
+                || !UiUtils.isInteger(buttonTimesField.getValue())) {
+                showStatus(Component.literal("Invalid arguments!"),
+                    STATUS_ERROR);
+                return;
+            }
+
+            int syncId = Integer.parseInt(buttonSyncIdField.getValue());
+            int buttonId = Integer.parseInt(buttonIdField.getValue());
+            int timesToSend = Integer.parseInt(buttonTimesField.getValue());
+            if (timesToSend < 1) {
+                showStatus(Component.literal("Invalid arguments!"),
+                    STATUS_ERROR);
+                return;
+            }
+
+            ServerboundContainerButtonClickPacket packet =
+                new ServerboundContainerButtonClickPacket(syncId, buttonId);
+
+            try {
+                LOGGER.info(
+                    "Fabricate ButtonClick: syncId={}, buttonId={}, times={}",
+                    syncId, buttonId, timesToSend);
+                chatIfEnabled("ButtonClick: buttonId=" + buttonId + ", times="
+                    + timesToSend);
+                Runnable toRun = getFabricatePacketRunnable(minecraft,
+                    buttonDelayToggle.getValue(), packet);
+                for (int i = 0; i < timesToSend; i++)
+                    toRun.run();
+            } catch (Exception e) {
+                showStatus(
+                    Component.literal("You must be connected to a server!"),
+                    STATUS_ERROR);
+                return;
+            }
+
+            showStatus(Component.literal("Sent successfully!"), STATUS_SUCCESS);
+        }
+
+        private void showStatus(Component message, int color) {
+            statusMessage = message;
+            statusColor = color;
+            queueTask(() -> {
+                if (minecraft.screen == this) {
+                    statusMessage = null;
+                    statusColor = 0;
+                }
+            }, STATUS_DURATION_MS);
+        }
     }
 }

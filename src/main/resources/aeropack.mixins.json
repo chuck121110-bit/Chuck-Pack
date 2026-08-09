@@ -41,7 +41,8 @@
     "LocalPlayerAccessor",
     "PlayerMoveC2SPacketAccessor",
     "NoRotateMixin",
-    "KillAuraMixin"
+    "KillAuraMixin",
+    "WaypointReaderMixin"
   ],
   "injectors": { "defaultRequire": 0 }
 }

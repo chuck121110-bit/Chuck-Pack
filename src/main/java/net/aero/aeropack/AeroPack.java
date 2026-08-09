@@ -25,7 +25,6 @@ import net.aero.aeropack.modules.misc.StaffMonitor;
 import net.aero.aeropack.modules.movement.AutoFly;
 import net.aero.aeropack.modules.movement.BedrockEscape;
 import net.aero.aeropack.modules.movement.FlightScrollHandler;
-import net.aero.aeropack.modules.movement.JumpFlight;
 import net.aero.aeropack.modules.render.CoordinateLogout;
 import net.aero.aeropack.modules.render.DeepslateESP;
 import net.aero.aeropack.modules.render.NewChunks;
@@ -73,7 +72,6 @@ public class AeroPack extends MeteorAddon {
         addModule(new DoubleDoorsInteract());
         addModule(new AutoInteract());
         addModule(new AntiSocial());
-        addModule(new JumpFlight());
         addModule(new AutoFly());
         addModule(new BedrockEscape());
         addModule(new AutoFarming());

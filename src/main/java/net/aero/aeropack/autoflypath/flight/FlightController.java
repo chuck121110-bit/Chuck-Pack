@@ -79,7 +79,7 @@ public final class FlightController
 
 {
 
-	private static final int PACK_RADIUS_CHUNKS = 40;
+	private static final int PACK_RADIUS_CHUNKS = 16;
 
 	private static final int TICKS_BETWEEN_PATH_RETRIES = 20;
 
@@ -1923,6 +1923,17 @@ public final class FlightController
 
 		double d = this.abortLanding ? 2.0 : this.config.flightArrivalRadius;
 
+		if(this.planFinalX != null && this.planFinalZ != null)
+		{
+			double dxFinal = (double)this.planFinalX + 0.5 - playerPos.x;
+			double dzFinal = (double)this.planFinalZ + 0.5 - playerPos.z;
+			double distToFinal = Math.sqrt(dxFinal * dxFinal + dzFinal * dzFinal);
+			if(distToFinal < d)
+			{
+				this.destinationIsFinal = true;
+			}
+		}
+
 		if(distToDest0 < d && this.destinationIsFinal)
 
 		{
@@ -2061,7 +2072,7 @@ public final class FlightController
 
 		}
 
-		if(!this.config.waitChunks && this.level().getChunkSource().getChunk(this.feet().getX() >> 4, this.feet().getZ() >> 4, false) == null)
+		if(this.config.waitChunks && this.level().getChunkSource().getChunk(this.feet().getX() >> 4, this.feet().getZ() >> 4, false) == null)
 
 		{
 
@@ -2773,7 +2784,7 @@ public final class FlightController
 
 		int dcz = this.destination.getZ() >> 4;
 
-		if(this.level().getChunkSource().getChunk(dcx, dcz, false) == null)
+		if(this.config.waitChunks && this.level().getChunkSource().getChunk(dcx, dcz, false) == null)
 
 		{
 

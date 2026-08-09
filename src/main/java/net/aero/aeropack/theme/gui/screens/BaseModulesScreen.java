@@ -82,28 +82,23 @@ public class BaseModulesScreen extends TabScreen {
         w.id = category.name;
         w.padding = w.spacing = 0;
         if (theme.categoryIcons()) {
-            String iconText = null;
             ItemStack iconStack = null;
-
-            try {
-                java.lang.reflect.Field iconTextField = Category.class.getField("iconText");
-                iconText = (String) iconTextField.get(category);
-            } catch (NoSuchFieldException | IllegalAccessException e) {
-            }
 
             try {
                 java.lang.reflect.Field iconField = Category.class.getField("icon");
                 Object icon = iconField.get(category);
-                if (icon instanceof ItemStack) {
-                    iconStack = (ItemStack) icon;
+                if (icon instanceof java.util.function.Supplier<?> supplier) {
+                    Object resolved = supplier.get();
+                    if (resolved instanceof ItemStack stack) {
+                        iconStack = stack;
+                    }
+                } else if (icon instanceof ItemStack stack) {
+                    iconStack = stack;
                 }
-            } catch (NoSuchFieldException | IllegalAccessException e) {
+            } catch (ReflectiveOperationException ignored) {
             }
 
-            if (iconText != null && !iconText.isEmpty()) {
-                final String text = iconText;
-                w.beforeHeaderInit = wContainer -> wContainer.add(theme.label(text)).pad(2);
-            } else if (iconStack != null) {
+            if (iconStack != null) {
                 final ItemStack stack = iconStack;
                 w.beforeHeaderInit = wContainer -> wContainer.add(theme.item(stack)).pad(2);
             }

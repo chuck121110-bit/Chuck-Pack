@@ -5,59 +5,82 @@ Daemon will be stopped at the end of the build
 Fabric Loom: 1.16.3
 
 > Task :compileJava
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:33: warning: Unsafe is internal proprietary API and may be removed in a future release
-import sun.misc.Unsafe;
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\ui_utils\UiUtilsBookEditScreenMixin.java:50: error: cannot find symbol
+        UiUtils.refreshLabels();
                ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:139: warning: Unsafe is internal proprietary API and may be removed in a future release
-            Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-                                ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:141: warning: Unsafe is internal proprietary API and may be removed in a future release
-            Unsafe unsafe = (Unsafe) unsafeField.get(null);
-            ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:141: warning: Unsafe is internal proprietary API and may be removed in a future release
-            Unsafe unsafe = (Unsafe) unsafeField.get(null);
-                             ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:147: warning: [removal] objectFieldOffset(Field) in Unsafe has been deprecated and marked for removal
-            long visibleOffset = unsafe.objectFieldOffset(visibleField);
-                                       ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:148: warning: [removal] putObject(Object,long,Object) in Unsafe has been deprecated and marked for removal
-            unsafe.putObject(maxBlocks, visibleOffset, HIDDEN);
-                  ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:156: warning: Unsafe is internal proprietary API and may be removed in a future release
-            Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-                                ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:158: warning: Unsafe is internal proprietary API and may be removed in a future release
-            Unsafe unsafe = (Unsafe) unsafeField.get(null);
-            ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:158: warning: Unsafe is internal proprietary API and may be removed in a future release
-            Unsafe unsafe = (Unsafe) unsafeField.get(null);
-                             ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:161: warning: [removal] objectFieldOffset(Field) in Unsafe has been deprecated and marked for removal
-            long nameOffset = unsafe.objectFieldOffset(nameField);
-                                    ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:162: warning: [removal] putObject(Object,long,Object) in Unsafe has been deprecated and marked for removal
-            unsafe.putObject(setting, nameOffset, newName);
-                  ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:165: warning: [removal] objectFieldOffset(Field) in Unsafe has been deprecated and marked for removal
-            long titleOffset = unsafe.objectFieldOffset(titleField);
-                                     ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:166: warning: [removal] putObject(Object,long,Object) in Unsafe has been deprecated and marked for removal
-            unsafe.putObject(setting, titleOffset, newTitle);
-                  ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\pathfinding\FlyPathProcessor.java:105: error: cannot find symbol
-			double horizontalSpeed = flight != null ? (double) flight.getOffGroundSpeed() : 1.0;
-			                                                         ^
-  symbol:   method getOffGroundSpeed()
-  location: variable flight of type Flight
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\pathfinding\FlyPathProcessor.java:122: error: cannot find symbol
-			double verticalSpeed = flight != null ? (double) flight.getOffGroundSpeed() : 0.5;
-			                                                       ^
-  symbol:   method getOffGroundSpeed()
-  location: variable flight of type Flight
-Note: Some input files use unchecked or unsafe operations.
-Note: Recompile with -Xlint:unchecked for details.
-2 errors
-13 warnings
+  symbol:   method refreshLabels()
+  location: class UiUtils
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\ui_utils\UiUtilsBookScreenMixin.java:50: error: cannot find symbol
+        UiUtils.refreshLabels();
+               ^
+  symbol:   method refreshLabels()
+  location: class UiUtils
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:78: error: cannot find symbol
+        UiUtilsState.storedScreen = mc.gui.screen();
+                                          ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:80: error: cannot find symbol
+        UiUtilsState.savedScreens.put(key, mc.gui.screen());
+                                                 ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:95: error: cannot find symbol
+        mc.gui.setScreen(screen);
+              ^
+  symbol:   method setScreen(Screen)
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:177: error: cannot find symbol
+                mc.gui.setScreen(null);
+                      ^
+  symbol:   method setScreen(<null>)
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:229: error: cannot find symbol
+                mc.gui.setScreen(null);
+                      ^
+  symbol:   method setScreen(<null>)
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:253: error: cannot find symbol
+                if (mc.gui.screen() instanceof AbstractContainerScreen) {
+                          ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:265: error: cannot find symbol
+                    mc.gui.setScreen(new FabricatePacketScreen(mc.gui.screen(),
+                                                                     ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:265: error: cannot find symbol
+                    mc.gui.setScreen(new FabricatePacketScreen(mc.gui.screen(),
+                          ^
+  symbol:   method setScreen(FabricatePacketScreen)
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:274: error: cannot find symbol
+                    if (mc.gui.screen() == null)
+                              ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:282: error: cannot find symbol
+                                        mc.gui.screen().getTitle())
+                                              ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:660: error: cannot find symbol
+            minecraft.gui.setScreen(parent);
+                         ^
+  symbol:   method setScreen(Screen)
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:934: error: cannot find symbol
+                if (minecraft.gui.screen() == this) {
+                                 ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtilsCommandSystem.java:70: error: cannot find symbol
+        Minecraft.getInstance().gui.setScreen(null);
+                                   ^
+  symbol:   method setScreen(<null>)
+  location: variable gui of type Gui
+15 errors
 
 > Task :compileJava FAILED
 
@@ -68,59 +91,82 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':compileJava'.
 > Compilation failed; see the compiler output below.
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:33: warning: Unsafe is internal proprietary API and may be removed in a future release
-  import sun.misc.Unsafe;
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\ui_utils\UiUtilsBookEditScreenMixin.java:50: error: cannot find symbol
+          UiUtils.refreshLabels();
                  ^
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:139: warning: Unsafe is internal proprietary API and may be removed in a future release
-              Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-                                  ^
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:141: warning: Unsafe is internal proprietary API and may be removed in a future release
-              Unsafe unsafe = (Unsafe) unsafeField.get(null);
-              ^
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:141: warning: Unsafe is internal proprietary API and may be removed in a future release
-              Unsafe unsafe = (Unsafe) unsafeField.get(null);
-                               ^
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:156: warning: Unsafe is internal proprietary API and may be removed in a future release
-              Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-                                  ^
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:158: warning: Unsafe is internal proprietary API and may be removed in a future release
-              Unsafe unsafe = (Unsafe) unsafeField.get(null);
-              ^
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:158: warning: Unsafe is internal proprietary API and may be removed in a future release
-              Unsafe unsafe = (Unsafe) unsafeField.get(null);
-                               ^
-  Note: Recompile with -Xlint:unchecked for details.
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:147: warning: [removal] objectFieldOffset(Field) in Unsafe has been deprecated and marked for removal
-              long visibleOffset = unsafe.objectFieldOffset(visibleField);
-                                         ^
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:148: warning: [removal] putObject(Object,long,Object) in Unsafe has been deprecated and marked for removal
-              unsafe.putObject(maxBlocks, visibleOffset, HIDDEN);
-                    ^
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:161: warning: [removal] objectFieldOffset(Field) in Unsafe has been deprecated and marked for removal
-              long nameOffset = unsafe.objectFieldOffset(nameField);
-                                      ^
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:162: warning: [removal] putObject(Object,long,Object) in Unsafe has been deprecated and marked for removal
-              unsafe.putObject(setting, nameOffset, newName);
-                    ^
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:165: warning: [removal] objectFieldOffset(Field) in Unsafe has been deprecated and marked for removal
-              long titleOffset = unsafe.objectFieldOffset(titleField);
-                                       ^
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:166: warning: [removal] putObject(Object,long,Object) in Unsafe has been deprecated and marked for removal
-              unsafe.putObject(setting, titleOffset, newTitle);
-                    ^
-  Note: Some input files use unchecked or unsafe operations.
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\pathfinding\FlyPathProcessor.java:105: error: cannot find symbol
-  			double horizontalSpeed = flight != null ? (double) flight.getOffGroundSpeed() : 1.0;
-  			                                                         ^
-    symbol:   method getOffGroundSpeed()
-    location: variable flight of type Flight
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\pathfinding\FlyPathProcessor.java:122: error: cannot find symbol
-  			double verticalSpeed = flight != null ? (double) flight.getOffGroundSpeed() : 0.5;
-  			                                                       ^
-    symbol:   method getOffGroundSpeed()
-    location: variable flight of type Flight
-  2 errors
-  13 warnings
+    symbol:   method refreshLabels()
+    location: class UiUtils
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\ui_utils\UiUtilsBookScreenMixin.java:50: error: cannot find symbol
+          UiUtils.refreshLabels();
+                 ^
+    symbol:   method refreshLabels()
+    location: class UiUtils
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:78: error: cannot find symbol
+          UiUtilsState.storedScreen = mc.gui.screen();
+                                            ^
+    symbol:   method screen()
+    location: variable gui of type Gui
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:80: error: cannot find symbol
+          UiUtilsState.savedScreens.put(key, mc.gui.screen());
+                                                   ^
+    symbol:   method screen()
+    location: variable gui of type Gui
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:95: error: cannot find symbol
+          mc.gui.setScreen(screen);
+                ^
+    symbol:   method setScreen(Screen)
+    location: variable gui of type Gui
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:177: error: cannot find symbol
+                  mc.gui.setScreen(null);
+                        ^
+    symbol:   method setScreen(<null>)
+    location: variable gui of type Gui
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:229: error: cannot find symbol
+                  mc.gui.setScreen(null);
+                        ^
+    symbol:   method setScreen(<null>)
+    location: variable gui of type Gui
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:253: error: cannot find symbol
+                  if (mc.gui.screen() instanceof AbstractContainerScreen) {
+                            ^
+    symbol:   method screen()
+    location: variable gui of type Gui
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:265: error: cannot find symbol
+                      mc.gui.setScreen(new FabricatePacketScreen(mc.gui.screen(),
+                                                                       ^
+    symbol:   method screen()
+    location: variable gui of type Gui
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:265: error: cannot find symbol
+                      mc.gui.setScreen(new FabricatePacketScreen(mc.gui.screen(),
+                            ^
+    symbol:   method setScreen(FabricatePacketScreen)
+    location: variable gui of type Gui
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:274: error: cannot find symbol
+                      if (mc.gui.screen() == null)
+                                ^
+    symbol:   method screen()
+    location: variable gui of type Gui
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:282: error: cannot find symbol
+                                          mc.gui.screen().getTitle())
+                                                ^
+    symbol:   method screen()
+    location: variable gui of type Gui
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:660: error: cannot find symbol
+              minecraft.gui.setScreen(parent);
+                           ^
+    symbol:   method setScreen(Screen)
+    location: variable gui of type Gui
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:934: error: cannot find symbol
+                  if (minecraft.gui.screen() == this) {
+                                   ^
+    symbol:   method screen()
+    location: variable gui of type Gui
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtilsCommandSystem.java:70: error: cannot find symbol
+          Minecraft.getInstance().gui.setScreen(null);
+                                     ^
+    symbol:   method setScreen(<null>)
+    location: variable gui of type Gui
+  15 errors
 
 * Try:
 > Check your code and dependencies to fix the compilation error(s)
@@ -162,59 +208,82 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':compile
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
 Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Compilation failed; see the compiler output below.
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:33: warning: Unsafe is internal proprietary API and may be removed in a future release
-import sun.misc.Unsafe;
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\ui_utils\UiUtilsBookEditScreenMixin.java:50: error: cannot find symbol
+        UiUtils.refreshLabels();
                ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:139: warning: Unsafe is internal proprietary API and may be removed in a future release
-            Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-                                ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:141: warning: Unsafe is internal proprietary API and may be removed in a future release
-            Unsafe unsafe = (Unsafe) unsafeField.get(null);
-            ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:141: warning: Unsafe is internal proprietary API and may be removed in a future release
-            Unsafe unsafe = (Unsafe) unsafeField.get(null);
-                             ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:147: warning: [removal] objectFieldOffset(Field) in Unsafe has been deprecated and marked for removal
-            long visibleOffset = unsafe.objectFieldOffset(visibleField);
-                                       ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:148: warning: [removal] putObject(Object,long,Object) in Unsafe has been deprecated and marked for removal
-            unsafe.putObject(maxBlocks, visibleOffset, HIDDEN);
-                  ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:156: warning: Unsafe is internal proprietary API and may be removed in a future release
-            Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-                                ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:158: warning: Unsafe is internal proprietary API and may be removed in a future release
-            Unsafe unsafe = (Unsafe) unsafeField.get(null);
-            ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:158: warning: Unsafe is internal proprietary API and may be removed in a future release
-            Unsafe unsafe = (Unsafe) unsafeField.get(null);
-                             ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:161: warning: [removal] objectFieldOffset(Field) in Unsafe has been deprecated and marked for removal
-            long nameOffset = unsafe.objectFieldOffset(nameField);
-                                    ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:162: warning: [removal] putObject(Object,long,Object) in Unsafe has been deprecated and marked for removal
-            unsafe.putObject(setting, nameOffset, newName);
-                  ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:165: warning: [removal] objectFieldOffset(Field) in Unsafe has been deprecated and marked for removal
-            long titleOffset = unsafe.objectFieldOffset(titleField);
-                                     ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\NukerMixin.java:166: warning: [removal] putObject(Object,long,Object) in Unsafe has been deprecated and marked for removal
-            unsafe.putObject(setting, titleOffset, newTitle);
-                  ^
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\pathfinding\FlyPathProcessor.java:105: error: cannot find symbol
-			double horizontalSpeed = flight != null ? (double) flight.getOffGroundSpeed() : 1.0;
-			                                                         ^
-  symbol:   method getOffGroundSpeed()
-  location: variable flight of type Flight
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\pathfinding\FlyPathProcessor.java:122: error: cannot find symbol
-			double verticalSpeed = flight != null ? (double) flight.getOffGroundSpeed() : 0.5;
-			                                                       ^
-  symbol:   method getOffGroundSpeed()
-  location: variable flight of type Flight
-Note: Some input files use unchecked or unsafe operations.
-Note: Recompile with -Xlint:unchecked for details.
-2 errors
-13 warnings
+  symbol:   method refreshLabels()
+  location: class UiUtils
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\ui_utils\UiUtilsBookScreenMixin.java:50: error: cannot find symbol
+        UiUtils.refreshLabels();
+               ^
+  symbol:   method refreshLabels()
+  location: class UiUtils
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:78: error: cannot find symbol
+        UiUtilsState.storedScreen = mc.gui.screen();
+                                          ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:80: error: cannot find symbol
+        UiUtilsState.savedScreens.put(key, mc.gui.screen());
+                                                 ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:95: error: cannot find symbol
+        mc.gui.setScreen(screen);
+              ^
+  symbol:   method setScreen(Screen)
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:177: error: cannot find symbol
+                mc.gui.setScreen(null);
+                      ^
+  symbol:   method setScreen(<null>)
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:229: error: cannot find symbol
+                mc.gui.setScreen(null);
+                      ^
+  symbol:   method setScreen(<null>)
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:253: error: cannot find symbol
+                if (mc.gui.screen() instanceof AbstractContainerScreen) {
+                          ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:265: error: cannot find symbol
+                    mc.gui.setScreen(new FabricatePacketScreen(mc.gui.screen(),
+                                                                     ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:265: error: cannot find symbol
+                    mc.gui.setScreen(new FabricatePacketScreen(mc.gui.screen(),
+                          ^
+  symbol:   method setScreen(FabricatePacketScreen)
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:274: error: cannot find symbol
+                    if (mc.gui.screen() == null)
+                              ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:282: error: cannot find symbol
+                                        mc.gui.screen().getTitle())
+                                              ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:660: error: cannot find symbol
+            minecraft.gui.setScreen(parent);
+                         ^
+  symbol:   method setScreen(Screen)
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:934: error: cannot find symbol
+                if (minecraft.gui.screen() == this) {
+                                 ^
+  symbol:   method screen()
+  location: variable gui of type Gui
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtilsCommandSystem.java:70: error: cannot find symbol
+        Minecraft.getInstance().gui.setScreen(null);
+                                   ^
+  symbol:   method setScreen(<null>)
+  location: variable gui of type Gui
+15 errors
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:89)
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:50)
 	at org.gradle.api.internal.tasks.compile.NormalizingJavaCompiler.delegateAndHandleErrors(NormalizingJavaCompiler.java:98)
@@ -226,9 +295,9 @@ Note: Recompile with -Xlint:unchecked for details.
 	at org.gradle.api.internal.tasks.compile.ModuleApplicationNameWritingCompiler.execute(ModuleApplicationNameWritingCompiler.java:36)
 	at org.gradle.jvm.toolchain.internal.DefaultToolchainJavaCompiler.execute(DefaultToolchainJavaCompiler.java:57)
 	at org.gradle.api.tasks.compile.JavaCompile.lambda$createToolchainCompiler$3(JavaCompile.java:206)
-	at org.gradle.api.internal.tasks.compile.CleaningJavaCompiler.execute(CleaningJavaCompiler.java:53)
-	at org.gradle.api.internal.tasks.compile.incremental.IncrementalCompilerFactory.lambda$createRebuildAllCompiler$0(IncrementalCompilerFactory.java:55)
-	at org.gradle.api.internal.tasks.compile.incremental.SelectiveCompiler.execute(SelectiveCompiler.java:70)
+	at org.gradle.api.internal.tasks.compile.incremental.SelectiveCompiler.lambda$execute$0(SelectiveCompiler.java:101)
+	at org.gradle.api.internal.tasks.compile.incremental.transaction.CompileTransaction.execute(CompileTransaction.java:108)
+	at org.gradle.api.internal.tasks.compile.incremental.SelectiveCompiler.execute(SelectiveCompiler.java:95)
 	at org.gradle.api.internal.tasks.compile.incremental.SelectiveCompiler.execute(SelectiveCompiler.java:44)
 	at org.gradle.api.internal.tasks.compile.incremental.IncrementalResultStoringCompiler.execute(IncrementalResultStoringCompiler.java:66)
 	at org.gradle.api.internal.tasks.compile.incremental.IncrementalResultStoringCompiler.execute(IncrementalResultStoringCompiler.java:52)
@@ -355,5 +424,5 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.4.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 12s
+BUILD FAILED in 8s
 1 actionable task: 1 executed
