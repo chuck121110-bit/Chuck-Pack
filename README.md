@@ -75,7 +75,7 @@ A feature-rich addon for [Meteor Client](https://github.com/MeteorDevelopment/me
 
 ```bash
 # Windows
-aero-pack-build.bat
+chuck-pack-build.bat
 
 # Manual
 gradle build --no-daemon --stacktrace
