@@ -1,6 +1,6 @@
 # Chuck Pack
 
-A feature-rich addon for [Meteor Client](https://github.com/MeteorDevelopment/meteor-client) on Minecraft. Provides 30+ gameplay modules, HUD elements, commands, and a custom pathfinding engine.
+A feature-rich addon for [Meteor Client](https://github.com/MeteorDevelopment/meteor-client) on Minecraft. Provides 29 gameplay modules, 3 HUD elements, 2 commands, and a custom pathfinding engine.
 
 ## Features
 
@@ -54,8 +54,7 @@ A feature-rich addon for [Meteor Client](https://github.com/MeteorDevelopment/me
 
 | Branch | MC Version | Status |
 |--------|-----------|--------|
-| `main` | 26.1.2 | Current development |
-| `26.1.2-beta` | 26.1.2 | Port in progress (WIP) |
+| `26.1.2-beta` | 26.1.2 | Current development |
 | `1.21.11` | 1.21.11 | Stable |
 
 ## Requirements
@@ -82,13 +81,13 @@ aero-pack-build.bat
 gradle build --no-daemon --stacktrace
 ```
 
-Output JAR lands in `build/libs/`.
+Output JARs land in `build/libs/` (Chuck Pack) and `Map Integration/build/libs/` (Map Integration).
 
 ## Dependencies
 
 All bundled or available at runtime:
 - [Baritone](https://github.com/cabaletta/baritone) — Pathfinding (bundled via `libs/`)
-- [Cubiomes](https://github.com/moulins/cubiomes) — Native structure search bindings
+- [Cubiomes](https://github.com/moulins/cubiomes) — Native structure search bindings (lazy-loaded)
 - [Xaero's World Map](https://www.curseforge.com/minecraft/mc-mods/xaeros-world-map) — Map integration (compile-only)
 - [Xaero's Minimap](https://www.curseforge.com/minecraft/mc-mods/xaeros-minimap) — Minimap integration (compile-only)
 
