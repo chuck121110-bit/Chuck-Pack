@@ -35,7 +35,8 @@
     "NoRotateMixin",
     "KillAuraMixin",
     "WaypointReaderMixin",
-    "PacketByteBufNbtLimitMixin"
+    "PacketByteBufNbtLimitMixin",
+    "ChatCoordinateMixin"
   ],
   "injectors": { "defaultRequire": 0 }
 }

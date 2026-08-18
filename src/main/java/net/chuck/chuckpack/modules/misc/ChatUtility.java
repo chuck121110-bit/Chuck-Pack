@@ -160,7 +160,7 @@ public class ChatUtility extends Module {
             return;
         }
 
-        try (InputStream is = ChatUtility.class.getResourceAsStream("/assets/aero-pack/icon.png")) {
+        try (InputStream is = ChatUtility.class.getResourceAsStream("/assets/chuckpack/icon.png")) {
             if (is == null) return;
             BufferedImage image = ImageIO.read(is);
             if (image == null) return;
