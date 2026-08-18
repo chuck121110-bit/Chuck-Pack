@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "chuckpack",
+  "version": "1.0.0",
+  "name": "Chuck Pack",
+  "description": "A Meteor Client addon by Chuck.",
+  "authors": ["Chuck"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/chuckpack/icon.png",
+  "environment": "client",
+  "entrypoints": { "meteor": ["net.chuck.chuckpack.ChuckPack"] },
+  "accessWidener": "chuckpack.accesswidener",
+  "mixins": ["chuckpack.mixins.json", "chuckpack-theme.mixins.json"],
+  "custom": { "meteor-client:color": "0,200,160" },
+  "depends": { "java": ">=21", "minecraft": ">=26.1", "meteor-client": "*" }
+}

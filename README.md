@@ -1,4 +1,4 @@
-# Aero Pack
+# Chuck Pack
 
 A feature-rich addon for [Meteor Client](https://github.com/MeteorDevelopment/meteor-client) on Minecraft. Provides 30+ gameplay modules, HUD elements, commands, and a custom pathfinding engine.
 
@@ -40,7 +40,6 @@ A feature-rich addon for [Meteor Client](https://github.com/MeteorDevelopment/me
 - **PlayerTriangulate** — Player location triangulation
 - **StaffMonitor** — Staff detection
 - **VillagerRoller** — Villager trade rolling for enchantments
-- **UiUtils** — UI overlay utilities
 
 ### HUD
 - **AutoFlyHud** — ETA, distance, speed overlay
@@ -69,7 +68,7 @@ A feature-rich addon for [Meteor Client](https://github.com/MeteorDevelopment/me
 ## Installation
 
 1. Install Fabric Loader and Meteor Client
-2. Download the latest `aero-pack-*.jar` from [Releases](https://github.com/chuck121110-bit/Meteor-client-Aero-Pack-/releases)
+2. Download the latest `chuck-pack-*.jar` from [Releases](https://github.com/chuck121110-bit/Chuck-Pack/releases)
 3. Place the JAR in your Minecraft `mods/` folder
 4. Launch Minecraft
 

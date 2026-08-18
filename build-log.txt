@@ -5,82 +5,16 @@ Daemon will be stopped at the end of the build
 Fabric Loom: 1.16.3
 
 > Task :compileJava
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\ui_utils\UiUtilsBookEditScreenMixin.java:50: error: cannot find symbol
-        UiUtils.refreshLabels();
-               ^
-  symbol:   method refreshLabels()
-  location: class UiUtils
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\ui_utils\UiUtilsBookScreenMixin.java:50: error: cannot find symbol
-        UiUtils.refreshLabels();
-               ^
-  symbol:   method refreshLabels()
-  location: class UiUtils
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:78: error: cannot find symbol
-        UiUtilsState.storedScreen = mc.gui.screen();
-                                          ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:80: error: cannot find symbol
-        UiUtilsState.savedScreens.put(key, mc.gui.screen());
-                                                 ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:95: error: cannot find symbol
-        mc.gui.setScreen(screen);
-              ^
-  symbol:   method setScreen(Screen)
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:177: error: cannot find symbol
-                mc.gui.setScreen(null);
-                      ^
-  symbol:   method setScreen(<null>)
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:229: error: cannot find symbol
-                mc.gui.setScreen(null);
-                      ^
-  symbol:   method setScreen(<null>)
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:253: error: cannot find symbol
-                if (mc.gui.screen() instanceof AbstractContainerScreen) {
-                          ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:265: error: cannot find symbol
-                    mc.gui.setScreen(new FabricatePacketScreen(mc.gui.screen(),
-                                                                     ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:265: error: cannot find symbol
-                    mc.gui.setScreen(new FabricatePacketScreen(mc.gui.screen(),
-                          ^
-  symbol:   method setScreen(FabricatePacketScreen)
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:274: error: cannot find symbol
-                    if (mc.gui.screen() == null)
-                              ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:282: error: cannot find symbol
-                                        mc.gui.screen().getTitle())
-                                              ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:660: error: cannot find symbol
-            minecraft.gui.setScreen(parent);
-                         ^
-  symbol:   method setScreen(Screen)
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:934: error: cannot find symbol
-                if (minecraft.gui.screen() == this) {
-                                 ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtilsCommandSystem.java:70: error: cannot find symbol
-        Minecraft.getInstance().gui.setScreen(null);
-                                   ^
-  symbol:   method setScreen(<null>)
-  location: variable gui of type Gui
-15 errors
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\PacketByteBufNbtLimitMixin.java:3: error: cannot find symbol
+import net.minecraft.nbt.NbtSizeTracker;
+                        ^
+  symbol:   class NbtSizeTracker
+  location: package net.minecraft.nbt
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\PacketByteBufNbtLimitMixin.java:11: error: cannot find symbol
+@Mixin(NbtSizeTracker.class)
+       ^
+  symbol: class NbtSizeTracker
+2 errors
 
 > Task :compileJava FAILED
 
@@ -91,82 +25,16 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':compileJava'.
 > Compilation failed; see the compiler output below.
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\ui_utils\UiUtilsBookEditScreenMixin.java:50: error: cannot find symbol
-          UiUtils.refreshLabels();
-                 ^
-    symbol:   method refreshLabels()
-    location: class UiUtils
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\ui_utils\UiUtilsBookScreenMixin.java:50: error: cannot find symbol
-          UiUtils.refreshLabels();
-                 ^
-    symbol:   method refreshLabels()
-    location: class UiUtils
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:78: error: cannot find symbol
-          UiUtilsState.storedScreen = mc.gui.screen();
-                                            ^
-    symbol:   method screen()
-    location: variable gui of type Gui
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:80: error: cannot find symbol
-          UiUtilsState.savedScreens.put(key, mc.gui.screen());
-                                                   ^
-    symbol:   method screen()
-    location: variable gui of type Gui
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:95: error: cannot find symbol
-          mc.gui.setScreen(screen);
-                ^
-    symbol:   method setScreen(Screen)
-    location: variable gui of type Gui
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:177: error: cannot find symbol
-                  mc.gui.setScreen(null);
-                        ^
-    symbol:   method setScreen(<null>)
-    location: variable gui of type Gui
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:229: error: cannot find symbol
-                  mc.gui.setScreen(null);
-                        ^
-    symbol:   method setScreen(<null>)
-    location: variable gui of type Gui
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:253: error: cannot find symbol
-                  if (mc.gui.screen() instanceof AbstractContainerScreen) {
-                            ^
-    symbol:   method screen()
-    location: variable gui of type Gui
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:265: error: cannot find symbol
-                      mc.gui.setScreen(new FabricatePacketScreen(mc.gui.screen(),
-                                                                       ^
-    symbol:   method screen()
-    location: variable gui of type Gui
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:265: error: cannot find symbol
-                      mc.gui.setScreen(new FabricatePacketScreen(mc.gui.screen(),
-                            ^
-    symbol:   method setScreen(FabricatePacketScreen)
-    location: variable gui of type Gui
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:274: error: cannot find symbol
-                      if (mc.gui.screen() == null)
-                                ^
-    symbol:   method screen()
-    location: variable gui of type Gui
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:282: error: cannot find symbol
-                                          mc.gui.screen().getTitle())
-                                                ^
-    symbol:   method screen()
-    location: variable gui of type Gui
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:660: error: cannot find symbol
-              minecraft.gui.setScreen(parent);
-                           ^
-    symbol:   method setScreen(Screen)
-    location: variable gui of type Gui
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:934: error: cannot find symbol
-                  if (minecraft.gui.screen() == this) {
-                                   ^
-    symbol:   method screen()
-    location: variable gui of type Gui
-  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtilsCommandSystem.java:70: error: cannot find symbol
-          Minecraft.getInstance().gui.setScreen(null);
-                                     ^
-    symbol:   method setScreen(<null>)
-    location: variable gui of type Gui
-  15 errors
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\PacketByteBufNbtLimitMixin.java:3: error: cannot find symbol
+  import net.minecraft.nbt.NbtSizeTracker;
+                          ^
+    symbol:   class NbtSizeTracker
+    location: package net.minecraft.nbt
+  C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\PacketByteBufNbtLimitMixin.java:11: error: cannot find symbol
+  @Mixin(NbtSizeTracker.class)
+         ^
+    symbol: class NbtSizeTracker
+  2 errors
 
 * Try:
 > Check your code and dependencies to fix the compilation error(s)
@@ -208,82 +76,16 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':compile
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
 Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Compilation failed; see the compiler output below.
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\ui_utils\UiUtilsBookEditScreenMixin.java:50: error: cannot find symbol
-        UiUtils.refreshLabels();
-               ^
-  symbol:   method refreshLabels()
-  location: class UiUtils
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\ui_utils\UiUtilsBookScreenMixin.java:50: error: cannot find symbol
-        UiUtils.refreshLabels();
-               ^
-  symbol:   method refreshLabels()
-  location: class UiUtils
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:78: error: cannot find symbol
-        UiUtilsState.storedScreen = mc.gui.screen();
-                                          ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:80: error: cannot find symbol
-        UiUtilsState.savedScreens.put(key, mc.gui.screen());
-                                                 ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:95: error: cannot find symbol
-        mc.gui.setScreen(screen);
-              ^
-  symbol:   method setScreen(Screen)
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:177: error: cannot find symbol
-                mc.gui.setScreen(null);
-                      ^
-  symbol:   method setScreen(<null>)
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:229: error: cannot find symbol
-                mc.gui.setScreen(null);
-                      ^
-  symbol:   method setScreen(<null>)
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:253: error: cannot find symbol
-                if (mc.gui.screen() instanceof AbstractContainerScreen) {
-                          ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:265: error: cannot find symbol
-                    mc.gui.setScreen(new FabricatePacketScreen(mc.gui.screen(),
-                                                                     ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:265: error: cannot find symbol
-                    mc.gui.setScreen(new FabricatePacketScreen(mc.gui.screen(),
-                          ^
-  symbol:   method setScreen(FabricatePacketScreen)
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:274: error: cannot find symbol
-                    if (mc.gui.screen() == null)
-                              ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:282: error: cannot find symbol
-                                        mc.gui.screen().getTitle())
-                                              ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:660: error: cannot find symbol
-            minecraft.gui.setScreen(parent);
-                         ^
-  symbol:   method setScreen(Screen)
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtils.java:934: error: cannot find symbol
-                if (minecraft.gui.screen() == this) {
-                                 ^
-  symbol:   method screen()
-  location: variable gui of type Gui
-C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\uiutils\UiUtilsCommandSystem.java:70: error: cannot find symbol
-        Minecraft.getInstance().gui.setScreen(null);
-                                   ^
-  symbol:   method setScreen(<null>)
-  location: variable gui of type Gui
-15 errors
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\PacketByteBufNbtLimitMixin.java:3: error: cannot find symbol
+import net.minecraft.nbt.NbtSizeTracker;
+                        ^
+  symbol:   class NbtSizeTracker
+  location: package net.minecraft.nbt
+C:\Users\Areo\source\repos\Meteor (Aero-pack)\src\main\java\net\aero\aeropack\mixin\PacketByteBufNbtLimitMixin.java:11: error: cannot find symbol
+@Mixin(NbtSizeTracker.class)
+       ^
+  symbol: class NbtSizeTracker
+2 errors
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:89)
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:50)
 	at org.gradle.api.internal.tasks.compile.NormalizingJavaCompiler.delegateAndHandleErrors(NormalizingJavaCompiler.java:98)
@@ -424,5 +226,5 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.4.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 8s
+BUILD FAILED in 38s
 1 actionable task: 1 executed
