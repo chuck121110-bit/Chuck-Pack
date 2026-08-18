@@ -21,7 +21,7 @@ public class FlightMixin {
     @Shadow @Final private SettingGroup sgGeneral;
 
     @Unique
-    private static final Minecraft chuckpack\$mc = Minecraft.getInstance();
+    private static final Minecraft chuckpack$mc = Minecraft.getInstance();
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void onInit(CallbackInfo ci) {
@@ -43,23 +43,23 @@ public class FlightMixin {
     }
 
     @Unique
-    private static boolean chuckpack\$isAutoFlyActive() {
+    private static boolean chuckpack$isAutoFlyActive() {
         AutoFly af = Modules.get().get(AutoFly.class);
         return af != null && af.isActive();
     }
 
     @Inject(method = "onPreTick", at = @At("HEAD"), cancellable = true)
-    private void chuckpack\$cancelPreTick(TickEvent.Pre event, CallbackInfo ci) {
-        if (chuckpack\$mc.player == null || chuckpack\$isAutoFlyActive()) ci.cancel();
+    private void chuckpack$cancelPreTick(TickEvent.Pre event, CallbackInfo ci) {
+        if (chuckpack$mc.player == null || chuckpack$isAutoFlyActive()) ci.cancel();
     }
 
     @Inject(method = "onPostTick", at = @At("HEAD"), cancellable = true)
-    private void chuckpack\$cancelPostTick(TickEvent.Post event, CallbackInfo ci) {
-        if (chuckpack\$mc.player == null || chuckpack\$isAutoFlyActive()) ci.cancel();
+    private void chuckpack$cancelPostTick(TickEvent.Post event, CallbackInfo ci) {
+        if (chuckpack$mc.player == null || chuckpack$isAutoFlyActive()) ci.cancel();
     }
 
     @Inject(method = "onDeactivate", at = @At("HEAD"), cancellable = true)
-    private void chuckpack\$nullCheckDeactivate(CallbackInfo ci) {
-        if (chuckpack\$mc.player == null) ci.cancel();
+    private void chuckpack$nullCheckDeactivate(CallbackInfo ci) {
+        if (chuckpack$mc.player == null) ci.cancel();
     }
 }

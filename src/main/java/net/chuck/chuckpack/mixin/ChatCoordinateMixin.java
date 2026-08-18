@@ -9,8 +9,7 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.ChatFormatting;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,11 +18,6 @@ import java.util.regex.Pattern;
 
 @Mixin(ChatComponent.class)
 public class ChatCoordinateMixin {
-
-    private static final Pattern COORD_PATTERN = Pattern.compile(
-        "(?<prefix>(?:[XxYyZz]\\s*[:=]\\s*|-?\\d{1,10}\\s*,\\s*|-?\\d{1,10}\\s+))" +
-        "(?<coords>(?:-?\\d{1,10}[\\s,]+){1,3}-?\\d{1,10})"
-    );
 
     private static final Pattern COORD_XYZ_LABELED = Pattern.compile(
         "[Xx]\\s*[:=]?\\s*(-?\\d{1,10})\\s+[Yy]\\s*[:=]?\\s*(-?\\d{1,10})\\s+[Zz]\\s*[:=]?\\s*(-?\\d{1,10})"
@@ -41,63 +35,52 @@ public class ChatCoordinateMixin {
         "(?<![\\w.-])(-?\\d{1,10})\\s+(-?\\d{1,10})\\s+(-?\\d{1,10})(?![\\w.-])"
     );
 
-    private static final Pattern COORD_DEATH = Pattern.compile(
-        "(?:killed|died|death|at|pos|position|located|found|teleported|tp)\\s*(?:at|to|near)?\\s*.*?" +
-        "(?<coords>-?\\d{1,10}\\s*[,.]\\s*-?\\d{1,10}\\s*[,.]\\s*-?\\d{1,10})"
-    );
-
-    @Inject(method = "addMessage(Lnet/minecraft/network/chat/Component;)V", at = @At("HEAD"), cancellable = true)
-    private void onAddMessage(Component message, CallbackInfo ci) {
+    @ModifyVariable(method = "addMessage(Lnet/minecraft/network/chat/Component;)V", at = @At("HEAD"), argsOnly = true)
+    private Component highlightCoords(Component message) {
         try {
-            Component modified = highlightCoordinates(message);
-            if (modified != null) {
-                ci.cancel();
-                ((ChatComponent)(Object)this).addMessage(modified, null, null);
+            String text = message.getString();
+            if (text == null || text.isEmpty()) return message;
+
+            List<CoordinateMatch> matches = findCoordinates(text);
+            if (matches.isEmpty()) return message;
+
+            MutableComponent result = Component.literal("");
+            int lastEnd = 0;
+
+            for (CoordinateMatch match : matches) {
+                if (match.start > lastEnd) {
+                    result.append(Component.literal(text.substring(lastEnd, match.start)));
+                }
+
+                String coordText = text.substring(match.start, match.end);
+
+                MutableComponent coordComponent = Component.literal(coordText);
+                Style coordStyle = Style.EMPTY
+                    .withColor(ChatFormatting.GREEN)
+                    .withBold(true)
+                    .withHoverEvent(new HoverEvent.ShowText(
+                        Component.literal("Click to copy coordinates")
+                            .withStyle(ChatFormatting.YELLOW)
+                            .append(Component.literal("\nShift+click to teleport").withStyle(ChatFormatting.GRAY))
+                    ))
+                    .withClickEvent(new ClickEvent.CopyToClipboard(
+                        match.x + " " + match.y + " " + match.z
+                    ));
+
+                coordComponent.setStyle(coordStyle);
+                result.append(coordComponent);
+                lastEnd = match.end;
             }
-        } catch (Exception ignored) {}
-    }
 
-    private Component highlightCoordinates(Component component) {
-        String text = component.getString();
-        if (text == null || text.isEmpty()) return null;
-
-        List<CoordinateMatch> matches = findCoordinates(text);
-        if (matches.isEmpty()) return null;
-
-        MutableComponent result = Component.literal("");
-        int lastEnd = 0;
-
-        for (CoordinateMatch match : matches) {
-            if (match.start > lastEnd) {
-                result.append(Component.literal(text.substring(lastEnd, match.start)));
+            if (lastEnd < text.length()) {
+                result.append(Component.literal(text.substring(lastEnd)));
             }
 
-            String coordText = text.substring(match.start, match.end);
-
-            MutableComponent coordComponent = Component.literal(coordText);
-            Style coordStyle = Style.EMPTY
-                .withColor(ChatFormatting.GREEN)
-                .withBold(true)
-                .withHoverEvent(new HoverEvent.ShowText(
-                    Component.literal("Click to copy coordinates")
-                        .withStyle(ChatFormatting.YELLOW)
-                        .append(Component.literal("\nShift+click to teleport").withStyle(ChatFormatting.GRAY))
-                ))
-                .withClickEvent(new ClickEvent.CopyToClipboard(
-                    match.x + " " + match.y + " " + match.z
-                ));
-
-            coordComponent.setStyle(coordStyle);
-            result.append(coordComponent);
-            lastEnd = match.end;
+            result.setStyle(message.getStyle());
+            return result;
+        } catch (Exception ignored) {
+            return message;
         }
-
-        if (lastEnd < text.length()) {
-            result.append(Component.literal(text.substring(lastEnd)));
-        }
-
-        result.setStyle(component.getStyle());
-        return result;
     }
 
     private List<CoordinateMatch> findCoordinates(String text) {

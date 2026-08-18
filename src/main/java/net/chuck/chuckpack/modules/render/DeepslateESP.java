@@ -237,7 +237,7 @@ public class DeepslateESP extends Module implements AeroShaderSource {
     // ── AeroShaderSource ───────────────────────────────────────────────
 
     @Override
-    public boolean chuckpack\$isShaderActive() {
+    public boolean chuckpack$isShaderActive() {
         return isActive() && renderMode.get() == AeroRenderMode.Shader;
     }
 }

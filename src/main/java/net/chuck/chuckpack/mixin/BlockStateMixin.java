@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class BlockStateMixin {
 
     @Inject(method = "getCollisionShape", at = @At("HEAD"), cancellable = true)
-    private void chuckpack\$makeLavaSolid(BlockGetter blockGetter, BlockPos pos, CallbackInfoReturnable<VoxelShape> cir) {
+    private void chuckpack$makeLavaSolid(BlockGetter blockGetter, BlockPos pos, CallbackInfoReturnable<VoxelShape> cir) {
         if (pos == null) return;
         if (Modules.get() == null) return;
         AutoFly autoFly = Modules.get().get(AutoFly.class);

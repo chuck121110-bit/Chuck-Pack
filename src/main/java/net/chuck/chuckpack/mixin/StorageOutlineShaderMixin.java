@@ -23,17 +23,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class StorageOutlineShaderMixin {
 
     @Inject(method = "shouldDraw", at = @At("RETURN"), cancellable = true)
-    private void chuckpack\$shouldDraw(CallbackInfoReturnable<Boolean> cir) {
+    private void chuckpack$shouldDraw(CallbackInfoReturnable<Boolean> cir) {
         if (cir.getReturnValueZ()) return;
-        if (chuckpack\$activeSource() != null) cir.setReturnValue(true);
+        if (chuckpack$activeSource() != null) cir.setReturnValue(true);
     }
 
     @Inject(method = "setupPass", at = @At("HEAD"), cancellable = true)
-    private void chuckpack\$setupPass(MeshRenderer renderer, CallbackInfo ci) {
+    private void chuckpack$setupPass(MeshRenderer renderer, CallbackInfo ci) {
         StorageESP storageESP = Modules.get().get(StorageESP.class);
         if (storageESP.isShader()) return;
 
-        AeroShaderSource source = chuckpack\$activeSource();
+        AeroShaderSource source = chuckpack$activeSource();
         if (source == null) return;
 
         renderer.uniform("OutlineData", OutlineUniforms.write(
@@ -45,24 +45,24 @@ public class StorageOutlineShaderMixin {
         ci.cancel();
     }
 
-    private static AeroShaderSource chuckpack\$activeSource() {
+    private static AeroShaderSource chuckpack$activeSource() {
         Object blockESP = Modules.get().get(BlockESP.class);
-        if (blockESP instanceof AeroShaderSource src && src.ChuckPack$isShaderActive()) return src;
+        if (blockESP instanceof AeroShaderSource src && src.chuckpack$isShaderActive()) return src;
 
         Object nuker = Modules.get().get(Nuker.class);
-        if (nuker instanceof AeroShaderSource src && src.ChuckPack$isShaderActive()) return src;
+        if (nuker instanceof AeroShaderSource src && src.chuckpack$isShaderActive()) return src;
 
         Object veinMiner = Modules.get().get(VeinMiner.class);
-        if (veinMiner instanceof AeroShaderSource src && src.ChuckPack$isShaderActive()) return src;
+        if (veinMiner instanceof AeroShaderSource src && src.chuckpack$isShaderActive()) return src;
 
         Object excavator = Modules.get().get(Excavator.class);
-        if (excavator instanceof AeroShaderSource src && src.ChuckPack$isShaderActive()) return src;
+        if (excavator instanceof AeroShaderSource src && src.chuckpack$isShaderActive()) return src;
 
         Object deepslateESP = Modules.get().get(DeepslateESP.class);
-        if (deepslateESP instanceof AeroShaderSource src && src.ChuckPack$isShaderActive()) return src;
+        if (deepslateESP instanceof AeroShaderSource src && src.chuckpack$isShaderActive()) return src;
 
         Object holeTunnelStairsESP = Modules.get().get(HoleTunnelStairsESP.class);
-        if (holeTunnelStairsESP instanceof AeroShaderSource src && src.ChuckPack$isShaderActive()) return src;
+        if (holeTunnelStairsESP instanceof AeroShaderSource src && src.chuckpack$isShaderActive()) return src;
 
         return null;
     }

@@ -9,9 +9,9 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 @Mixin(ConfirmScreen.class)
 public interface ConfirmScreenAccessor {
     @Accessor("yesButton")
-    Button chuckpack\$getYesButton();
+    Button chuckpack$getYesButton();
 
     @Mutable
     @Accessor("yesButton")
-    void chuckpack\$setYesButton(Button button);
+    void chuckpack$setYesButton(Button button);
 }

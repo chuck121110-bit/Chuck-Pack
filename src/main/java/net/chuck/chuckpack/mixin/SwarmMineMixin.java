@@ -24,7 +24,7 @@ import java.util.List;
 public class SwarmMineMixin {
 
     @Inject(method = "build", at = @At("TAIL"))
-    private void chuckpack\$replaceMineCommand(LiteralArgumentBuilder<CommandSource> builder, CallbackInfo ci) {
+    private void chuckpack$replaceMineCommand(LiteralArgumentBuilder<CommandSource> builder, CallbackInfo ci) {
         // ── swarm mine ─────────────────────────────────────────────────────
         builder.then(
             LiteralArgumentBuilder.<CommandSource>literal("mine").then(
@@ -105,7 +105,7 @@ public class SwarmMineMixin {
                     Swarm swarm = Modules.get().get(Swarm.class);
                     if (!swarm.isActive()) { ChatUtils.error("The swarm module must be active to use this command."); return 0; }
                     if (swarm.isHost()) { swarm.host.sendMessage("swarm drop-junk"); }
-                    else if (swarm.isWorker()) { chuckpack\$dropByType("junk"); }
+                    else if (swarm.isWorker()) { chuckpack$dropByType("junk"); }
                     return 1;
                 })
                 .then(LiteralArgumentBuilder.<CommandSource>literal("all")
@@ -113,7 +113,7 @@ public class SwarmMineMixin {
                         Swarm swarm = Modules.get().get(Swarm.class);
                         if (!swarm.isActive()) { ChatUtils.error("The swarm module must be active to use this command."); return 0; }
                         if (swarm.isHost()) { swarm.host.sendMessage("swarm drop-all"); }
-                        else if (swarm.isWorker()) { chuckpack\$dropByType("all"); }
+                        else if (swarm.isWorker()) { chuckpack$dropByType("all"); }
                         return 1;
                     })
                 )
@@ -122,7 +122,7 @@ public class SwarmMineMixin {
                         Swarm swarm = Modules.get().get(Swarm.class);
                         if (!swarm.isActive()) { ChatUtils.error("The swarm module must be active to use this command."); return 0; }
                         if (swarm.isHost()) { swarm.host.sendMessage("swarm drop-ores"); }
-                        else if (swarm.isWorker()) { chuckpack\$dropByType("ores"); }
+                        else if (swarm.isWorker()) { chuckpack$dropByType("ores"); }
                         return 1;
                     })
                 )
@@ -131,7 +131,7 @@ public class SwarmMineMixin {
                         Swarm swarm = Modules.get().get(Swarm.class);
                         if (!swarm.isActive()) { ChatUtils.error("The swarm module must be active to use this command."); return 0; }
                         if (swarm.isHost()) { swarm.host.sendMessage("swarm drop-hotbar"); }
-                        else if (swarm.isWorker()) { chuckpack\$dropByType("hotbar"); }
+                        else if (swarm.isWorker()) { chuckpack$dropByType("hotbar"); }
                         return 1;
                     })
                 )
@@ -140,7 +140,7 @@ public class SwarmMineMixin {
                         Swarm swarm = Modules.get().get(Swarm.class);
                         if (!swarm.isActive()) { ChatUtils.error("The swarm module must be active to use this command."); return 0; }
                         if (swarm.isHost()) { swarm.host.sendMessage("swarm drop-junk"); }
-                        else if (swarm.isWorker()) { chuckpack\$dropByType("junk"); }
+                        else if (swarm.isWorker()) { chuckpack$dropByType("junk"); }
                         return 1;
                     })
                 )
@@ -149,7 +149,7 @@ public class SwarmMineMixin {
                         Swarm swarm = Modules.get().get(Swarm.class);
                         if (!swarm.isActive()) { ChatUtils.error("The swarm module must be active to use this command."); return 0; }
                         if (swarm.isHost()) { swarm.host.sendMessage("swarm drop-valuables"); }
-                        else if (swarm.isWorker()) { chuckpack\$dropByType("valuables"); }
+                        else if (swarm.isWorker()) { chuckpack$dropByType("valuables"); }
                         return 1;
                     })
                 )
@@ -180,8 +180,8 @@ public class SwarmMineMixin {
                 .executes(context -> {
                     Swarm swarm = Modules.get().get(Swarm.class);
                     if (!swarm.isActive()) { ChatUtils.error("The swarm module must be active to use this command."); return 0; }
-                    if (swarm.isHost()) { chuckpack\$sendNames(swarm); ChatUtils.info("Swarm Guard activated on all workers."); }
-                    else if (swarm.isWorker()) { chuckpack\$activateGuardOnWorker(null); }
+                    if (swarm.isHost()) { chuckpack$sendNames(swarm); ChatUtils.info("Swarm Guard activated on all workers."); }
+                    else if (swarm.isWorker()) { chuckpack$activateGuardOnWorker(null); }
                     return 1;
                 })
         );
@@ -204,7 +204,7 @@ public class SwarmMineMixin {
                             }
                             ChatUtils.info("Telling %d workers to join (highlight)%s", nextId - 1, address);
                         } else {
-                            chuckpack\$joinMinecraftServer(address);
+                            chuckpack$joinMinecraftServer(address);
                         }
                         return 1;
                     })
@@ -224,7 +224,7 @@ public class SwarmMineMixin {
                                     }
                                     ChatUtils.info("Telling %d workers to join (highlight)%s (random names)", nextId - 1, address);
                                 } else {
-                                    chuckpack\$joinMinecraftServer(address);
+                                    chuckpack$joinMinecraftServer(address);
                                 }
                                 return 1;
                             })
@@ -280,13 +280,13 @@ public class SwarmMineMixin {
 
     // ── Drop logic (host-side execution when on worker) ───────────────────
 
-    private static void chuckpack\$dropByType(String type) {
+    private static void chuckpack$dropByType(String type) {
         net.chuck.chuckpack.util.SwarmDropHelper.dropByType(type);
     }
 
     // ── Server join helper ────────────────────────────────────────────────
 
-    private static void chuckpack\$joinMinecraftServer(String addressInput) {
+    private static void chuckpack$joinMinecraftServer(String addressInput) {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
 
         String host = addressInput;
@@ -327,10 +327,10 @@ public class SwarmMineMixin {
 
     // ── Guard sync ────────────────────────────────────────────────────────
 
-    private static final java.util.Map<String, Integer> chuckpack\$workerIds = new java.util.HashMap<>();
-    private static final java.util.Set<Integer> chuckpack\$usedIds = new java.util.HashSet<>();
+    private static final java.util.Map<String, Integer> chuckpack$workerIds = new java.util.HashMap<>();
+    private static final java.util.Set<Integer> chuckpack$usedIds = new java.util.HashSet<>();
 
-    private static void chuckpack\$sendNames(Swarm swarm) {
+    private static void chuckpack$sendNames(Swarm swarm) {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
@@ -340,15 +340,15 @@ public class SwarmMineMixin {
             currentPlayers.add(p.getName().getString());
         }
 
-        chuckpack\$workerIds.entrySet().removeIf(e -> !currentPlayers.contains(e.getKey()));
-        chuckpack\$usedIds.retainAll(chuckpack\$workerIds.values());
+        chuckpack$workerIds.entrySet().removeIf(e -> !currentPlayers.contains(e.getKey()));
+        chuckpack$usedIds.retainAll(chuckpack$workerIds.values());
 
         for (String name : currentPlayers) {
-            if (!chuckpack\$workerIds.containsKey(name)) {
+            if (!chuckpack$workerIds.containsKey(name)) {
                 int id = 1;
-                while (chuckpack\$usedIds.contains(id)) id++;
-                chuckpack\$workerIds.put(name, id);
-                chuckpack\$usedIds.add(id);
+                while (chuckpack$usedIds.contains(id)) id++;
+                chuckpack$workerIds.put(name, id);
+                chuckpack$usedIds.add(id);
             }
         }
 
@@ -370,7 +370,7 @@ public class SwarmMineMixin {
 
             sb.append("###IDS###");
             boolean firstId = true;
-            for (java.util.Map.Entry<String, Integer> entry : chuckpack\$workerIds.entrySet()) {
+            for (java.util.Map.Entry<String, Integer> entry : chuckpack$workerIds.entrySet()) {
                 if (!firstId) sb.append(";");
                 sb.append(entry.getKey()).append(":").append(entry.getValue());
                 firstId = false;
@@ -380,7 +380,7 @@ public class SwarmMineMixin {
         }
     }
 
-    private static void chuckpack\$activateGuardOnWorker(String specifiedName) {
+    private static void chuckpack$activateGuardOnWorker(String specifiedName) {
         net.minecraft.client.Minecraft.getInstance().execute(() -> {
             String hostName = specifiedName;
             if (hostName == null) {

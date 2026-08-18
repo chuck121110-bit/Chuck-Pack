@@ -17,7 +17,7 @@ import net.minecraft.client.gui.screens.Screen;
 public abstract class WaypointReaderMixin {
 
     @Inject(method = "getRightClickOptions(Lxaero/map/mods/gui/Waypoint;Lxaero/map/gui/IRightClickableElement;)Ljava/util/ArrayList;", at = @At("RETURN"))
-    private void chuckpack\$addAutoFlyHere(Waypoint waypoint, IRightClickableElement target, CallbackInfoReturnable<ArrayList<RightClickOption>> cir) {
+    private void chuckpack$addAutoFlyHere(Waypoint waypoint, IRightClickableElement target, CallbackInfoReturnable<ArrayList<RightClickOption>> cir) {
         try {
             ArrayList<RightClickOption> options = cir.getReturnValue();
             if (options == null) return;

@@ -20,7 +20,7 @@ public abstract class GuiMapMixin {
     @Shadow private int rightClickZ;
 
     @Inject(method = "getRightClickOptions", at = @At("RETURN"), remap = false)
-    private void chuckpack\$addAutoFlyHere(CallbackInfoReturnable<ArrayList<RightClickOption>> cir) {
+    private void chuckpack$addAutoFlyHere(CallbackInfoReturnable<ArrayList<RightClickOption>> cir) {
         try {
             ArrayList<RightClickOption> options = cir.getReturnValue();
             if (options == null) return;

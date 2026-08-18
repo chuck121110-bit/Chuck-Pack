@@ -39,14 +39,14 @@ public abstract class VeinMinerMixin implements AeroShaderSource {
     @Shadow private Setting<Boolean> render;
     @Shadow private List blocks;
 
-    @Unique private Setting<AeroRenderMode> chuckpack\$renderMode;
+    @Unique private Setting<AeroRenderMode> chuckpack$renderMode;
 
-    @Unique private final MeshBuilder chuckpack\$mesh = new MeshBuilder(MeteorRenderPipelines.WORLD_COLORED);
-    @Unique private final MeshBuilderVertexConsumerProvider chuckpack\$vcp = new MeshBuilderVertexConsumerProvider(chuckpack\$mesh);
+    @Unique private final MeshBuilder chuckpack$mesh = new MeshBuilder(MeteorRenderPipelines.WORLD_COLORED);
+    @Unique private final MeshBuilderVertexConsumerProvider chuckpack$vcp = new MeshBuilderVertexConsumerProvider(chuckpack$mesh);
 
     @Inject(method = "<init>", at = @At("RETURN"))
-    private void chuckpack\$addShaderSettings(CallbackInfo ci) {
-        chuckpack\$renderMode = sgRender.add(new EnumSetting.Builder<AeroRenderMode>()
+    private void chuckpack$addShaderSettings(CallbackInfo ci) {
+        chuckpack$renderMode = sgRender.add(new EnumSetting.Builder<AeroRenderMode>()
             .name("ChuckPack-render-mode")
             .description("AABB ESP draws a normal AABB outline. Shader uses the same post-process outline shader as Storage ESP.")
             .defaultValue(AeroRenderMode.BoxESP)
@@ -55,27 +55,27 @@ public abstract class VeinMinerMixin implements AeroShaderSource {
     }
 
     @Inject(method = "onRender", at = @At("HEAD"), cancellable = true)
-    private void chuckpack\$renderShaderBlocks(Render3DEvent event, CallbackInfo ci) {
+    private void chuckpack$renderShaderBlocks(Render3DEvent event, CallbackInfo ci) {
         if (!render.get() || blocks.isEmpty()) return;
-        if (chuckpack\$renderMode.get() != AeroRenderMode.Shader) return;
+        if (chuckpack$renderMode.get() != AeroRenderMode.Shader) return;
 
-        chuckpack\$mesh.begin();
+        chuckpack$mesh.begin();
         for (Object obj : blocks) {
-            BlockPos pos = ((VeinMinerMyBlockAccessor) obj).ChuckPack$getBlockPos();
+            BlockPos pos = ((VeinMinerMyBlockAccessor) obj).chuckpack$getBlockPos();
             BlockState state = mc.level.getBlockState(pos);
             if (state.isAir()) continue;
 
             Color lc = lineColor.get();
-            chuckpack\$vcp.setColor(new Color(lc.r, lc.g, lc.b, 255));
-            chuckpack\$vcp.setOffset(pos.getX(), pos.getY(), pos.getZ());
-            SimpleBlockRenderer.render(pos, state, chuckpack\$vcp);
+            chuckpack$vcp.setColor(new Color(lc.r, lc.g, lc.b, 255));
+            chuckpack$vcp.setOffset(pos.getX(), pos.getY(), pos.getZ());
+            SimpleBlockRenderer.render(pos, state, chuckpack$vcp);
         }
-        chuckpack\$vcp.setOffset(0, 0, 0);
+        chuckpack$vcp.setOffset(0, 0, 0);
 
         MeshRenderer.begin()
             .attachments(PostProcessShaders.STORAGE_OUTLINE.framebuffer)
             .pipeline(MeteorRenderPipelines.WORLD_COLORED)
-            .mesh(chuckpack\$mesh, event.matrices)
+            .mesh(chuckpack$mesh, event.matrices)
             .end();
 
         AeroShaderHelper.markDirty();
@@ -85,7 +85,7 @@ public abstract class VeinMinerMixin implements AeroShaderSource {
     // ── AeroShaderSource ─────────────────────────────────────────────────
 
     @Override
-    public boolean chuckpack\$isShaderActive() {
-        return ((VeinMiner)(Object)this).isActive() && render.get() && chuckpack\$renderMode.get() == AeroRenderMode.Shader;
+    public boolean chuckpack$isShaderActive() {
+        return ((VeinMiner)(Object)this).isActive() && render.get() && chuckpack$renderMode.get() == AeroRenderMode.Shader;
     }
 }

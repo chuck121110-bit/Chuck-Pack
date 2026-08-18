@@ -13,18 +13,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class SwarmHostMixin {
 
     @Inject(method = "getConnectionCount", at = @At("HEAD"), cancellable = true)
-    private void chuckpack\$fixWorkerCount(CallbackInfoReturnable<Integer> cir) {
-        int count = chuckpack\$cleanAndCount();
+    private void chuckpack$fixWorkerCount(CallbackInfoReturnable<Integer> cir) {
+        int count = chuckpack$cleanAndCount();
         cir.setReturnValue(count);
     }
 
     @Inject(method = "sendMessage", at = @At("HEAD"))
-    private void chuckpack\$cleanBeforeSend(String s, CallbackInfo ci) {
-        chuckpack\$cleanAndCount();
+    private void chuckpack$cleanBeforeSend(String s, CallbackInfo ci) {
+        chuckpack$cleanAndCount();
     }
 
     @Unique
-    private int chuckpack\$cleanAndCount() {
+    private int chuckpack$cleanAndCount() {
         SwarmHost self = (SwarmHost) (Object) this;
         SwarmConnection[] conns = self.getConnections();
         int count = 0;

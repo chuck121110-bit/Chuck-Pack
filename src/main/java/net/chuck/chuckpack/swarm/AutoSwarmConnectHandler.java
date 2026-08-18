@@ -19,7 +19,7 @@ public class AutoSwarmConnectHandler {
         if (swarm == null || !swarm.isActive()) return;
 
         IAutoSwarmConnect autoConnect = (IAutoSwarmConnect) (Object) swarm;
-        if (!autoConnect.ChuckPack$autoConnectSetting().get()) {
+        if (!autoConnect.chuckpack$autoConnectSetting().get()) {
             lastScanMs = 0;
             return;
         }
@@ -35,27 +35,27 @@ public class AutoSwarmConnectHandler {
 
         if (hostAlive || workerAlive) return;
 
-        chuckpack\$attemptConnect(swarm);
+        chuckpack$attemptConnect(swarm);
     }
 
-    private void chuckpack\$attemptConnect(Swarm swarm) {
+    private void chuckpack$attemptConnect(Swarm swarm) {
         try {
-            Object mode = chuckpack\$getField(swarm, "mode");
-            String modeName = mode != null ? chuckpack\$invokeGet(mode).toString() : null;
+            Object mode = chuckpack$getField(swarm, "mode");
+            String modeName = mode != null ? chuckpack$invokeGet(mode).toString() : null;
 
             if (modeName != null && modeName.equalsIgnoreCase("Host")) {
-                chuckpack\$startHost(swarm);
+                chuckpack$startHost(swarm);
             } else if (modeName != null && modeName.equalsIgnoreCase("Worker")) {
-                chuckpack\$connectWorker(swarm);
+                chuckpack$connectWorker(swarm);
             }
         } catch (Exception e) {
             ChatUtils.error("Auto Swarm Connect failed: " + e.getMessage());
         }
     }
 
-    private void chuckpack\$startHost(Swarm swarm) throws Exception {
+    private void chuckpack$startHost(Swarm swarm) throws Exception {
         swarm.close();
-        int port = ((Number) chuckpack\$invokeGet(chuckpack\$getField(swarm, "serverPort"))).intValue();
+        int port = ((Number) chuckpack$invokeGet(chuckpack$getField(swarm, "serverPort"))).intValue();
 
         Class<?> hostClass = Class.forName("meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmHost");
         Object hostInstance = hostClass.getConstructor(int.class).newInstance(port);
@@ -66,10 +66,10 @@ public class AutoSwarmConnectHandler {
         ChatUtils.info("Auto Swarm Connect: started host on port " + port);
     }
 
-    private void chuckpack\$connectWorker(Swarm swarm) throws Exception {
+    private void chuckpack$connectWorker(Swarm swarm) throws Exception {
         swarm.close();
-        String address = chuckpack\$invokeGet(chuckpack\$getField(swarm, "ipAddress")).toString();
-        int port = ((Number) chuckpack\$invokeGet(chuckpack\$getField(swarm, "serverPort"))).intValue();
+        String address = chuckpack$invokeGet(chuckpack$getField(swarm, "ipAddress")).toString();
+        int port = ((Number) chuckpack$invokeGet(chuckpack$getField(swarm, "serverPort"))).intValue();
 
         Class<?> workerClass = Class.forName("meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmWorker");
         Object workerInstance = workerClass.getConstructor(String.class, int.class).newInstance(address, port);
@@ -80,13 +80,13 @@ public class AutoSwarmConnectHandler {
         ChatUtils.info("Auto Swarm Connect: connecting to " + address + ":" + port);
     }
 
-    private Object chuckpack\$getField(Object obj, String fieldName) throws Exception {
+    private Object chuckpack$getField(Object obj, String fieldName) throws Exception {
         java.lang.reflect.Field f = obj.getClass().getDeclaredField(fieldName);
         f.setAccessible(true);
         return f.get(obj);
     }
 
-    private Object chuckpack\$invokeGet(Object setting) throws Exception {
+    private Object chuckpack$invokeGet(Object setting) throws Exception {
         return setting.getClass().getMethod("get").invoke(setting);
     }
 }

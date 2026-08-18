@@ -15,7 +15,7 @@ import meteordevelopment.meteorclient.systems.modules.render.ESP;
 public abstract class ESPMixin {
 
     @Inject(method = "shouldSkip(Lnet/minecraft/entity/Entity;)Z", at = @At("HEAD"), cancellable = true)
-    private void chuckpack\$frustumCullEntity(Entity entity, CallbackInfoReturnable<Boolean> cir) {
+    private void chuckpack$frustumCullEntity(Entity entity, CallbackInfoReturnable<Boolean> cir) {
         Minecraft mc = Minecraft.getInstance();
         Entity camera = mc.getCameraEntity();
         if (camera == null) return;

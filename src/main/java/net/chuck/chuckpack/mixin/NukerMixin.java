@@ -49,23 +49,23 @@ public abstract class NukerMixin implements AeroShaderSource {
     @Shadow private SettingGroup sgRender;
     @Shadow private Setting<Boolean> enableRenderBreaking;
 
-    @Unique private Setting<AeroRenderMode> chuckpack\$renderMode;
+    @Unique private Setting<AeroRenderMode> chuckpack$renderMode;
 
-    @Unique private final Map<BlockPos, Integer> chuckpack\$shaderBlocks = new HashMap<>();
-    @Unique private final MeshBuilder chuckpack\$mesh = new MeshBuilder(MeteorRenderPipelines.WORLD_COLORED);
-    @Unique private final MeshBuilderVertexConsumerProvider chuckpack\$vcp = new MeshBuilderVertexConsumerProvider(chuckpack\$mesh);
+    @Unique private final Map<BlockPos, Integer> chuckpack$shaderBlocks = new HashMap<>();
+    @Unique private final MeshBuilder chuckpack$mesh = new MeshBuilder(MeteorRenderPipelines.WORLD_COLORED);
+    @Unique private final MeshBuilderVertexConsumerProvider chuckpack$vcp = new MeshBuilderVertexConsumerProvider(chuckpack$mesh);
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void renameDuplicateSettings(CallbackInfo ci) {
         renameSetting(sideColor, "breaking-side-color", "Breaking Side Color");
         renameSetting(lineColor, "breaking-line-color", "Breaking Line Color");
         hideMaxBlocksPerTick();
-        chuckpack\$addShaderSettings();
+        chuckpack$addShaderSettings();
     }
 
     @Unique
-    private void chuckpack\$addShaderSettings() {
-        chuckpack\$renderMode = sgRender.add(new EnumSetting.Builder<AeroRenderMode>()
+    private void chuckpack$addShaderSettings() {
+        chuckpack$renderMode = sgRender.add(new EnumSetting.Builder<AeroRenderMode>()
             .name("ChuckPack-render-mode")
             .description("AABB ESP draws a normal AABB outline. Shader uses the same post-process outline shader as Storage ESP.")
             .defaultValue(AeroRenderMode.BoxESP)
@@ -76,7 +76,7 @@ public abstract class NukerMixin implements AeroShaderSource {
     // ── Redirect the AABB-mode "ticking block" render call ──────────────────
     // In Shader mode we don't call the real renderTickingBlock at all -
     // instead we track the position ourselves and draw it via the shared
-    // outline shader in chuckpack\$renderShaderBlocks below.
+    // outline shader in chuckpack$renderShaderBlocks below.
     @Redirect(
         method = "lambda$onTickPre$13",
         at = @At(
@@ -84,42 +84,42 @@ public abstract class NukerMixin implements AeroShaderSource {
             target = "Lmeteordevelopment/meteorclient/utils/render/RenderUtils;renderTickingBlock(Lnet/minecraft/util/math/BlockPos;Lmeteordevelopment/meteorclient/utils/render/color/Color;Lmeteordevelopment/meteorclient/utils/render/color/Color;Lmeteordevelopment/meteorclient/renderer/ShapeMode;IIZZ)V"
         )
     )
-    private void chuckpack\$redirectTickingBlock(BlockPos pos, Color side, Color line, ShapeMode shapeMode, int startFade, int endFade, boolean bool1, boolean bool2) {
-        if (chuckpack\$renderMode.get() == AeroRenderMode.Shader) {
-            chuckpack\$shaderBlocks.put(pos.immutable(), 8);
+    private void chuckpack$redirectTickingBlock(BlockPos pos, Color side, Color line, ShapeMode shapeMode, int startFade, int endFade, boolean bool1, boolean bool2) {
+        if (chuckpack$renderMode.get() == AeroRenderMode.Shader) {
+            chuckpack$shaderBlocks.put(pos.immutable(), 8);
         } else {
             RenderUtils.renderTickingBlock(pos, side, line, shapeMode, startFade, endFade, bool1, bool2);
         }
     }
 
     @Inject(method = "onTickPre", at = @At("TAIL"))
-    private void chuckpack\$expireShaderBlocks(TickEvent.Pre event, CallbackInfo ci) {
-        if (chuckpack\$shaderBlocks.isEmpty()) return;
-        chuckpack\$shaderBlocks.replaceAll((pos, ticksLeft) -> ticksLeft - 1);
-        chuckpack\$shaderBlocks.values().removeIf(ticksLeft -> ticksLeft <= 0);
+    private void chuckpack$expireShaderBlocks(TickEvent.Pre event, CallbackInfo ci) {
+        if (chuckpack$shaderBlocks.isEmpty()) return;
+        chuckpack$shaderBlocks.replaceAll((pos, ticksLeft) -> ticksLeft - 1);
+        chuckpack$shaderBlocks.values().removeIf(ticksLeft -> ticksLeft <= 0);
     }
 
     @Inject(method = "onRender", at = @At("TAIL"))
-    private void chuckpack\$renderShaderBlocks(Render3DEvent event, CallbackInfo ci) {
-        if (!enableRenderBreaking.get() || chuckpack\$renderMode.get() != AeroRenderMode.Shader || chuckpack\$shaderBlocks.isEmpty()) return;
+    private void chuckpack$renderShaderBlocks(Render3DEvent event, CallbackInfo ci) {
+        if (!enableRenderBreaking.get() || chuckpack$renderMode.get() != AeroRenderMode.Shader || chuckpack$shaderBlocks.isEmpty()) return;
 
-        chuckpack\$mesh.begin();
+        chuckpack$mesh.begin();
         Color lc = lineColor.get();
-        chuckpack\$vcp.setColor(new Color(lc.r, lc.g, lc.b, 255));
+        chuckpack$vcp.setColor(new Color(lc.r, lc.g, lc.b, 255));
 
-        for (BlockPos pos : chuckpack\$shaderBlocks.keySet()) {
+        for (BlockPos pos : chuckpack$shaderBlocks.keySet()) {
             BlockState state = mc.level.getBlockState(pos);
             if (state.isAir()) continue;
 
-            chuckpack\$vcp.setOffset(pos.getX(), pos.getY(), pos.getZ());
-            SimpleBlockRenderer.render(pos, state, chuckpack\$vcp);
+            chuckpack$vcp.setOffset(pos.getX(), pos.getY(), pos.getZ());
+            SimpleBlockRenderer.render(pos, state, chuckpack$vcp);
         }
-        chuckpack\$vcp.setOffset(0, 0, 0);
+        chuckpack$vcp.setOffset(0, 0, 0);
 
         MeshRenderer.begin()
             .attachments(PostProcessShaders.STORAGE_OUTLINE.framebuffer)
             .pipeline(MeteorRenderPipelines.WORLD_COLORED)
-            .mesh(chuckpack\$mesh, event.matrices)
+            .mesh(chuckpack$mesh, event.matrices)
             .end();
 
         AeroShaderHelper.markDirty();
@@ -128,8 +128,8 @@ public abstract class NukerMixin implements AeroShaderSource {
     // ── AeroShaderSource ─────────────────────────────────────────────────
 
     @Override
-    public boolean chuckpack\$isShaderActive() {
-        return enableRenderBreaking.get() && chuckpack\$renderMode.get() == AeroRenderMode.Shader;
+    public boolean chuckpack$isShaderActive() {
+        return enableRenderBreaking.get() && chuckpack$renderMode.get() == AeroRenderMode.Shader;
     }
 
     // ── Existing setting-rename / hide logic ────────────────────────────

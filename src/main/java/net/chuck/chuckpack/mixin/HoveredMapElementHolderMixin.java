@@ -15,7 +15,7 @@ public abstract class HoveredMapElementHolderMixin {
     @Shadow protected Object element;
 
     @Inject(method = "getRightClickOptions", at = @At("RETURN"))
-    private void chuckpack\$addWaypointOptions(CallbackInfoReturnable<?> cir) {
+    private void chuckpack$addWaypointOptions(CallbackInfoReturnable<?> cir) {
         // TODO: Port to Xaero's API for MC 26.1.2
     }
 }

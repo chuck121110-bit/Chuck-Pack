@@ -14,28 +14,28 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ClientPacketListener.class)
 public class NoRotateMixin {
     @Unique
-    private float chuckpack\$savedYaw;
+    private float chuckpack$savedYaw;
 
     @Unique
-    private float chuckpack\$savedPitch;
+    private float chuckpack$savedPitch;
 
     @Inject(method = "onPlayerPositionLook", at = @At("HEAD"))
-    private void chuckpack\$onPlayerPositionLookHead(ClientboundPlayerPositionPacket packet, CallbackInfo ci) {
+    private void chuckpack$onPlayerPositionLookHead(ClientboundPlayerPositionPacket packet, CallbackInfo ci) {
         AutoFly af = Modules.get().get(AutoFly.class);
         if (af == null || !af.isActive()) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
-        this.ChuckPack$savedYaw = mc.player.getYRot();
-        this.ChuckPack$savedPitch = mc.player.getXRot();
+        this.chuckpack$savedYaw = mc.player.getYRot();
+        this.chuckpack$savedPitch = mc.player.getXRot();
     }
 
     @Inject(method = "onPlayerPositionLook", at = @At("RETURN"))
-    private void chuckpack\$onPlayerPositionLookReturn(ClientboundPlayerPositionPacket packet, CallbackInfo ci) {
+    private void chuckpack$onPlayerPositionLookReturn(ClientboundPlayerPositionPacket packet, CallbackInfo ci) {
         AutoFly af = Modules.get().get(AutoFly.class);
         if (af == null || !af.isActive()) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
-        mc.player.setYRot(this.ChuckPack$savedYaw + 1.0E-6F);
-        mc.player.setXRot(this.ChuckPack$savedPitch + 1.0E-6F);
+        mc.player.setYRot(this.chuckpack$savedYaw + 1.0E-6F);
+        mc.player.setXRot(this.chuckpack$savedPitch + 1.0E-6F);
     }
 }

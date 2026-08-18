@@ -14,7 +14,7 @@ public class StorageESPMixin {
         method = "onRender",
         at = @At(value = "INVOKE", target = "Lmeteordevelopment/meteorclient/utils/render/postprocess/PostProcessShader;render()V")
     )
-    private void chuckpack\$deferRender(PostProcessShader shader) {
+    private void chuckpack$deferRender(PostProcessShader shader) {
         AeroShaderHelper.markDirty();
     }
 }

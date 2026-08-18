@@ -20,23 +20,23 @@ public abstract class SwarmAutoConnectMixin extends Module implements IAutoSwarm
     }
 
     @Unique
-    private Setting<Boolean> chuckpack\$autoSwarmConnect;
+    private Setting<Boolean> chuckpack$autoSwarmConnect;
 
     @Unique
-    private Setting<Boolean> chuckpack\$autoAccount;
+    private Setting<Boolean> chuckpack$autoAccount;
 
     @Inject(method = "<init>", at = @At("TAIL"))
-    private void chuckpack\$addAutoConnectSetting(CallbackInfo ci) {
+    private void chuckpack$addAutoConnectSetting(CallbackInfo ci) {
         SettingGroup sg = this.settings.getDefaultGroup();
 
-        chuckpack\$autoSwarmConnect = sg.add(new BoolSetting.Builder()
+        chuckpack$autoSwarmConnect = sg.add(new BoolSetting.Builder()
             .name("Auto Swarm Connect")
             .description("Automatically starts the host server or connects as a worker every 5 seconds until successful (Chuck Pack).")
             .defaultValue(false)
             .build()
         );
 
-        chuckpack\$autoAccount = sg.add(new BoolSetting.Builder()
+        chuckpack$autoAccount = sg.add(new BoolSetting.Builder()
             .name("Auto Account")
             .description("Automatically switches to the next available cracked account when joining a server via .swarm server (Chuck Pack).")
             .defaultValue(false)
@@ -45,12 +45,12 @@ public abstract class SwarmAutoConnectMixin extends Module implements IAutoSwarm
     }
 
     @Override
-    public Setting<Boolean> chuckpack\$autoConnectSetting() {
-        return chuckpack\$autoSwarmConnect;
+    public Setting<Boolean> chuckpack$autoConnectSetting() {
+        return chuckpack$autoSwarmConnect;
     }
 
     @Override
-    public Setting<Boolean> chuckpack\$autoAccountSetting() {
-        return chuckpack\$autoAccount;
+    public Setting<Boolean> chuckpack$autoAccountSetting() {
+        return chuckpack$autoAccount;
     }
 }

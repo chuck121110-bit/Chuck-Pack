@@ -48,16 +48,16 @@ public abstract class BlockESPMixin implements AeroShaderSource {
     @Shadow private Setting<Boolean> tracers;
     @Shadow private Set<ESPGroup> groups;
 
-    @Unique private Setting<AeroRenderMode> chuckpack\$renderMode;
+    @Unique private Setting<AeroRenderMode> chuckpack$renderMode;
 
-    @Unique private final MeshBuilder chuckpack\$mesh = new MeshBuilder(MeteorRenderPipelines.WORLD_COLORED);
-    @Unique private final MeshBuilderVertexConsumerProvider chuckpack\$vcp = new MeshBuilderVertexConsumerProvider(chuckpack\$mesh);
+    @Unique private final MeshBuilder chuckpack$mesh = new MeshBuilder(MeteorRenderPipelines.WORLD_COLORED);
+    @Unique private final MeshBuilderVertexConsumerProvider chuckpack$vcp = new MeshBuilderVertexConsumerProvider(chuckpack$mesh);
 
     @Inject(method = "<init>", at = @At("RETURN"))
-    private void chuckpack\$addShaderSettings(CallbackInfo ci) {
+    private void chuckpack$addShaderSettings(CallbackInfo ci) {
         SettingGroup sgShader = ((BlockESP)(Object)this).settings.createGroup("Shader");
 
-        chuckpack\$renderMode = sgShader.add(new EnumSetting.Builder<AeroRenderMode>()
+        chuckpack$renderMode = sgShader.add(new EnumSetting.Builder<AeroRenderMode>()
             .name("ChuckPack-render-mode")
             .description("AABB ESP draws normal boxes. Shader uses the same post-process outline shader as Storage ESP.")
             .defaultValue(AeroRenderMode.BoxESP)
@@ -66,8 +66,8 @@ public abstract class BlockESPMixin implements AeroShaderSource {
     }
 
     @Inject(method = "onRender", at = @At("HEAD"), cancellable = true)
-    private void chuckpack\$renderShader(Render3DEvent event, CallbackInfo ci) {
-        if (chuckpack\$renderMode.get() != AeroRenderMode.Shader) return;
+    private void chuckpack$renderShader(Render3DEvent event, CallbackInfo ci) {
+        if (chuckpack$renderMode.get() != AeroRenderMode.Shader) return;
 
         HashSet<Long> trackedSet = new HashSet<>();
 
@@ -79,7 +79,7 @@ public abstract class BlockESPMixin implements AeroShaderSource {
                 }
             }
 
-            chuckpack\$mesh.begin();
+            chuckpack$mesh.begin();
 
             for (ESPChunk LevelChunk : chunks.values()) {
                 if (LevelChunk.blocks == null) continue;
@@ -104,25 +104,25 @@ public abstract class BlockESPMixin implements AeroShaderSource {
                     if (blockData == null) blockData = defaultBlockConfig.get();
 
                     Color lc = blockData.lineColor;
-                    chuckpack\$vcp.setColor(new Color(lc.r, lc.g, lc.b, 255));
+                    chuckpack$vcp.setColor(new Color(lc.r, lc.g, lc.b, 255));
 
                     if (state.getRenderShape() != RenderShape.MODEL) {
-                        chuckpack\$vcp.setOffset(0, 0, 0);
-                        chuckpack\$renderFullBlock(bx, by, bz, new Color(lc.r, lc.g, lc.b, 255));
+                        chuckpack$vcp.setOffset(0, 0, 0);
+                        chuckpack$renderFullBlock(bx, by, bz, new Color(lc.r, lc.g, lc.b, 255));
                     } else {
-                        chuckpack\$vcp.setOffset(bx, by, bz);
-                        SimpleBlockRenderer.render(pos, state, chuckpack\$vcp);
+                        chuckpack$vcp.setOffset(bx, by, bz);
+                        SimpleBlockRenderer.render(pos, state, chuckpack$vcp);
                     }
                 }
             }
         }
 
-        chuckpack\$vcp.setOffset(0, 0, 0);
+        chuckpack$vcp.setOffset(0, 0, 0);
 
         MeshRenderer.begin()
             .attachments(PostProcessShaders.STORAGE_OUTLINE.framebuffer)
             .pipeline(MeteorRenderPipelines.WORLD_COLORED)
-            .mesh(chuckpack\$mesh, event.matrices)
+            .mesh(chuckpack$mesh, event.matrices)
             .end();
 
         AeroShaderHelper.markDirty();
@@ -144,28 +144,28 @@ public abstract class BlockESPMixin implements AeroShaderSource {
     // ── AeroShaderSource ─────────────────────────────────────────────────
 
     @Override
-    public boolean chuckpack\$isShaderActive() {
-        return ((BlockESP)(Object)this).isActive() && chuckpack\$renderMode.get() == AeroRenderMode.Shader;
+    public boolean chuckpack$isShaderActive() {
+        return ((BlockESP)(Object)this).isActive() && chuckpack$renderMode.get() == AeroRenderMode.Shader;
     }
 
     @Unique
-    private void chuckpack\$renderFullBlock(int bx, int by, int bz, Color color) {
-        chuckpack\$mesh.ensureCapacity(24, 36);
+    private void chuckpack$renderFullBlock(int bx, int by, int bz, Color color) {
+        chuckpack$mesh.ensureCapacity(24, 36);
 
-        int v0 = chuckpack\$mesh.vec3(bx, by, bz).color(color).next();
-        int v1 = chuckpack\$mesh.vec3(bx + 1, by, bz).color(color).next();
-        int v2 = chuckpack\$mesh.vec3(bx + 1, by + 1, bz).color(color).next();
-        int v3 = chuckpack\$mesh.vec3(bx, by + 1, bz).color(color).next();
-        int v4 = chuckpack\$mesh.vec3(bx, by, bz + 1).color(color).next();
-        int v5 = chuckpack\$mesh.vec3(bx + 1, by, bz + 1).color(color).next();
-        int v6 = chuckpack\$mesh.vec3(bx + 1, by + 1, bz + 1).color(color).next();
-        int v7 = chuckpack\$mesh.vec3(bx, by + 1, bz + 1).color(color).next();
+        int v0 = chuckpack$mesh.vec3(bx, by, bz).color(color).next();
+        int v1 = chuckpack$mesh.vec3(bx + 1, by, bz).color(color).next();
+        int v2 = chuckpack$mesh.vec3(bx + 1, by + 1, bz).color(color).next();
+        int v3 = chuckpack$mesh.vec3(bx, by + 1, bz).color(color).next();
+        int v4 = chuckpack$mesh.vec3(bx, by, bz + 1).color(color).next();
+        int v5 = chuckpack$mesh.vec3(bx + 1, by, bz + 1).color(color).next();
+        int v6 = chuckpack$mesh.vec3(bx + 1, by + 1, bz + 1).color(color).next();
+        int v7 = chuckpack$mesh.vec3(bx, by + 1, bz + 1).color(color).next();
 
-        chuckpack\$mesh.quad(v0, v1, v2, v3);
-        chuckpack\$mesh.quad(v5, v4, v7, v6);
-        chuckpack\$mesh.quad(v4, v0, v3, v7);
-        chuckpack\$mesh.quad(v1, v5, v6, v2);
-        chuckpack\$mesh.quad(v3, v2, v6, v7);
-        chuckpack\$mesh.quad(v4, v5, v1, v0);
+        chuckpack$mesh.quad(v0, v1, v2, v3);
+        chuckpack$mesh.quad(v5, v4, v7, v6);
+        chuckpack$mesh.quad(v4, v0, v3, v7);
+        chuckpack$mesh.quad(v1, v5, v6, v2);
+        chuckpack$mesh.quad(v3, v2, v6, v7);
+        chuckpack$mesh.quad(v4, v5, v1, v0);
     }
 }

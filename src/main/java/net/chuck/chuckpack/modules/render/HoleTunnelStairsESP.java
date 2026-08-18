@@ -823,7 +823,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     }
 
     @Override
-    public boolean chuckpack\$isShaderActive() {
+    public boolean chuckpack$isShaderActive() {
         return isActive() && renderMode.get() == AeroRenderMode.Shader;
     }
 

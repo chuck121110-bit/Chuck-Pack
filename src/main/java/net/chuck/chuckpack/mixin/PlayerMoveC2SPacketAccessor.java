@@ -9,9 +9,9 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface PlayerMoveC2SPacketAccessor {
     @Mutable
     @Accessor("y")
-    void chuckpack\$setY(double value);
+    void chuckpack$setY(double value);
 
     @Mutable
     @Accessor("onGround")
-    void chuckpack\$setOnGround(boolean value);
+    void chuckpack$setOnGround(boolean value);
 }

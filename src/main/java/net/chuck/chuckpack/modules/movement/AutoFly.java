@@ -1044,7 +1044,7 @@ public final class AutoFly extends Module
 		if(antiKickDelayLeft <= 0 && antiKickLastPacketY != Double.MAX_VALUE
 			&& shouldFlyDown(currentY, antiKickLastPacketY) && !mc.player.onGround())
 		{
-			((PlayerMoveC2SPacketAccessor) packet).ChuckPack$setY(antiKickLastPacketY - 0.0313);
+			((PlayerMoveC2SPacketAccessor) packet).chuckpack$setY(antiKickLastPacketY - 0.0313);
 		}
 		else
 		{

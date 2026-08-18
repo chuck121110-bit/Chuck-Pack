@@ -14,8 +14,8 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 @Mixin(targets = "meteordevelopment.meteorclient.systems.modules.world.VeinMiner$MyBlock")
 public interface VeinMinerMyBlockAccessor {
     @Accessor("blockPos")
-    BlockPos chuckpack\$getBlockPos();
+    BlockPos chuckpack$getBlockPos();
 
     @Invoker("render")
-    void chuckpack\$invokeRender(Render3DEvent event);
+    void chuckpack$invokeRender(Render3DEvent event);
 }

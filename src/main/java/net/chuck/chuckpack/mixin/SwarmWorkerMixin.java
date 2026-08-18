@@ -32,15 +32,15 @@ public class SwarmWorkerMixin {
     private static final String DROP_SLOT_CMD = "swarm drop-slot ";
 
     @Unique
-    private static final AtomicInteger chuckpack\$accountCounter = new AtomicInteger(0);
+    private static final AtomicInteger chuckpack$accountCounter = new AtomicInteger(0);
 
     @Inject(method = "tick", at = @At("HEAD"))
-    private void chuckpack\$onTick(CallbackInfo ci) {
+    private void chuckpack$onTick(CallbackInfo ci) {
         SwarmGuard.get().tick(Minecraft.getInstance());
     }
 
     @Redirect(method = "run", at = @At(value = "INVOKE", target = "Lmeteordevelopment/meteorclient/commands/Commands;dispatch(Ljava/lang/String;)V"))
-    private void chuckpack\$onDispatch(String command) {
+    private void chuckpack$onDispatch(String command) {
         Minecraft mc = Minecraft.getInstance();
         String lower = command.toLowerCase().trim();
 
@@ -55,7 +55,7 @@ public class SwarmWorkerMixin {
         }
 
         if (command.startsWith(SYNC_PREFIX)) {
-            chuckpack\$handleSync(mc, command.substring(SYNC_PREFIX.length()));
+            chuckpack$handleSync(mc, command.substring(SYNC_PREFIX.length()));
             return;
         }
 
@@ -71,23 +71,23 @@ public class SwarmWorkerMixin {
         // ── Drop commands ──────────────────────────────────────────────────
 
         if (lower.equals("swarm drop-all")) {
-            mc.execute(() -> chuckpack\$dropByType("all"));
+            mc.execute(() -> chuckpack$dropByType("all"));
             return;
         }
         if (lower.equals("swarm drop-junk")) {
-            mc.execute(() -> chuckpack\$dropByType("junk"));
+            mc.execute(() -> chuckpack$dropByType("junk"));
             return;
         }
         if (lower.equals("swarm drop-ores")) {
-            mc.execute(() -> chuckpack\$dropByType("ores"));
+            mc.execute(() -> chuckpack$dropByType("ores"));
             return;
         }
         if (lower.equals("swarm drop-hotbar")) {
-            mc.execute(() -> chuckpack\$dropByType("hotbar"));
+            mc.execute(() -> chuckpack$dropByType("hotbar"));
             return;
         }
         if (lower.equals("swarm drop-valuables")) {
-            mc.execute(() -> chuckpack\$dropByType("valuables"));
+            mc.execute(() -> chuckpack$dropByType("valuables"));
             return;
         }
 
@@ -96,7 +96,7 @@ public class SwarmWorkerMixin {
         if (lower.equals("swarm inventory-check")) {
             mc.execute(() -> {
                 if (mc.player == null) return;
-                chuckpack\$writeInventoryToFile(mc);
+                chuckpack$writeInventoryToFile(mc);
             });
             return;
         }
@@ -147,7 +147,7 @@ public class SwarmWorkerMixin {
         if (lower.startsWith(IMPERSONATE_KICK_PREFIX)) {
             String targetName = command.substring(IMPERSONATE_KICK_PREFIX.length()).trim();
             if (!targetName.isEmpty()) {
-                mc.execute(() -> chuckpack\$impersonateKick(mc, targetName));
+                mc.execute(() -> chuckpack$impersonateKick(mc, targetName));
             }
             return;
         }
@@ -155,7 +155,7 @@ public class SwarmWorkerMixin {
         // ── Server join ────────────────────────────────────────────────────
 
         if (lower.startsWith(SERVER_PREFIX)) {
-            chuckpack\$handleServerJoin(mc, command.substring(SERVER_PREFIX.length()).trim());
+            chuckpack$handleServerJoin(mc, command.substring(SERVER_PREFIX.length()).trim());
             return;
         }
 
@@ -170,7 +170,7 @@ public class SwarmWorkerMixin {
     // ── Sync handler ──────────────────────────────────────────────────────
 
     @Unique
-    private static void chuckpack\$handleSync(Minecraft mc, String payload) {
+    private static void chuckpack$handleSync(Minecraft mc, String payload) {
         String nameList = payload;
         String configPart = null;
         String idsPart = null;
@@ -216,7 +216,7 @@ public class SwarmWorkerMixin {
                     if (kv.length == 2 && kv[0].trim().equalsIgnoreCase(myName)) {
                         try {
                             int id = Integer.parseInt(kv[1].trim());
-                            chuckpack\$saveWorkerId(id);
+                            chuckpack$saveWorkerId(id);
                             guard.workerId = id;
                         } catch (NumberFormatException ignored) {}
                         break;
@@ -246,7 +246,7 @@ public class SwarmWorkerMixin {
     // ── Server join handler ───────────────────────────────────────────────
 
     @Unique
-    private static void chuckpack\$handleServerJoin(Minecraft mc, String raw) {
+    private static void chuckpack$handleServerJoin(Minecraft mc, String raw) {
         if (raw.isEmpty()) return;
 
         String address = raw;
@@ -287,14 +287,14 @@ public class SwarmWorkerMixin {
                     meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm swarm = Modules.get().get(meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm.class);
                     if (swarm != null) {
                         IAutoSwarmConnect settings = (IAutoSwarmConnect) swarm;
-                        if (settings.ChuckPack$autoAccountSetting().get()) {
-                            int savedId = chuckpack\$loadWorkerId();
+                        if (settings.chuckpack$autoAccountSetting().get()) {
+                            int savedId = chuckpack$loadWorkerId();
                             int useId = savedId > 0 ? savedId : fEmbeddedId;
                             if (useId > 0) {
-                                chuckpack\$saveWorkerId(useId);
-                                chuckpack\$switchToAccount(useId);
+                                chuckpack$saveWorkerId(useId);
+                                chuckpack$switchToAccount(useId);
                             } else {
-                                chuckpack\$switchToNextCrackedAccount();
+                                chuckpack$switchToNextCrackedAccount();
                             }
                         }
                     }
@@ -322,14 +322,14 @@ public class SwarmWorkerMixin {
     // ── Drop logic ────────────────────────────────────────────────────────
 
     @Unique
-    private static void chuckpack\$dropByType(String type) {
+    private static void chuckpack$dropByType(String type) {
         net.chuck.chuckpack.util.SwarmDropHelper.dropByType(type);
     }
 
     // ── Impersonate kick ──────────────────────────────────────────────────
 
     @Unique
-    private static void chuckpack\$impersonateKick(Minecraft mc, String targetName) {
+    private static void chuckpack$impersonateKick(Minecraft mc, String targetName) {
         if (mc.player == null || mc.level == null || mc.getCurrentServer() == null) {
             ChatUtils.error("Must be on a server to impersonate-kick.");
             return;
@@ -373,11 +373,11 @@ public class SwarmWorkerMixin {
                             executor.schedule(() -> {
                                 mc.execute(() -> {
                                     try {
-                                        int savedId = chuckpack\$loadWorkerId();
+                                        int savedId = chuckpack$loadWorkerId();
                                         if (savedId > 0) {
-                                            chuckpack\$switchToAccount(savedId);
+                                            chuckpack$switchToAccount(savedId);
                                         } else {
-                                            chuckpack\$switchToNextCrackedAccount();
+                                            chuckpack$switchToNextCrackedAccount();
                                         }
 
                                         net.minecraft.client.multiplayer.resolver.ServerAddress sa2 = net.minecraft.client.multiplayer.resolver.ServerAddress.parseString(serverAddress);
@@ -405,7 +405,7 @@ public class SwarmWorkerMixin {
     // ── Account management ────────────────────────────────────────────────
 
     @Unique
-    private static void chuckpack\$switchToAccount(int workerId) {
+    private static void chuckpack$switchToAccount(int workerId) {
         List<Account<?>> crackedAccounts = new ArrayList<>();
         for (Account<?> account : Accounts.get()) {
             if (account.getType() == AccountType.Cracked) crackedAccounts.add(account);
@@ -428,7 +428,7 @@ public class SwarmWorkerMixin {
     }
 
     @Unique
-    private static void chuckpack\$switchToNextCrackedAccount() {
+    private static void chuckpack$switchToNextCrackedAccount() {
         List<Account<?>> crackedAccounts = new ArrayList<>();
         for (Account<?> account : Accounts.get()) {
             if (account.getType() == AccountType.Cracked) crackedAccounts.add(account);
@@ -439,14 +439,14 @@ public class SwarmWorkerMixin {
             return;
         }
 
-        int workerId = chuckpack\$loadWorkerId();
+        int workerId = chuckpack$loadWorkerId();
         if (workerId > 0 && workerId <= crackedAccounts.size()) {
             Account<?> account = crackedAccounts.get(workerId - 1);
             if (account.login()) {
                 ChatUtils.infoPrefix("Swarm", "Switched to account: (highlight)%s (worker ID: %d)", account.getUsername(), workerId);
             }
         } else {
-            int index = Math.abs(chuckpack\$accountCounter.getAndIncrement() % crackedAccounts.size());
+            int index = Math.abs(chuckpack$accountCounter.getAndIncrement() % crackedAccounts.size());
             Account<?> account = crackedAccounts.get(index);
             if (account.login()) {
                 ChatUtils.infoPrefix("Swarm", "Switched to account: (highlight)%s (no ID, round-robin)", account.getUsername());
@@ -455,28 +455,28 @@ public class SwarmWorkerMixin {
     }
 
     @Unique
-    private static int chuckpack\$savedWorkerId = 0;
+    private static int chuckpack$savedWorkerId = 0;
 
     @Unique
-    private static void chuckpack\$saveWorkerId(int id) {
-        chuckpack\$savedWorkerId = id;
+    private static void chuckpack$saveWorkerId(int id) {
+        chuckpack$savedWorkerId = id;
         ChatUtils.infoPrefix("Swarm", "Assigned worker ID: (highlight)%d", id);
     }
 
     @Unique
-    private static int chuckpack\$loadWorkerId() {
-        return chuckpack\$savedWorkerId;
+    private static int chuckpack$loadWorkerId() {
+        return chuckpack$savedWorkerId;
     }
 
     // ── Inventory file writing ────────────────────────────────────────────
 
     @Unique
-    private static void chuckpack\$writeInventoryToFile(Minecraft mc) {
+    private static void chuckpack$writeInventoryToFile(Minecraft mc) {
         if (mc.player == null) return;
 
         SwarmGuard.initInventoryDir();
         String workerName = mc.player.getName().getString();
-        int workerId = chuckpack\$savedWorkerId;
+        int workerId = chuckpack$savedWorkerId;
         String fileName = "inv-" + (workerId > 0 ? workerId : Math.abs(workerName.hashCode() % 10000)) + ".txt";
 
         try {

@@ -17,17 +17,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class SwarmMixin {
 
     @Inject(method = "onGameLeft", at = @At("HEAD"), cancellable = true)
-    private void chuckpack\$preventGameLeft(GameLeftEvent event, CallbackInfo ci) {
+    private void chuckpack$preventGameLeft(GameLeftEvent event, CallbackInfo ci) {
         ci.cancel();
     }
 
     @Inject(method = "onGameJoin", at = @At("HEAD"), cancellable = true)
-    private void chuckpack\$preventGameJoin(GameJoinedEvent event, CallbackInfo ci) {
+    private void chuckpack$preventGameJoin(GameJoinedEvent event, CallbackInfo ci) {
         ci.cancel();
     }
 
     @Inject(method = "onTick", at = @At("HEAD"))
-    private void chuckpack\$onTick(TickEvent.Post event, CallbackInfo ci) {
+    private void chuckpack$onTick(TickEvent.Post event, CallbackInfo ci) {
         Swarm self = (Swarm) (Object) this;
         if (!self.isHost()) return;
 

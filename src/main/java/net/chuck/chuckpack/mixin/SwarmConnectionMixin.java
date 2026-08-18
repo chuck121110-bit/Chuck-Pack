@@ -13,7 +13,7 @@ import java.io.IOException;
 public abstract class SwarmConnectionMixin extends Thread {
 
     @Inject(method = "run", at = @At("HEAD"), cancellable = true)
-    private void chuckpack\$silentRun(CallbackInfo ci) {
+    private void chuckpack$silentRun(CallbackInfo ci) {
         ci.cancel();
 
         SwarmConnection self = (SwarmConnection) (Object) this;
