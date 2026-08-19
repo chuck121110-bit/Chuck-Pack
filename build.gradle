@@ -38,7 +38,7 @@ dependencies {
     implementation "meteordevelopment:meteor-client:${project.minecraft_version}-SNAPSHOT"
 
     // Baritone (required runtime dependency)
-    implementation files('libs/baritone-meteor-26.1.2.jar')
+    implementation files('libs/baritone-meteor-1.21.11.jar')
 
     // Xaero's World Map + Minimap (compile-only, for "Auto Fly Here" button)
     compileOnly files('libs/xaeroworldmap-fabric-26.1.2-1.44.2.jar')

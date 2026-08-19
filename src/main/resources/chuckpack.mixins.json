@@ -37,7 +37,8 @@
     "WaypointReaderMixin",
     "PacketByteBufNbtLimitMixin",
     "ChatCoordinateMixin",
-    "ChatScreenMixin"
+    "ChatScreenMixin",
+    "TunnelChatMixin"
   ],
   "injectors": { "defaultRequire": 0 }
 }

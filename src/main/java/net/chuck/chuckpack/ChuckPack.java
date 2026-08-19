@@ -23,6 +23,7 @@ import net.chuck.chuckpack.modules.misc.villagerroller.VillagerRoller;
 import net.chuck.chuckpack.modules.misc.StaffMonitor;
 import net.chuck.chuckpack.modules.movement.AutoFly;
 import net.chuck.chuckpack.modules.movement.BedrockEscape;
+import net.chuck.chuckpack.modules.movement.Tunnel;
 import net.chuck.chuckpack.modules.movement.FlightScrollHandler;
 import net.chuck.chuckpack.modules.render.CoordinateLogout;
 import net.chuck.chuckpack.modules.render.DeepslateESP;
@@ -73,6 +74,7 @@ public class ChuckPack extends MeteorAddon {
         addModule(new AntiSocial());
         addModule(new AutoFly());
         addModule(new BedrockEscape());
+        addModule(new Tunnel());
         addModule(new AutoFarming());
         addModule(new ChatUtility());
         addModule(new PearlChecker());

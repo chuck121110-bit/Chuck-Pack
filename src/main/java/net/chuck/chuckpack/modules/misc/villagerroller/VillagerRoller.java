@@ -524,8 +524,6 @@ public class VillagerRoller extends Module {
         }
     }
 
-    private long waitingForTradesTicks = 0;
-
     public void triggerInteract() {
         if (pauseOnScreen.get() && mc.screen != null) {
             if (cfPausedOnScreen.get()) {
@@ -598,10 +596,10 @@ public class VillagerRoller extends Module {
                         }
                         continue;
                     }
-                    if (e.getMaxCost() > 0 && offer.getItemCostA().getCount() > e.getMaxCost()) {
+                    if (e.getMaxCost() > 0 && offer.getBaseCostA().getCount() > e.getMaxCost()) {
                         if (cfTooExpensive.get()) {
                             info(String.format("Found enchant %s but it costs too much: %s (max price) < %d (cost)",
-                                enchantName, e.getMaxCost(), offer.getItemCostA().getCount()));
+                                enchantName, e.getMaxCost(), offer.getBaseCostA().getCount()));
                         }
                         continue;
                     }
@@ -624,7 +622,7 @@ public class VillagerRoller extends Module {
                             levelText,
                             ChatFormatting.GRAY,
                             ChatFormatting.WHITE,
-                            offer.getItemCostA().getCount(),
+                            offer.getBaseCostA().getCount(),
                             ChatFormatting.GRAY
                         );
                         mc.getConnection().getConnection().disconnect(Component.nullToEmpty(message));
