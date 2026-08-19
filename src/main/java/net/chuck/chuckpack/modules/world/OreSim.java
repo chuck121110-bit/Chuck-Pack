@@ -219,6 +219,7 @@ public class OreSim extends Module {
         int chunkX = chunkPos.x() << 4;
         int chunkZ = chunkPos.z() << 4;
         RandomSource random = RandomSource.create();
+        random.setSeed(worldSeed.seed);
         long populationSeed = random.nextLong();
 
         Map<Ore, Set<Vec3>> orePositions = new HashMap<>();
@@ -259,7 +260,7 @@ public class OreSim extends Module {
         if (oreConfig == null) return Collections.emptyList();
         List<Ore> ores = oreConfig.get(biomeKey);
         if (ores != null) return ores;
-        return oreConfig.values().stream().findAny().orElse(Collections.emptyList());
+        return Collections.emptyList();
     }
 
     private List<Vec3> generateNormal(ClientLevel Level, RandomSource random, BlockPos blockPos, int veinSize, float discardOnAir) {
@@ -333,9 +334,9 @@ public class OreSim extends Module {
             int minBlockX = Math.max(Mth.floor(centerX - radius), minX);
             int minBlockY = Math.max(Mth.floor(centerY - radius), minY);
             int minBlockZ = Math.max(Mth.floor(centerZ - radius), minZ);
-            int maxBlockX = Math.max(Mth.floor(centerX + radius), minBlockX);
-            int maxBlockY = Math.max(Mth.floor(centerY + radius), minBlockY);
-            int maxBlockZ = Math.max(Mth.floor(centerZ + radius), minBlockZ);
+            int maxBlockX = Math.min(Mth.floor(centerX + radius), minX + sizeX - 1);
+            int maxBlockY = Math.min(Mth.floor(centerY + radius), minY + sizeY - 1);
+            int maxBlockZ = Math.min(Mth.floor(centerZ + radius), minZ + sizeX - 1);
 
             for (int x = minBlockX; x <= maxBlockX; x++) {
                 double normX = ((double) x + 0.5D - centerX) / radius;
@@ -364,9 +365,11 @@ public class OreSim extends Module {
     }
 
     private boolean shouldPlace(ClientLevel Level, BlockPos pos, float discardOnAir, RandomSource random) {
-        if (discardOnAir == 0 || (discardOnAir != 1.0F && random.nextFloat() >= discardOnAir)) return true;
+        if (discardOnAir == 0) return true;
         for (Direction direction : Direction.values()) {
-            if (!Level.getBlockState(pos.relative(direction)).canOcclude() && discardOnAir != 1.0F) return false;
+            if (!Level.getBlockState(pos.relative(direction)).canOcclude()) {
+                if (discardOnAir == 1.0F || random.nextFloat() < discardOnAir) return false;
+            }
         }
         return true;
     }

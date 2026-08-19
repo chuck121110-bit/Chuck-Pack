@@ -47,7 +47,7 @@ public class RollingEnchantment implements ISerializable<RollingEnchantment> {
 
     @Override
     public RollingEnchantment fromTag(CompoundTag tag) {
-        this.enchantment = Identifier.parse(tag.getStringOr("enchantment", ""));
+        this.enchantment = Identifier.tryParse(tag.getStringOr("enchantment", ""));
         this.minLevel = tag.getIntOr("minLevel", 1);
         this.maxCost = tag.getIntOr("maxCost", 64);
         this.enabled = tag.getBooleanOr("enabled", true);
@@ -56,8 +56,8 @@ public class RollingEnchantment implements ISerializable<RollingEnchantment> {
 
     public static int getMinimumPrice(Holder<Enchantment> e) {
         if (e == null) return 0;
-        boolean isTreasure = e.is(EnchantmentTags.TREASURE);
+        boolean isDoublePrice = e.is(EnchantmentTags.DOUBLE_TRADE_PRICE);
         int maxLevel = e.value().getMaxLevel();
-        return isTreasure ? (2 + 3 * maxLevel) * 2 : 2 + 3 * maxLevel;
+        return isDoublePrice ? (2 + 3 * maxLevel) * 2 : 2 + 3 * maxLevel;
     }
 }

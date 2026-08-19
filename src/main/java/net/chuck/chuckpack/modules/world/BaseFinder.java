@@ -51,7 +51,6 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.ChatFormatting;
-import java.net.URI;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
@@ -540,6 +539,7 @@ public class BaseFinder extends Module {
 
     @Override
     public WWidget getWidget(GuiTheme theme) {
+        this.cachedTheme = theme;
         WTable table1 = theme.table();
         WTable table = theme.table();
         WButton nearestB = table1.add(theme.button("NearestBase")).expandX().minWidth(100).widget();
@@ -704,6 +704,14 @@ public class BaseFinder extends Module {
         return list;
     }
 
+    public void openFlaggedChunksScreen() {
+        if (cachedTheme == null) {
+            error("Open BaseFinder settings first to load the GUI theme.");
+            return;
+        }
+        mc.setScreen(new net.chuck.chuckpack.gui.screens.FlaggedChunksScreen(cachedTheme, this, baseChunks, chunkTriggerReasons, chunkBlockCounts, chunkEntityCounts));
+    }
+
     // render
     public final Setting<Integer> renderDistance = sgRender.add(new IntSetting.Builder()
             .name("Render-Distance(Chunks)")
@@ -798,6 +806,7 @@ public class BaseFinder extends Module {
     private int found6 = 0;
     private boolean checkingchunk7=false;
     private int found7 = 0;
+    private GuiTheme cachedTheme;
     private ChunkPos LastBaseFound = new ChunkPos(2000000000, 2000000000);
     private ChunkPos closestBase = new ChunkPos(2000000000, 2000000000);
     private double basedistance=2000000000;
@@ -869,7 +878,7 @@ public class BaseFinder extends Module {
                 .withColor(ChatFormatting.GRAY)
                 .withUnderlined(true)
                 .withHoverEvent(new HoverEvent.ShowText(Component.literal("Open flagged chunks GUI")))
-                .withClickEvent(new ClickEvent.OpenUrl(URI.create("https://github.com/anomalyco/opencode"))));
+                .withClickEvent(new ClickEvent.RunCommand(".openflaggedchunks")));
         MutableComponent message = Component.literal("Base was found ")
             .withStyle(ChatFormatting.DARK_GRAY)
             .append(openGuiBtn);
@@ -1853,7 +1862,7 @@ public class BaseFinder extends Module {
                             .withColor(ChatFormatting.GRAY)
                             .withUnderlined(true)
                             .withHoverEvent(new HoverEvent.ShowText(Component.literal("Open flagged chunks GUI")))
-                            .withClickEvent(new ClickEvent.OpenUrl(URI.create("https://github.com/anomalyco/opencode"))));
+                            .withClickEvent(new ClickEvent.RunCommand(".openflaggedchunks")));
                     MutableComponent message = Component.literal("Base was found ")
                         .withStyle(ChatFormatting.DARK_GRAY)
                         .append(openGuiBtn);

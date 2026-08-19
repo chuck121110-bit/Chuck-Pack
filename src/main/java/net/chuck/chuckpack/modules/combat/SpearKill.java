@@ -305,7 +305,7 @@ public class SpearKill extends Module {
 
     private boolean isUsingSpear() {
         if (mc.player == null) return false;
-        String itemName = mc.player.getActiveItem().getItem().toString().toLowerCase();
+        String itemName = mc.player.getUseItem().getItem().toString().toLowerCase();
         return itemName.contains("spear");
     }
 
@@ -437,7 +437,7 @@ public class SpearKill extends Module {
 
         rotateToTarget(killTarget);
 
-        if (mc.player.getUseItemRemainingTicks() > readyTicks) {
+        if (mc.player.getTicksUsingItem() > readyTicks) {
             AABB playerBox = mc.player.getBoundingBox().inflate(stopDistance.get());
             AABB targetBox = killTarget.getBoundingBox();
             boolean atTarget = playerBox.intersects(targetBox);

@@ -391,15 +391,17 @@ public final class AutoFly extends Module
 	private boolean antiKickFlip;
 	private float antiKickLastYaw;
 	private double antiKickLastPacketY;
-	private final java.util.ArrayList<Long> recentSetbacks = new java.util.ArrayList<>();
-	private static final int INITIAL_SETBACK_THRESHOLD = 10;
-	private static final int ONGOING_SETBACK_THRESHOLD = 5;
-	private static final long SETBACK_WINDOW_MS = 10000;
-	private int currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
+
+	// Setback state machine
+	// Phase 0 = ramp up, counting setbacks
+	// Phase 1 = hold speed, every setback decreases, after 5s quiet stays held
 	private int setbackPhase = 0;
-	private long cooldownStartMs = 0;
-	private static final long COOLDOWN_MS = 1000;
+	private int setbackCount = 0;
+	private long quietStartMs = 0;
 	private long lastRampUpMs = 0;
+	private static final long QUIET_WINDOW_MS = 5000;
+	private static final int INITIAL_SETBACK_THRESHOLD = 10;
+
 	public int setbackDisplayTicks = 0;
 	private boolean jumpWasPressed = false;
 	private long lastJumpPressMs = 0;
@@ -431,8 +433,9 @@ public final class AutoFly extends Module
 		speedFrozen = false;
 		ticksSinceSetback = -1;
 		speedLocked = false;
-		recentSetbacks.clear();
-		currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
+		setbackCount = 0;
+		quietStartMs = 0;
+		setbackPhase = 0;
 		lastTarget = null;
 		arrived = false;
 		lastDangerAvoidMs = 0;
@@ -971,29 +974,11 @@ public final class AutoFly extends Module
 		}
 		else if(setbackPhase == 1)
 		{
-			if(now - cooldownStartMs >= COOLDOWN_MS)
+			if(now - quietStartMs >= QUIET_WINDOW_MS)
 			{
-				setbackPhase = 0;
-				recentSetbacks.clear();
-				currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
-				syncConfig();
 				if(speedDebug.get())
 				{
-					info("[SpeedDebug] Cooldown over, resuming ramp-up");
-				}
-			}
-		}
-		else if(setbackPhase == 3)
-		{
-			if(now - cooldownStartMs >= COOLDOWN_MS)
-			{
-				setbackPhase = 0;
-				recentSetbacks.clear();
-				currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
-				syncConfig();
-				if(speedDebug.get())
-				{
-					info("[SpeedDebug] Continuous cooldown over, resuming ramp-up");
+					info("[SpeedDebug] 5s quiet - holding speed at " + String.format(Locale.ROOT, "%.3f", currentSpeed));
 				}
 			}
 		}
@@ -1080,81 +1065,38 @@ public final class AutoFly extends Module
 		lastSetbackMs = now;
 		setbackDisplayTicks = 40;
 
+		if(setbackPhase == 0)
+		{
+			setbackCount++;
+
+			if(setbackCount < INITIAL_SETBACK_THRESHOLD)
+			{
+				if(speedDebug.get())
+				{
+					info("[SpeedDebug] Setback " + setbackCount + "/" + INITIAL_SETBACK_THRESHOLD);
+				}
+				return;
+			}
+
+			currentSpeed = Math.max(startSpeed.get(), currentSpeed - rampUpIncrement.get());
+			syncConfig();
+			setbackPhase = 1;
+			quietStartMs = now;
+			if(speedDebug.get())
+			{
+				info("[SpeedDebug] 10 setbacks! Speed: " + String.format(Locale.ROOT, "%.3f", currentSpeed) + " → holding");
+			}
+			return;
+		}
+
 		if(setbackPhase == 1)
 		{
 			currentSpeed = Math.max(startSpeed.get(), currentSpeed - rampUpIncrement.get());
-			cooldownStartMs = now;
-			recentSetbacks.clear();
+			quietStartMs = now;
 			syncConfig();
 			if(speedDebug.get())
 			{
-				info("[SpeedDebug] Setback during cooldown, speed: " + String.format(Locale.ROOT, "%.3f", currentSpeed) + " (reset timer)");
-			}
-			return;
-		}
-
-		if(setbackPhase == 3)
-		{
-			currentSpeed = Math.max(startSpeed.get(), currentSpeed - rampUpIncrement.get());
-			cooldownStartMs = now;
-			syncConfig();
-			if(speedDebug.get())
-			{
-				info("[SpeedDebug] Setback during continuous, speed: " + String.format(Locale.ROOT, "%.3f", currentSpeed) + " (reset timer)");
-			}
-			return;
-		}
-
-		if(setbackPhase == 2)
-		{
-			recentSetbacks.add(now);
-			recentSetbacks.removeIf(t -> now - t > SETBACK_WINDOW_MS);
-
-			if(recentSetbacks.size() < currentSetbackThreshold)
-			{
-				if(speedDebug.get())
-				{
-					info("[SpeedDebug] Setback " + recentSetbacks.size() + "/" + currentSetbackThreshold);
-				}
-				return;
-			}
-
-			currentSpeed = Math.max(startSpeed.get(), currentSpeed - rampUpIncrement.get());
-			cooldownStartMs = now;
-			recentSetbacks.clear();
-			setbackPhase = 3;
-			currentSetbackThreshold = ONGOING_SETBACK_THRESHOLD;
-			syncConfig();
-			if(speedDebug.get())
-			{
-				info("[SpeedDebug] 5 setbacks reached! Speed: " + String.format(Locale.ROOT, "%.3f", currentSpeed) + " → continuous mode");
-			}
-			return;
-		}
-
-		if(setbackPhase == 0)
-		{
-			recentSetbacks.add(now);
-			recentSetbacks.removeIf(t -> now - t > SETBACK_WINDOW_MS);
-
-			if(recentSetbacks.size() < currentSetbackThreshold)
-			{
-				if(speedDebug.get())
-				{
-					info("[SpeedDebug] Setback " + recentSetbacks.size() + "/" + currentSetbackThreshold);
-				}
-				return;
-			}
-
-			currentSpeed = Math.max(startSpeed.get(), currentSpeed - rampUpIncrement.get());
-			cooldownStartMs = now;
-			recentSetbacks.clear();
-			setbackPhase = 1;
-			currentSetbackThreshold = ONGOING_SETBACK_THRESHOLD;
-			syncConfig();
-			if(speedDebug.get())
-			{
-				info("[SpeedDebug] 10 setbacks reached! Speed: " + String.format(Locale.ROOT, "%.3f", currentSpeed) + " → cooldown");
+				info("[SpeedDebug] Setback during hold, speed: " + String.format(Locale.ROOT, "%.3f", currentSpeed));
 			}
 		}
 	}
@@ -1210,10 +1152,9 @@ public final class AutoFly extends Module
 		speedFrozen = false;
 		ticksSinceSetback = -1;
 		speedLocked = false;
-		recentSetbacks.clear();
-		currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
+		setbackCount = 0;
+		quietStartMs = 0;
 		setbackPhase = 0;
-		cooldownStartMs = 0;
 		setbackDisplayTicks = 0;
 
 		if(autoEat.get())
@@ -1267,10 +1208,9 @@ public final class AutoFly extends Module
 		speedFrozen = false;
 		ticksSinceSetback = -1;
 		speedLocked = false;
-		recentSetbacks.clear();
-		currentSetbackThreshold = INITIAL_SETBACK_THRESHOLD;
+		setbackCount = 0;
+		quietStartMs = 0;
 		setbackPhase = 0;
-		cooldownStartMs = 0;
 		setbackDisplayTicks = 0;
 
 		if(autoEat.get())
