@@ -1,9 +1,0 @@
-package net.aero.aeropack.autoflypath.flight;
-
-public final class PathCalculationException extends RuntimeException
-{
-	public PathCalculationException(String message)
-	{
-		super(message);
-	}
-}

@@ -1,0 +1,60 @@
+package net.chuck.chuckpack.modules.misc;
+
+import meteordevelopment.meteorclient.events.entity.player.InteractBlockEvent;
+import meteordevelopment.meteorclient.systems.modules.Categories;
+import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.meteorclient.utils.world.BlockUtils;
+import meteordevelopment.orbit.EventHandler;
+import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.state.properties.DoorHingeSide;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
+
+/**
+ * Ported from Meteorist by zgoly.
+ * Original: zgoly.meteorist.modules.DoubleDoorsInteract
+ */
+public class DoubleDoorsInteract extends Module {
+    private boolean isInteracting = false;
+
+    public DoubleDoorsInteract() {
+        super(Categories.Misc, "double-doors-interact", "Open both doors with one interaction. (Ported from Meteorist by zgoly)");
+    }
+
+    @EventHandler
+    private void onInteract(InteractBlockEvent event) {
+        if (isInteracting) return;
+
+        isInteracting = true;
+        BlockPos doorPos = event.result.getBlockPos();
+        if (mc.level == null) { isInteracting = false; return; }
+
+        var blockState = mc.level.getBlockState(doorPos);
+        if (blockState.getBlock() instanceof DoorBlock) {
+            Direction doorFacing = blockState.getValue(DoorBlock.FACING);
+            DoorHingeSide DoorHingeSide = blockState.getValue(DoorBlock.HINGE);
+
+            BlockPos otherDoorPos;
+            if (DoorHingeSide == DoorHingeSide.LEFT) {
+                otherDoorPos = doorPos.relative(doorFacing.getClockWise());
+            } else {
+                otherDoorPos = doorPos.relative(doorFacing.getCounterClockWise());
+            }
+
+            var otherBlockState = mc.level.getBlockState(otherDoorPos);
+            if (otherBlockState.getBlock() instanceof DoorBlock) {
+                if (blockState.getValue(DoorBlock.HALF) == otherBlockState.getValue(DoorBlock.HALF)
+                        && blockState.getValue(DoorBlock.HINGE) != otherBlockState.getValue(DoorBlock.HINGE)
+                        && blockState.getValue(DoorBlock.OPEN) == otherBlockState.getValue(DoorBlock.OPEN)) {
+                    BlockUtils.interact(new BlockHitResult(
+                        Vec3.atCenterOf(otherDoorPos), Direction.UP, otherDoorPos, false
+                    ), InteractionHand.MAIN_HAND, false);
+                }
+            }
+        }
+        isInteracting = false;
+    }
+}
