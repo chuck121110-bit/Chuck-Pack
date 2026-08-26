@@ -30,6 +30,7 @@ public class SwarmWorkerMixin {
     private static final String DISCONNECT_ALL_CMD = "swarm disconnect-all";
     private static final String IMPERSONATE_KICK_PREFIX = "swarm impersonate-kick ";
     private static final String DROP_SLOT_CMD = "swarm drop-slot ";
+    private static final String SWARM_FLY_PREFIX = "swarm ChuckPack-swarmfly ";
 
     @Unique
     private static final AtomicInteger chuckpack$accountCounter = new AtomicInteger(0);
@@ -50,6 +51,28 @@ public class SwarmWorkerMixin {
             String attackerName = command.substring(RETALIATE_PREFIX.length()).trim();
             if (!attackerName.isEmpty()) {
                 mc.execute(() -> SwarmGuard.get().applyRetaliation(attackerName));
+            }
+            return;
+        }
+
+        if (command.startsWith(SWARM_FLY_PREFIX)) {
+            String args = command.substring(SWARM_FLY_PREFIX.length()).trim();
+            String[] parts = args.split("\\s+");
+            if (parts.length >= 3) {
+                try {
+                    int x = Integer.parseInt(parts[0]);
+                    int y = Integer.parseInt(parts[1]);
+                    int z = Integer.parseInt(parts[2]);
+                    boolean yKnown = parts.length >= 4 && Boolean.parseBoolean(parts[3]);
+                    mc.execute(() -> {
+                        net.chuck.chuckpack.modules.movement.AutoFly af = Modules.get().get(net.chuck.chuckpack.modules.movement.AutoFly.class);
+                        if (af != null) {
+                            if (!af.isActive()) af.toggle();
+                            af.setTargetFromMap(x, y, z, yKnown, true);
+                            ChatUtils.infoPrefix("Swarm", "Flying to (highlight)%d %d %d", x, y, z);
+                        }
+                    });
+                } catch (NumberFormatException ignored) {}
             }
             return;
         }

@@ -186,6 +186,50 @@ public class SwarmMineMixin {
                 })
         );
 
+        // ── swarm fly ────────────────────────────────────────────────────────
+        builder.then(
+            LiteralArgumentBuilder.<CommandSource>literal("fly").then(
+                RequiredArgumentBuilder.<CommandSource, String>argument("coords", StringArgumentType.greedyString())
+                    .executes(context -> {
+                        Swarm swarm = Modules.get().get(Swarm.class);
+                        if (!swarm.isActive()) { ChatUtils.error("The swarm module must be active to use this command."); return 0; }
+
+                        String raw = StringArgumentType.getString(context, "coords").trim().replace(",", " ");
+                        String[] parts = raw.split("\\s+");
+                        if (parts.length < 2) { ChatUtils.error("Usage: .swarm fly <x> <z> or .swarm fly <x> <y> <z>"); return 0; }
+
+                        int x, y, z;
+                        boolean yKnown;
+                        try {
+                            x = Integer.parseInt(parts[0]);
+                            if (parts.length >= 3) {
+                                y = Integer.parseInt(parts[1]);
+                                z = Integer.parseInt(parts[2]);
+                                yKnown = true;
+                            } else {
+                                y = 64;
+                                z = Integer.parseInt(parts[1]);
+                                yKnown = false;
+                            }
+                        } catch (NumberFormatException e) { ChatUtils.error("Invalid coordinates."); return 0; }
+
+                        if (swarm.isHost()) {
+                            String cmd = "swarm ChuckPack-swarmfly " + x + " " + y + " " + z + " " + yKnown;
+                            swarm.host.sendMessage(cmd);
+                            ChatUtils.info("Telling workers to fly to (highlight)%d %d %d", x, y, z);
+                        } else {
+                            net.chuck.chuckpack.modules.movement.AutoFly af = Modules.get().get(net.chuck.chuckpack.modules.movement.AutoFly.class);
+                            if (af != null) {
+                                if (!af.isActive()) af.toggle();
+                                af.setTargetFromMap(x, y, z, yKnown, true);
+                                ChatUtils.info("Flying to (highlight)%d %d %d", x, y, z);
+                            }
+                        }
+                        return 1;
+                    })
+            )
+        );
+
         // ── swarm server ───────────────────────────────────────────────────
         builder.then(
             LiteralArgumentBuilder.<CommandSource>literal("server").then(

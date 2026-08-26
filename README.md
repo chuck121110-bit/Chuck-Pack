@@ -1,44 +1,50 @@
 # Chuck Pack
 
-A feature-rich addon for [Meteor Client](https://github.com/MeteorDevelopment/meteor-client) on Minecraft. Provides 29 gameplay modules, 3 HUD elements, 2 commands, and a custom pathfinding engine.
+A feature-rich addon for [Meteor Client](https://github.com/MeteorDevelopment/meteor-client) on Minecraft. Provides 30+ gameplay modules, 3 HUD elements, 2 commands, swarm support, and a custom pathfinding engine.
 
 ## Features
 
 ### Combat
 - **MaceDamage** — Mace damage calculation
-- **SpearKill** — Trident spear attacks
-- **SwarmGuard** — Swarm team protection
+- **SpearKill** — Trident spear attacks (ported from Trouser Streak)
 - **Untouchable** — PvP evasion with 9 threat types
 
 ### Movement
-- **AutoFly** — Auto-fly to waypoints with setback detection and adaptive speed
-- **BedrockEscape** — Escape bedrock from above/below
+- **AutoFly** — Auto-fly to waypoints with setback detection, adaptive speed, and swarm support
+- **BedrockEscape** — Escape bedrock from above/below (ported from Wurst CevAPI)
 - **FlightScrollHandler** — Scroll wheel flight control
-- **JumpFlight** — Jump-based flight
+- **NoFallPlus** — Anti-fall bypass module with 8 modes (Matrix, Vulcan, Verus, Elytra variants, No-Ground). Ported from meteor-plus by nekiplay
+- **Tunnel** — Cross-section tunnel digging (`.tunnel NxN` in chat)
 
 ### Render
 - **CoordinateLogout** — Logout spot coordinates
-- **DeepslateESP** — Deepslate block highlighting
-- **HoleTunnelStairsESP** — Hole/tunnel/stair ESP
-- **MobGearESP** — Mob equipment display
+- **DeepslateESP** — Deepslate block highlighting (ported from Nora Tweaks)
+- **HoleTunnelStairsESP** — Hole/tunnel/stair ESP (ported from Trouser Streak)
+- **MobGearESP** — Mob equipment display (ported from Trouser Streak)
 - **NewChunks** — New/old chunk detection
-- **PearlChecker** — Ender pearl trajectory preview
+- **PearlChecker** — Ender pearl trajectory preview (ported from Nora Tweaks)
 - **TrueSight** — See through walls
 
 ### World
-- **AutoFarming** — Automated farming
-- **BaseFinder** — Base detection via entity analysis
+- **AutoFarming** — Automated farming (ported from Nora Tweaks)
+- **BaseFinder** — Base detection via entity analysis (ported from Trouser Streak)
 - **OreSim** — Ore simulation
 
 ### Misc
-- **AiChat** — AI chat integration
+- **AiChat** — AI chat integration (OpenAI, Anthropic, Google, Groq)
 - **AiChatConverse** — Persistent AI conversations with memory
-- **AutoLogin** — Auto server login
-- **ChatUtility** — Chat enhancements
+- **AntiSocial** — Anti-social utilities
+- **AutoInteract** — Auto door/trapdoor interaction (ported from Meteorist)
+- **AutoLogin** — Auto server login (ported from Meteorist)
+- **AutoUpdate** — Check for and install updates from GitHub
+- **ChatUtility** — Chat enhancements (ported from Nora Tweaks)
+- **DoubleDoorsInteract** — Open both doors with one interaction (ported from Meteorist)
+- **MapIntegration** — Waypoint creation from FreeCam/Xaero's map
 - **NbtFilter** — NBT packet attack protection
 - **OppStats** — Opponent statistics tracking
 - **PlayerTriangulate** — Player location triangulation
-- **StaffMonitor** — Staff detection
+- **StaffMonitor** — Staff detection with auto-quit
+- **SwarmAutoConnect** — Auto-connect swarm workers to host
 - **VillagerRoller** — Villager trade rolling for enchantments
 
 ### HUD
@@ -49,6 +55,8 @@ A feature-rich addon for [Meteor Client](https://github.com/MeteorDevelopment/me
 ### Commands
 - **/locate** — Structure locating
 - **/seed** — World seed extraction
+- **.tunnel NxN** — Set tunnel cross-section
+- **.swarm fly X Y Z** — Swarm fly to coordinates
 
 ## Branches
 

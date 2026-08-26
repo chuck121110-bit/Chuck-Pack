@@ -16,5 +16,6 @@ meteor-client-*/
 build-log*.txt
 gradle-*-bin.zip
 *.log
+build-log*.txt
 yarn-to-mojang-map.txt
 meteordevelopment/

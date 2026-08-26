@@ -38,7 +38,9 @@
     "PacketByteBufNbtLimitMixin",
     "ChatCoordinateMixin",
     "ChatScreenMixin",
-    "TunnelChatMixin"
+    "TunnelChatMixin",
+    "BaritoneSettingsMixin",
+    "WWindowHeaderMixin"
   ],
   "injectors": { "defaultRequire": 0 }
 }

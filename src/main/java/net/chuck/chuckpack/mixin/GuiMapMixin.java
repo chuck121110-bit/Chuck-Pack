@@ -3,6 +3,8 @@ package net.chuck.chuckpack.mixin;
 import java.util.ArrayList;
 import net.chuck.chuckpack.modules.movement.AutoFly;
 import meteordevelopment.meteorclient.systems.modules.Modules;
+import meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm;
+import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -32,7 +34,8 @@ public abstract class GuiMapMixin {
             boolean yKnown = wy != 319;
 
             for (int i = options.size() - 1; i >= 0; i--) {
-                if (options.get(i).getDisplayName().getString().equals("Auto Fly Here")) {
+                String name = options.get(i).getDisplayName().getString();
+                if (name.equals("Auto Fly Here") || name.equals("Swarm Fly Here")) {
                     options.remove(i);
                 }
             }
@@ -45,6 +48,23 @@ public abstract class GuiMapMixin {
                         if (af != null) {
                             if (!af.isActive()) af.toggle();
                             af.setTargetFromMap(wx, wy, wz, yKnown, false);
+                        }
+                    }
+                });
+
+            insertIdx = Math.max(0, options.size() - 1);
+            options.add(insertIdx, new RightClickOption("Swarm Fly Here", insertIdx, (xaero.map.gui.IRightClickableElement) (Object) this) {
+                    @Override
+                    public void onAction(net.minecraft.client.gui.screens.Screen screen) {
+                        Swarm swarm = Modules.get().get(Swarm.class);
+                        if (swarm == null || !swarm.isActive()) {
+                            ChatUtils.error("Swarm module must be active to use Swarm Fly Here.");
+                            return;
+                        }
+                        String cmd = "swarm fly " + wx + " " + (yKnown ? wy + " " : "") + wz;
+                        Minecraft mc = Minecraft.getInstance();
+                        if (mc.player != null) {
+                            meteordevelopment.meteorclient.utils.player.ChatUtils.sendPlayerMsg(cmd);
                         }
                     }
                 });

@@ -6,7 +6,9 @@ import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
+import meteordevelopment.meteorclient.systems.modules.combat.KillAura;
 import meteordevelopment.meteorclient.systems.modules.movement.NoFall;
+import meteordevelopment.meteorclient.systems.modules.player.AutoEat;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -20,6 +22,9 @@ import java.util.List;
 
 public class Tunnel extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
+    private final SettingGroup sgAuto = settings.createGroup("Auto Modules");
+
+    // --- General ---
 
     private final Setting<Boolean> disableNoFall = sgGeneral.add(new BoolSetting.Builder()
         .name("disable-nofall")
@@ -46,6 +51,38 @@ public class Tunnel extends Module {
         .build()
     );
 
+    private final Setting<Boolean> leaveOnFullInventory = sgGeneral.add(new BoolSetting.Builder()
+        .name("leave-on-full-inventory")
+        .description("Stops tunneling when your inventory is full.")
+        .defaultValue(true)
+        .build()
+    );
+
+    // --- Auto Modules ---
+
+    private final Setting<Boolean> autoEat = sgAuto.add(new BoolSetting.Builder()
+        .name("auto-eat")
+        .description("Automatically enables AutoEat while tunneling.")
+        .defaultValue(false)
+        .build()
+    );
+
+    private final Setting<Boolean> autoLog = sgAuto.add(new BoolSetting.Builder()
+        .name("auto-log")
+        .description("Automatically enables AutoLog while tunneling.")
+        .defaultValue(false)
+        .build()
+    );
+
+    private final Setting<Boolean> killAura = sgAuto.add(new BoolSetting.Builder()
+        .name("kill-aura")
+        .description("Automatically enables KillAura while tunneling.")
+        .defaultValue(false)
+        .build()
+    );
+
+    // --- State ---
+
     private int tunnelSize = 0;
     private boolean active = false;
     private List<BlockPos> currentCrossSection = new ArrayList<>();
@@ -56,6 +93,12 @@ public class Tunnel extends Module {
     private BlockPos currentBreakTarget = null;
     private boolean wasNoFallEnabled = false;
     private boolean noFallToggled = false;
+    private boolean wasAutoEatEnabled = false;
+    private boolean autoEatToggled = false;
+    private boolean wasAutoLogEnabled = false;
+    private boolean autoLogToggled = false;
+    private boolean wasKillAuraEnabled = false;
+    private boolean killAuraToggled = false;
 
     public Tunnel() {
         super(Categories.Movement, "Tunnel", "Digs a tunnel of a specified cross-section. Type .tunnel NxN in chat (e.g., .tunnel 3x3, .tunnel 2x2).");
@@ -79,11 +122,33 @@ public class Tunnel extends Module {
         tunnelSize = 0;
         currentCrossSection.clear();
         PathManagers.get().stop();
+        restoreAllModules();
+    }
+
+    private void restoreAllModules() {
         if (noFallToggled && wasNoFallEnabled) {
             Modules.get().get(NoFall.class).toggle();
         }
         noFallToggled = false;
         wasNoFallEnabled = false;
+
+        if (autoEatToggled && wasAutoEatEnabled) {
+            Modules.get().get(AutoEat.class).toggle();
+        }
+        autoEatToggled = false;
+        wasAutoEatEnabled = false;
+
+        if (autoLogToggled && wasAutoLogEnabled) {
+            Modules.get().get(net.chuck.chuckpack.modules.misc.AutoLogin.class).toggle();
+        }
+        autoLogToggled = false;
+        wasAutoLogEnabled = false;
+
+        if (killAuraToggled && wasKillAuraEnabled) {
+            Modules.get().get(KillAura.class).toggle();
+        }
+        killAuraToggled = false;
+        wasKillAuraEnabled = false;
     }
 
     public void startTunnel(int size) {
@@ -102,24 +167,58 @@ public class Tunnel extends Module {
         currentCrossSection.clear();
         crossSectionIndex = 0;
 
+        enableAutoModules();
+
         info("Starting %dx%d tunnel. Length: %d blocks.", size, size, tunnelLength.get());
         calculateNextCrossSection();
+    }
+
+    private void enableAutoModules() {
+        if (disableNoFall.get()) {
+            wasNoFallEnabled = Modules.get().get(NoFall.class).isActive();
+            if (wasNoFallEnabled && !Modules.get().get(NoFall.class).isActive()) {
+                Modules.get().get(NoFall.class).toggle();
+                noFallToggled = true;
+            }
+        }
+
+        if (autoEat.get()) {
+            wasAutoEatEnabled = Modules.get().get(AutoEat.class).isActive();
+            if (!wasAutoEatEnabled) {
+                Modules.get().get(AutoEat.class).toggle();
+                autoEatToggled = true;
+            }
+        }
+
+        if (autoLog.get()) {
+            wasAutoLogEnabled = Modules.get().get(net.chuck.chuckpack.modules.misc.AutoLogin.class).isActive();
+            if (!wasAutoLogEnabled) {
+                Modules.get().get(net.chuck.chuckpack.modules.misc.AutoLogin.class).toggle();
+                autoLogToggled = true;
+            }
+        }
+
+        if (killAura.get()) {
+            wasKillAuraEnabled = Modules.get().get(KillAura.class).isActive();
+            if (!wasKillAuraEnabled) {
+                Modules.get().get(KillAura.class).toggle();
+                killAuraToggled = true;
+            }
+        }
     }
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (mc.player == null || mc.level == null || !active) return;
 
-        if (disableNoFall.get() && !noFallToggled) {
-            wasNoFallEnabled = Modules.get().get(NoFall.class).isActive();
-            if (wasNoFallEnabled) {
-                Modules.get().get(NoFall.class).toggle();
-                noFallToggled = true;
-            }
-        }
-
         if (tunnelStart != null && blocksBroken >= tunnelLength.get()) {
             info("Tunnel complete! Dug %d blocks.", blocksBroken);
+            toggle();
+            return;
+        }
+
+        if (leaveOnFullInventory.get() && isInventoryFull()) {
+            info("Inventory full! Stopping tunnel. Dug %d blocks.", blocksBroken);
             toggle();
             return;
         }
@@ -158,6 +257,16 @@ public class Tunnel extends Module {
         } else {
             mc.player.swing(InteractionHand.MAIN_HAND);
         }
+    }
+
+    private boolean isInventoryFull() {
+        if (mc.player == null) return false;
+        for (int i = 0; i < 36; i++) {
+            if (mc.player.getInventory().getItem(i).isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void calculateNextCrossSection() {
