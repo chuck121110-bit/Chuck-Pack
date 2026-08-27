@@ -19,6 +19,20 @@ public class ChuckPackConfigModifier {
         .build()
     );
 
+    public final Setting<Boolean> checkForUpdates = sgChuckPack.add(new BoolSetting.Builder()
+        .name("check-for-updates")
+        .description("Check for Chuck Pack updates from GitHub on Minecraft startup.")
+        .defaultValue(true)
+        .build()
+    );
+
+    public final Setting<Boolean> autoDownloadUpdates = sgChuckPack.add(new BoolSetting.Builder()
+        .name("auto-download-updates")
+        .description("Automatically download and install updates when found (requires restart).")
+        .defaultValue(false)
+        .build()
+    );
+
     public static ChuckPackConfigModifier get() {
         if (INSTANCE == null) INSTANCE = new ChuckPackConfigModifier();
         return INSTANCE;

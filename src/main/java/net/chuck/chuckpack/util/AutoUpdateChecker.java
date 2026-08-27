@@ -1,18 +1,12 @@
-package net.chuck.chuckpack.modules.misc;
+package net.chuck.chuckpack.util;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import meteordevelopment.meteorclient.gui.GuiTheme;
-import meteordevelopment.meteorclient.gui.widgets.WWidget;
-import meteordevelopment.meteorclient.gui.widgets.pressable.WButton;
-import meteordevelopment.meteorclient.settings.*;
-import meteordevelopment.meteorclient.systems.modules.Categories;
-import meteordevelopment.meteorclient.systems.modules.Module;
-import meteordevelopment.meteorclient.utils.player.ChatUtils;
+import net.chuck.chuckpack.ChuckPack;
+import net.chuck.chuckpack.util.config.ChuckPackConfigModifier;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -24,67 +18,24 @@ import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
-public class AutoUpdate extends Module {
-    private final SettingGroup sgGeneral = settings.getDefaultGroup();
+public class AutoUpdateChecker {
+    private static String latestVersion = "";
+    private static String downloadUrl = "";
+    private static boolean updateAvailable = false;
 
-    private final Setting<Boolean> checkOnStartup = sgGeneral.add(new BoolSetting.Builder()
-        .name("Check on Startup")
-        .description("Check for updates when the mod loads.")
-        .defaultValue(true)
-        .build()
-    );
-
-    private final Setting<Boolean> autoDownload = sgGeneral.add(new BoolSetting.Builder()
-        .name("Auto Download")
-        .description("Automatically download and install updates when found.")
-        .defaultValue(false)
-        .build()
-    );
-
-    private GuiTheme cachedTheme;
-    private boolean updateAvailable = false;
-    private String latestVersion = "";
-    private String downloadUrl = "";
-    private String currentVersion = "";
-
-    public AutoUpdate() {
-        super(Categories.Misc, "Auto Update", "Check for and install Chuck Pack updates from GitHub.");
-    }
-
-    @Override
-    public void onActivate() {
-        currentVersion = getVersion();
-        if (checkOnStartup.get()) {
-            checkForUpdates();
+    public static void checkOnStartup() {
+        ChuckPackConfigModifier cfg = ChuckPackConfigModifier.get();
+        if (!cfg.checkForUpdates.get()) {
+            ChuckPack.LOG.info("AutoUpdate: check on startup disabled.");
+            return;
         }
+        checkForUpdates(cfg.autoDownloadUpdates.get());
     }
 
-    @Override
-    public WWidget getWidget(GuiTheme theme) {
-        this.cachedTheme = theme;
-        var table = theme.table();
-
-        WButton checkBtn = table.add(theme.button("Check for Updates")).expandX().minWidth(100).widget();
-        checkBtn.action = this::checkForUpdates;
-
-        WButton downloadBtn = table.add(theme.button("Download & Install")).expandX().minWidth(100).widget();
-        downloadBtn.action = () -> {
-            if (updateAvailable) {
-                downloadUpdate();
-            } else {
-                ChatUtils.info("No update available.");
-            }
-        };
-
-        WButton openFolderBtn = table.add(theme.button("Open Mods Folder")).expandX().minWidth(100).widget();
-        openFolderBtn.action = this::openModsFolder;
-
-        return table;
-    }
-
-    private void checkForUpdates() {
+    public static void checkForUpdates(boolean autoDownload) {
         CompletableFuture.runAsync(() -> {
             try {
+                String currentVersion = getVersion();
                 HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(10))
                     .build();
@@ -107,40 +58,41 @@ public class AutoUpdate extends Module {
 
                     if (!currentClean.equals(latestClean)) {
                         updateAvailable = true;
-                        info("Update available: %s -> %s", currentClean, latestClean);
+                        ChuckPack.LOG.info("Update available: {} -> {}", currentClean, latestClean);
 
-                        // Find jar asset
                         if (json.has("assets")) {
                             for (var asset : json.getAsJsonArray("assets")) {
                                 JsonObject assetObj = asset.getAsJsonObject();
                                 String name = assetObj.get("name").getAsString();
                                 if (name.endsWith(".jar") && name.contains("chuck-pack")) {
                                     downloadUrl = assetObj.get("browser_download_url").getAsString();
-                                    info("Download: %s", downloadUrl);
+                                    ChuckPack.LOG.info("Download: {}", downloadUrl);
                                     break;
                                 }
                             }
                         }
 
-                        if (autoDownload.get() && !downloadUrl.isEmpty()) {
+                        if (autoDownload && !downloadUrl.isEmpty()) {
                             downloadUpdate();
+                        } else {
+                            ChuckPack.LOG.info("Open Config > Chuck Pack or check GitHub Releases to update. URL: {}", downloadUrl);
                         }
                     } else {
                         updateAvailable = false;
-                        info("You are on the latest version: %s", currentClean);
+                        ChuckPack.LOG.info("Chuck Pack is up to date: {}", currentClean);
                     }
                 } else {
-                    error("GitHub API returned status %d", response.statusCode());
+                    ChuckPack.LOG.warn("AutoUpdate GitHub API returned status {}", response.statusCode());
                 }
             } catch (Exception e) {
-                error("Failed to check for updates: %s", e.getMessage());
+                ChuckPack.LOG.warn("Failed to check for updates: {}", e.getMessage());
             }
         });
     }
 
-    private void downloadUpdate() {
+    public static void downloadUpdate() {
         if (downloadUrl.isEmpty()) {
-            error("No download URL available.");
+            ChuckPack.LOG.warn("No download URL available. Run check first.");
             return;
         }
 
@@ -150,7 +102,7 @@ public class AutoUpdate extends Module {
                 Path currentJar = getCurrentJarPath();
                 Path tempJar = modsDir.resolve("chuck-pack-update.jar");
 
-                info("Downloading update...");
+                ChuckPack.LOG.info("Downloading update from {} ...", downloadUrl);
                 HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(30))
                     .followRedirects(HttpClient.Redirect.NORMAL)
@@ -167,36 +119,24 @@ public class AutoUpdate extends Module {
                 if (response.statusCode() == 200) {
                     Files.copy(response.body(), tempJar, StandardCopyOption.REPLACE_EXISTING);
 
-                    // Replace current jar
-                    if (currentJar != null) {
+                    if (currentJar != null && Files.exists(currentJar)) {
                         Path backup = modsDir.resolve("chuck-pack-backup.jar");
                         Files.move(currentJar, backup, StandardCopyOption.REPLACE_EXISTING);
                         Files.move(tempJar, currentJar, StandardCopyOption.REPLACE_EXISTING);
-                        info("Update installed! Restart Minecraft to apply.");
-                        info("Backup saved as: %s", backup.getFileName());
+                        ChuckPack.LOG.info("Update installed! Restart Minecraft to apply. Backup: {}", backup.getFileName());
                     } else {
-                        info("Update downloaded to: %s", tempJar);
-                        info("Manually replace the current jar and restart.");
+                        ChuckPack.LOG.info("Update downloaded to: {}. Manually replace current jar and restart.", tempJar);
                     }
                 } else {
-                    error("Download failed with status %d", response.statusCode());
+                    ChuckPack.LOG.warn("Download failed with status {}", response.statusCode());
                 }
             } catch (Exception e) {
-                error("Download failed: %s", e.getMessage());
+                ChuckPack.LOG.warn("Download failed: {}", e.getMessage());
             }
         });
     }
 
-    private void openModsFolder() {
-        try {
-            Path modsDir = FabricLoader.getInstance().getGameDir().resolve("mods");
-            java.awt.Desktop.getDesktop().open(modsDir.toFile());
-        } catch (Exception e) {
-            error("Failed to open mods folder: %s", e.getMessage());
-        }
-    }
-
-    private String getVersion() {
+    private static String getVersion() {
         try {
             ModContainer mod = FabricLoader.getInstance().getModContainer("chuckpack").orElse(null);
             if (mod != null) {
@@ -206,11 +146,9 @@ public class AutoUpdate extends Module {
         return "unknown";
     }
 
-    private Path getCurrentJarPath() {
+    private static Path getCurrentJarPath() {
         try {
-            // Try to find the running jar
-            String path = AutoUpdate.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
-            // Decode URL-encoded characters
+            String path = AutoUpdateChecker.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
             path = java.net.URLDecoder.decode(path, "UTF-8");
             return Path.of(path);
         } catch (Exception e) {

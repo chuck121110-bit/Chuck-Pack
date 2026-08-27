@@ -13,7 +13,7 @@ A feature-rich addon for [Meteor Client](https://github.com/MeteorDevelopment/me
 - **AutoFly** — Auto-fly to waypoints with setback detection, adaptive speed, and swarm support
 - **BedrockEscape** — Escape bedrock from above/below (ported from Wurst CevAPI)
 - **FlightScrollHandler** — Scroll wheel flight control
-- **NoFallPlus** — Anti-fall bypass module with 8 modes (Matrix, Vulcan, Verus, Elytra variants, No-Ground). Ported from meteor-plus by nekiplay
+- **NoFall (enhanced)** — Adds `no-ground-spoof` setting to Meteor's NoFall (No_Ground mode from meteor-plus by nekiplay) — spoofs `onGround=false`
 - **Tunnel** — Cross-section tunnel digging (`.tunnel NxN` in chat)
 
 ### Render
@@ -36,7 +36,6 @@ A feature-rich addon for [Meteor Client](https://github.com/MeteorDevelopment/me
 - **AntiSocial** — Anti-social utilities
 - **AutoInteract** — Auto door/trapdoor interaction (ported from Meteorist)
 - **AutoLogin** — Auto server login (ported from Meteorist)
-- **AutoUpdate** — Check for and install updates from GitHub
 - **ChatUtility** — Chat enhancements (ported from Nora Tweaks)
 - **DoubleDoorsInteract** — Open both doors with one interaction (ported from Meteorist)
 - **MapIntegration** — Waypoint creation from FreeCam/Xaero's map

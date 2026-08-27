@@ -13,7 +13,6 @@ import net.chuck.chuckpack.modules.misc.AiChatConverse;
 import net.chuck.chuckpack.modules.misc.AntiSocial;
 import net.chuck.chuckpack.modules.misc.AutoInteract;
 import net.chuck.chuckpack.modules.misc.AutoLogin;
-import net.chuck.chuckpack.modules.misc.AutoUpdate;
 import net.chuck.chuckpack.modules.misc.ChatUtility;
 import net.chuck.chuckpack.modules.misc.DoubleDoorsInteract;
 import net.chuck.chuckpack.modules.misc.NbtFilter;
@@ -25,7 +24,6 @@ import net.chuck.chuckpack.modules.misc.StaffMonitor;
 import net.chuck.chuckpack.modules.movement.AutoFly;
 import net.chuck.chuckpack.modules.movement.BedrockEscape;
 import net.chuck.chuckpack.modules.movement.Tunnel;
-import net.chuck.chuckpack.modules.movement.nofallplus.NoFallPlus;
 import net.chuck.chuckpack.modules.movement.FlightScrollHandler;
 import net.chuck.chuckpack.modules.render.CoordinateLogout;
 import net.chuck.chuckpack.modules.render.DeepslateESP;
@@ -75,7 +73,6 @@ public class ChuckPack extends MeteorAddon {
         addModule(new AutoInteract());
         addModule(new AntiSocial());
         addModule(new AutoFly());
-        addModule(new NoFallPlus());
         addModule(new BedrockEscape());
         addModule(new Tunnel());
         addModule(new AutoFarming());
@@ -95,7 +92,6 @@ public class ChuckPack extends MeteorAddon {
         addModule(new MapIntegration());
         addModule(new OreSim());
         addModule(new VillagerRoller());
-        addModule(new AutoUpdate());
 
         meteordevelopment.meteorclient.commands.Commands.add(
             new net.chuck.chuckpack.commands.SeedCommand()
@@ -132,6 +128,8 @@ public class ChuckPack extends MeteorAddon {
         }
 
         ChuckPackConfigModifier.get();
+        // Auto-update check on MC startup (like separate-category, not a module)
+        net.chuck.chuckpack.util.AutoUpdateChecker.checkOnStartup();
 
         meteordevelopment.meteorclient.gui.GuiThemes.add(
             new net.chuck.chuckpack.theme.gui.themes.base.BaseGuiTheme()
