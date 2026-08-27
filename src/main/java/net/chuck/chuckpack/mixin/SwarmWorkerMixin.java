@@ -5,6 +5,7 @@ import meteordevelopment.meteorclient.systems.accounts.Account;
 import meteordevelopment.meteorclient.systems.accounts.AccountType;
 import meteordevelopment.meteorclient.systems.accounts.Accounts;
 import meteordevelopment.meteorclient.systems.modules.Modules;
+import meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm;
 import meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmWorker;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import net.chuck.chuckpack.modules.combat.SwarmGuard;
@@ -411,12 +412,7 @@ public class SwarmWorkerMixin {
                 net.minecraft.client.multiplayer.ServerData si = new net.minecraft.client.multiplayer.ServerData(fHost, fHost + ":" + fPort, net.minecraft.client.multiplayer.ServerData.Type.OTHER);
                 net.minecraft.client.gui.screens.Screen rs = mc.screen != null ? mc.screen : new net.minecraft.client.gui.screens.TitleScreen();
                 // Works outside world (TitleScreen) so you can start MC on host+worker and worker joins without touching it
-                try {
-                    net.minecraft.client.gui.screens.ConnectScreen.startConnecting(rs, mc, sa, si, false, new net.minecraft.client.multiplayer.TransferState(java.util.Map.of(), java.util.Map.of(), false));
-                } catch (Throwable t) {
-                    // Fallback: try alternative ConnectScreen overload if TransferState fails outside world
-                    try { net.minecraft.client.gui.screens.ConnectScreen.startConnecting(rs, mc, sa, si, false); } catch (Throwable ignored2) { throw t; }
-                }
+                net.minecraft.client.gui.screens.ConnectScreen.startConnecting(rs, mc, sa, si, false, new net.minecraft.client.multiplayer.TransferState(java.util.Map.of(), java.util.Map.of(), false));
                 ChatUtils.infoPrefix("Swarm", "Joining (highlight)%s:%d", fHost, fPort);
             } catch (Throwable e) {
                 ChatUtils.error("Failed to join server: " + e.getMessage());
