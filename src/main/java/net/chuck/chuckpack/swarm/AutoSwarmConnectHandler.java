@@ -84,8 +84,13 @@ public class AutoSwarmConnectHandler {
     }
 
     private void chuckpack$startHost(Swarm swarm) throws Exception {
-        swarm.close();
+        // Only log listening (Meteor's own message) — suppress STARTED HOST spam
         int port = ((Number) chuckpack$invokeGet(chuckpack$getField(swarm, "serverPort"))).intValue();
+        // Don't close if already listening to avoid SERVER CLOSED spam
+        boolean alreadyListening = false;
+        try { alreadyListening = swarm.host != null && !swarm.host.isInterrupted() && swarm.host.isAlive(); } catch (Throwable ignored) {}
+        if (alreadyListening) return;
+        try { swarm.close(); } catch (Throwable ignored) {}
 
         Class<?> hostClass = Class.forName("meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmHost");
         Object hostInstance = hostClass.getConstructor(int.class).newInstance(port);
@@ -93,7 +98,9 @@ public class AutoSwarmConnectHandler {
         java.lang.reflect.Field hostField = Swarm.class.getField("host");
         hostField.set(swarm, hostInstance);
 
-        ChatUtils.info("Auto Swarm Connect: started host on port " + port);
+        if (ChuckPackConfigModifier.get().debugLogging.get()) {
+            ChatUtils.info("Auto Swarm Connect: started host on port " + port);
+        }
     }
 
     private void chuckpack$connectWorker(Swarm swarm) throws Exception {
@@ -118,7 +125,9 @@ public class AutoSwarmConnectHandler {
         java.lang.reflect.Field workerField = Swarm.class.getField("worker");
         workerField.set(swarm, workerInstance);
 
-        ChatUtils.info("Auto Swarm Connect: connecting to " + address + ":" + port);
+        if (ChuckPackConfigModifier.get().debugLogging.get()) {
+            ChatUtils.info("Auto Swarm Connect: connecting to " + address + ":" + port);
+        }
     }
 
     private Object chuckpack$getField(Object obj, String fieldName) throws Exception {

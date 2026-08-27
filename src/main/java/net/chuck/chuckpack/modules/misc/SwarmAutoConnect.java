@@ -9,6 +9,7 @@ import meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm;
 import meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmWorker;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.orbit.EventHandler;
+import net.chuck.chuckpack.util.config.ChuckPackConfigModifier;
 
 public class SwarmAutoConnect extends Module {
 
@@ -76,7 +77,9 @@ public class SwarmAutoConnect extends Module {
                     setSwarmSetting(swarm, "serverPort", port.get());
                     try { swarm.close(); } catch (Throwable ignored) {}
                     swarm.worker = new SwarmWorker(address.get(), port.get());
-                    ChatUtils.infoPrefix("Swarm Auto Connect", "Starting worker -> (highlight)%s:%d", address.get(), port.get());
+                    if (ChuckPackConfigModifier.get().debugLogging.get()) {
+                        ChatUtils.infoPrefix("Swarm Auto Connect", "Starting worker -> (highlight)%s:%d", address.get(), port.get());
+                    }
                 }
             } else if (mode.get() == Mode.Host) {
                 if (!isHost) {
@@ -88,9 +91,13 @@ public class SwarmAutoConnect extends Module {
                         Object hostInstance = hostClass.getConstructor(int.class).newInstance(port.get());
                         java.lang.reflect.Field hostField = Swarm.class.getField("host");
                         hostField.set(swarm, hostInstance);
-                        ChatUtils.infoPrefix("Swarm Auto Connect", "Started host on port (highlight)%d", port.get());
+                        if (ChuckPackConfigModifier.get().debugLogging.get()) {
+                            ChatUtils.infoPrefix("Swarm Auto Connect", "Started host on port (highlight)%d", port.get());
+                        }
                     } catch (Throwable e) {
-                        ChatUtils.error("Swarm Auto Connect host failed: " + e.getMessage());
+                        if (ChuckPackConfigModifier.get().debugLogging.get()) {
+                            ChatUtils.error("Swarm Auto Connect host failed: " + e.getMessage());
+                        }
                     }
                 }
             }
