@@ -52,6 +52,9 @@ public class AutoSwarmConnectHandler {
         }
     }
 
+    private static long lastFailLogMs = 0;
+    private static String lastFailAddr = "";
+
     private void chuckpack$attemptConnect(Swarm swarm) {
         try {
             Object mode = chuckpack$getField(swarm, "mode");
@@ -62,8 +65,20 @@ public class AutoSwarmConnectHandler {
             } else if (modeName != null && modeName.equalsIgnoreCase("Worker")) {
                 chuckpack$connectWorker(swarm);
             }
-        } catch (Exception e) {
-            ChatUtils.error("Auto Swarm Connect failed: " + e.getMessage());
+        } catch (Throwable e) {
+            // Rate-limit Connection refused spam (worker tries every 5s when host not yet up — qnd8U8h log)
+            String msg = e.getMessage() != null ? e.getMessage() : e.toString();
+            boolean isRefused = msg.toLowerCase().contains("refused") || (e.getCause() != null && e.getCause().getMessage() != null && e.getCause().getMessage().toLowerCase().contains("refused"));
+            long now = System.currentTimeMillis();
+            if (isRefused) {
+                if (now - lastFailLogMs < 30000) return; // only log every 30s for refused
+                lastFailLogMs = now;
+                ChatUtils.info("Auto Swarm Connect: host not yet up, retrying in 5s... (" + msg + ")");
+            } else {
+                if (now - lastFailLogMs < 5000) return;
+                lastFailLogMs = now;
+                ChatUtils.error("Auto Swarm Connect failed: " + msg);
+            }
         }
     }
 

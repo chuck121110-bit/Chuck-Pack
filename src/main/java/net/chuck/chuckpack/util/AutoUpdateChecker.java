@@ -87,10 +87,16 @@ public class AutoUpdateChecker {
                         splashStatus = "Chuck Pack up to date: " + currentClean;
                         ChuckPack.LOG.info("Chuck Pack is up to date: {}", currentClean);
                     }
+                } else if (response.statusCode() == 404) {
+                    // No releases yet or repo private/network blocked on Linux Chromebook (qnd8U8h) — not an error
+                    splashStatus = "Chuck Pack up to date (no releases)";
+                    ChuckPack.LOG.info("AutoUpdate: no releases found (404) — you are on {}", currentVersion);
                 } else {
+                    splashStatus = "Chuck Pack update check failed: " + response.statusCode();
                     ChuckPack.LOG.warn("AutoUpdate GitHub API returned status {}", response.statusCode());
                 }
             } catch (Exception e) {
+                splashStatus = "Chuck Pack update check failed";
                 ChuckPack.LOG.warn("Failed to check for updates: {}", e.getMessage());
             }
         });
