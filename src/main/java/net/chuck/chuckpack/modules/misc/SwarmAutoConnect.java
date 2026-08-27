@@ -48,15 +48,11 @@ public class SwarmAutoConnect extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        // Works outside world (TitleScreen) so you can start MC on host+worker and worker joins without touching it
+        // Works outside world (TitleScreen) and does NOT auto-toggle Swarm module (per request: should not turn on module)
+        // Uses configured port/ip directly, even in menu
         if (Modules.get() == null) return;
         Swarm swarm = Modules.get().get(Swarm.class);
         if (swarm == null) return;
-        // Auto-toggle Swarm active so you never need to click Play or .swarm sync manually
-        if (!swarm.isActive()) {
-            try { swarm.toggle(); ChatUtils.infoPrefix("Swarm Auto Connect", "Auto-enabled Swarm"); } catch (Throwable ignored) {}
-            return;
-        }
 
         long now = System.currentTimeMillis();
         long currentSlot = now / SCAN_INTERVAL_MS;

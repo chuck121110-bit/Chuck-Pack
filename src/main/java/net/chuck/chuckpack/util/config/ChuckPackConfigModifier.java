@@ -33,6 +33,13 @@ public class ChuckPackConfigModifier {
         .build()
     );
 
+    public final Setting<Boolean> debugLogging = sgChuckPack.add(new BoolSetting.Builder()
+        .name("debug-logging")
+        .description("Master switch for debug logging (auto-connect, auto-updater, swarm) — shows detailed logs to help find issues.")
+        .defaultValue(false)
+        .build()
+    );
+
     public static ChuckPackConfigModifier get() {
         if (INSTANCE == null) INSTANCE = new ChuckPackConfigModifier();
         return INSTANCE;

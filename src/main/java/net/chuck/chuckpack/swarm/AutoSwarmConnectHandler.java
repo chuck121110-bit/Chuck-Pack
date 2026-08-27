@@ -5,6 +5,7 @@ import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.orbit.EventHandler;
+import net.chuck.chuckpack.util.config.ChuckPackConfigModifier;
 import net.minecraft.client.Minecraft;
 
 public class AutoSwarmConnectHandler {
@@ -26,10 +27,10 @@ public class AutoSwarmConnectHandler {
                 lastScanMs = 0;
                 return;
             }
-            // Auto-toggle Swarm active so it works from TitleScreen without clicking Play (never requires .swarm sync)
-            if (!swarm.isActive()) {
-                try { swarm.toggle(); ChatUtils.info("Auto Swarm Connect: auto-enabled Swarm"); } catch (Throwable ignored) {}
-                return;
+            // Do NOT auto-toggle Swarm module (per request: should not turn on module) — just work no matter if active or in menu
+            // Uses configured ip/port directly, even on TitleScreen
+            if (ChuckPackConfigModifier.get().debugLogging.get()) {
+                net.chuck.chuckpack.ChuckPack.LOG.info("AutoSwarmConnectHandler tick: mode check, autoOn={}, swarmActive={}", autoOn, swarm.isActive());
             }
 
             long now = System.currentTimeMillis();

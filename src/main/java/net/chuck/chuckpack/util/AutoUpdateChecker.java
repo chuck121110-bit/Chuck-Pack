@@ -110,8 +110,12 @@ public class AutoUpdateChecker {
 
         CompletableFuture.runAsync(() -> {
             try {
-                Path modsDir = FabricLoader.getInstance().getGameDir().resolve("mods");
                 Path currentJar = getCurrentJarPath();
+                // Use the actual file's directory (handles Barebones nrc-26.1.2-fabric subfolder and USB) — not just mods
+                Path modsDir = (currentJar != null && currentJar.getParent() != null) ? currentJar.getParent() : FabricLoader.getInstance().getGameDir().resolve("mods");
+                if (ChuckPackConfigModifier.get().debugLogging.get()) {
+                    ChuckPack.LOG.info("AutoUpdate: currentJar={} modsDir={}", currentJar, modsDir);
+                }
                 Path tempJar = modsDir.resolve("chuck-pack-update.jar");
 
                 ChuckPack.LOG.info("Downloading update from {} ...", downloadUrl);
