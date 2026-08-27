@@ -42,7 +42,8 @@
     "BaritoneSettingsMixin",
     "WWindowHeaderMixin",
     "NoFallMixin",
-    "TitleScreenMixin"
+    "TitleScreenMixin",
+    "CommandsMixin"
   ],
   "injectors": { "defaultRequire": 0 }
 }

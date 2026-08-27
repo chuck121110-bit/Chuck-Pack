@@ -199,10 +199,63 @@ public class SwarmWorkerMixin {
             return;
         }
 
+        // ── Kill (host + workers) — .swarm kill [player] kills all or specific, works headless on Chromebook
+        if (lower.equals("swarm kill") || lower.startsWith("swarm kill ")) {
+            String target = lower.equals("swarm kill") ? "" : command.substring("swarm kill".length()).trim();
+            // If host, broadcast to workers
+            try {
+                meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm swarm = Modules.get().get(meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm.class);
+                if (swarm != null && swarm.isHost() && swarm.host != null) {
+                    String killCmd = target.isEmpty() ? "swarm ChuckPack-kill" : "swarm ChuckPack-kill " + target;
+                    swarm.host.sendMessage(killCmd);
+                    ChatUtils.infoPrefix("Swarm", target.isEmpty() ? "Sent kill to all workers" : "Sent kill to (highlight)" + target);
+                }
+            } catch (Throwable ignored) {}
+            // Kill self if no target or target matches self
+            mc.execute(() -> {
+                try {
+                    String myName = mc.player != null ? mc.player.getName().getString() : "";
+                    if (target.isEmpty() || target.equalsIgnoreCase(myName)) {
+                        ChatUtils.infoPrefix("Swarm", "Killed by host — closing Minecraft...");
+                        try { mc.close(); } catch (Throwable ignored) {}
+                        try { System.exit(0); } catch (Throwable ignored) {}
+                    }
+                } catch (Throwable ignored) {}
+            });
+            return;
+        }
+        if (lower.startsWith("swarm chuckpack-kill") || lower.startsWith("swarm chuckpack-kill ")) {
+            String target = command.substring("swarm ChuckPack-kill".length()).trim();
+            // Normalize prefix case
+            if (command.toLowerCase().startsWith("swarm chuckpack-kill")) {
+                target = command.substring("swarm ChuckPack-kill".length()).trim();
+                // Actually get correct substring length
+                int idx = command.toLowerCase().indexOf("swarm chuckpack-kill");
+                target = command.substring(idx + "swarm ChuckPack-kill".length()).trim();
+            }
+            final String fTarget = target;
+            mc.execute(() -> {
+                try {
+                    String myName = mc.player != null ? mc.player.getName().getString() : "";
+                    if (fTarget.isEmpty() || fTarget.equalsIgnoreCase(myName)) {
+                        ChatUtils.infoPrefix("Swarm", "Killed by host — closing Minecraft...");
+                        try { mc.close(); } catch (Throwable ignored) {}
+                        try { System.exit(0); } catch (Throwable ignored) {}
+                    }
+                } catch (Throwable ignored) {}
+            });
+            return;
+        }
+
         // ── Server join ────────────────────────────────────────────────────
 
-        if (lower.startsWith(SERVER_PREFIX)) {
-            chuckpack$handleServerJoin(mc, command.substring(SERVER_PREFIX.length()).trim());
+        if (lower.equals(SERVER_PREFIX) || lower.startsWith(SERVER_PREFIX + " ")) {
+            String raw = "";
+            if (lower.equals("swarm server")) raw = "";
+            else raw = command.substring(SERVER_PREFIX.length()).trim();
+            // Trim leading space if any
+            if (raw.startsWith(" ")) raw = raw.trim();
+            chuckpack$handleServerJoin(mc, raw);
             return;
         }
 
