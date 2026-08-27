@@ -270,7 +270,79 @@ public class SwarmWorkerMixin {
 
     @Unique
     private static void chuckpack$handleServerJoin(Minecraft mc, String raw) {
-        if (raw.isEmpty()) return;
+        boolean wasEmpty = raw.isEmpty();
+        if (wasEmpty) {
+            // No address given — if run via swarm with no server, just ensure swarm is connected to host (so worker joins host)
+            try {
+                meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm swarm = Modules.get().get(meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm.class);
+                if (swarm != null) {
+                    // Try to (re)connect swarm worker to host when no Minecraft server specified
+                    try {
+                        String hostIp = "";
+                        int hostPort = 6969;
+                        try {
+                            Object ipSetting = swarm.getClass().getDeclaredField("ipAddress").get(swarm);
+                            hostIp = ipSetting.getClass().getMethod("get").invoke(ipSetting).toString();
+                        } catch (Throwable ignored) {}
+                        try {
+                            Object portSetting = swarm.getClass().getDeclaredField("serverPort").get(swarm);
+                            hostPort = ((Number) portSetting.getClass().getMethod("get").invoke(portSetting)).intValue();
+                        } catch (Throwable ignored) {}
+                        if (hostIp == null || hostIp.trim().isEmpty()) {
+                            try {
+                                net.chuck.chuckpack.modules.misc.SwarmAutoConnect sac = Modules.get().get(net.chuck.chuckpack.modules.misc.SwarmAutoConnect.class);
+                                if (sac != null) { hostIp = sac.address.get(); hostPort = sac.port.get(); }
+                            } catch (Throwable ignored2) {}
+                        }
+                        if (hostIp == null || hostIp.trim().isEmpty()) hostIp = "localhost";
+                        // Ensure swarm worker/host is connected (works outside world — TitleScreen)
+                        if (!swarm.isWorker() || swarm.worker == null || !swarm.worker.isAlive()) {
+                            try { swarm.close(); } catch (Throwable ignored) {}
+                            try {
+                                Class<?> workerClass = Class.forName("meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmWorker");
+                                Object workerInstance = workerClass.getConstructor(String.class, int.class).newInstance(hostIp, hostPort);
+                                java.lang.reflect.Field workerField = Swarm.class.getField("worker");
+                                workerField.set(swarm, workerInstance);
+                                ChatUtils.infoPrefix("Swarm", "No server given — joined swarm host (highlight)%s:%d", hostIp, hostPort);
+                                return; // Don't also try Minecraft join when no server specified
+                            } catch (Throwable e) {
+                                ChatUtils.error("Failed to join swarm host: " + e.getMessage());
+                                return;
+                            }
+                        } else {
+                            ChatUtils.infoPrefix("Swarm", "Already connected to swarm host (highlight)%s:%d", hostIp, hostPort);
+                            return;
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            } catch (Throwable ignored) {}
+            // Fallback to previous logic if swarm not available
+            try {
+                meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm swarm = Modules.get().get(meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm.class);
+                if (swarm != null) {
+                    try {
+                        Object ipSetting = swarm.getClass().getDeclaredField("ipAddress").get(swarm);
+                        Object portSetting = swarm.getClass().getDeclaredField("serverPort").get(swarm);
+                        String defaultIp = ipSetting.getClass().getMethod("get").invoke(ipSetting).toString();
+                        int defaultPort = ((Number) portSetting.getClass().getMethod("get").invoke(portSetting)).intValue();
+                        if (!defaultIp.isEmpty()) {
+                            raw = defaultIp + ":" + defaultPort;
+                            ChatUtils.infoPrefix("Swarm", "No address given, defaulting to swarm host (highlight)%s", raw);
+                        }
+                    } catch (Exception ignored) {}
+                    if (raw.isEmpty()) {
+                        try {
+                            net.chuck.chuckpack.modules.misc.SwarmAutoConnect sac = Modules.get().get(net.chuck.chuckpack.modules.misc.SwarmAutoConnect.class);
+                            if (sac != null) raw = sac.address.get() + ":" + sac.port.get();
+                        } catch (Exception ignored2) {}
+                    }
+                }
+            } catch (Throwable ignored) {}
+            if (raw.isEmpty()) {
+                ChatUtils.error("No server address - set Swarm ipAddress or .swarm server <address>");
+                return;
+            }
+        }
 
         String address = raw;
         int embeddedId = 0;
@@ -331,13 +403,24 @@ public class SwarmWorkerMixin {
                 }
                 final String fHost = host;
                 final int fPort = port;
+                if (fHost == null || fHost.trim().isEmpty()) {
+                    ChatUtils.error("Invalid server address");
+                    return;
+                }
                 net.minecraft.client.multiplayer.resolver.ServerAddress sa = new net.minecraft.client.multiplayer.resolver.ServerAddress(fHost, fPort);
                 net.minecraft.client.multiplayer.ServerData si = new net.minecraft.client.multiplayer.ServerData(fHost, fHost + ":" + fPort, net.minecraft.client.multiplayer.ServerData.Type.OTHER);
                 net.minecraft.client.gui.screens.Screen rs = mc.screen != null ? mc.screen : new net.minecraft.client.gui.screens.TitleScreen();
-                net.minecraft.client.gui.screens.ConnectScreen.startConnecting(rs, mc, sa, si, false, new net.minecraft.client.multiplayer.TransferState(java.util.Map.of(), java.util.Map.of(), false));
+                // Works outside world (TitleScreen) so you can start MC on host+worker and worker joins without touching it
+                try {
+                    net.minecraft.client.gui.screens.ConnectScreen.startConnecting(rs, mc, sa, si, false, new net.minecraft.client.multiplayer.TransferState(java.util.Map.of(), java.util.Map.of(), false));
+                } catch (Throwable t) {
+                    // Fallback: try alternative ConnectScreen overload if TransferState fails outside world
+                    try { net.minecraft.client.gui.screens.ConnectScreen.startConnecting(rs, mc, sa, si, false); } catch (Throwable ignored2) { throw t; }
+                }
                 ChatUtils.infoPrefix("Swarm", "Joining (highlight)%s:%d", fHost, fPort);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 ChatUtils.error("Failed to join server: " + e.getMessage());
+                e.printStackTrace();
             }
         });
     }

@@ -15,27 +15,34 @@ public class AutoSwarmConnectHandler {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
-        Swarm swarm = Modules.get().get(Swarm.class);
-        if (swarm == null || !swarm.isActive()) return;
+        try {
+            Swarm swarm = Modules.get().get(Swarm.class);
+            if (swarm == null || !swarm.isActive()) return;
 
-        IAutoSwarmConnect autoConnect = (IAutoSwarmConnect) (Object) swarm;
-        if (!autoConnect.chuckpack$autoConnectSetting().get()) {
-            lastScanMs = 0;
-            return;
+            IAutoSwarmConnect autoConnect = (IAutoSwarmConnect) (Object) swarm;
+            if (!autoConnect.chuckpack$autoConnectSetting().get()) {
+                lastScanMs = 0;
+                return;
+            }
+
+            long now = System.currentTimeMillis();
+            long currentSlot = now / SCAN_INTERVAL_MS;
+            long lastSlot = lastScanMs / SCAN_INTERVAL_MS;
+            if (currentSlot == lastSlot) return;
+            lastScanMs = now;
+
+            // Works outside world (TitleScreen) — no player/level needed
+            boolean hostAlive = false, workerAlive = false;
+            try { hostAlive = swarm.isHost() && swarm.host != null && swarm.host.isAlive(); } catch (Throwable ignored) {}
+            try { workerAlive = swarm.isWorker() && swarm.worker != null && swarm.worker.isAlive(); } catch (Throwable ignored) {}
+
+            if (hostAlive || workerAlive) return;
+
+            chuckpack$attemptConnect(swarm);
+        } catch (Throwable t) {
+            // Never crash game from auto-connect tick (server joining crash fix)
+            try { ChatUtils.error("Auto Swarm Connect tick: " + t.getMessage()); } catch (Throwable ignored) {}
         }
-
-        long now = System.currentTimeMillis();
-        long currentSlot = now / SCAN_INTERVAL_MS;
-        long lastSlot = lastScanMs / SCAN_INTERVAL_MS;
-        if (currentSlot == lastSlot) return;
-        lastScanMs = now;
-
-        boolean hostAlive = swarm.isHost() && swarm.host != null && swarm.host.isAlive();
-        boolean workerAlive = swarm.isWorker() && swarm.worker != null && swarm.worker.isAlive();
-
-        if (hostAlive || workerAlive) return;
-
-        chuckpack$attemptConnect(swarm);
     }
 
     private void chuckpack$attemptConnect(Swarm swarm) {
@@ -67,9 +74,20 @@ public class AutoSwarmConnectHandler {
     }
 
     private void chuckpack$connectWorker(Swarm swarm) throws Exception {
-        swarm.close();
-        String address = chuckpack$invokeGet(chuckpack$getField(swarm, "ipAddress")).toString();
-        int port = ((Number) chuckpack$invokeGet(chuckpack$getField(swarm, "serverPort"))).intValue();
+        try { swarm.close(); } catch (Throwable ignored) {}
+        String address = "";
+        int port = 6969;
+        try { address = chuckpack$invokeGet(chuckpack$getField(swarm, "ipAddress")).toString(); } catch (Throwable ignored) {}
+        try { port = ((Number) chuckpack$invokeGet(chuckpack$getField(swarm, "serverPort"))).intValue(); } catch (Throwable ignored) {}
+        if (address == null || address.trim().isEmpty()) {
+            // Fallback to SwarmAutoConnect's address if Swarm ipAddress empty (lets worker join host with no server)
+            try {
+                net.chuck.chuckpack.modules.misc.SwarmAutoConnect sac = Modules.get().get(net.chuck.chuckpack.modules.misc.SwarmAutoConnect.class);
+                if (sac != null && !sac.address.get().trim().isEmpty()) address = sac.address.get().trim();
+                else address = "localhost";
+            } catch (Throwable ignored) { address = "localhost"; }
+        }
+        if (address.trim().isEmpty()) address = "localhost";
 
         Class<?> workerClass = Class.forName("meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmWorker");
         Object workerInstance = workerClass.getConstructor(String.class, int.class).newInstance(address, port);

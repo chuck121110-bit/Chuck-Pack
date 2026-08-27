@@ -48,8 +48,7 @@ public class SwarmAutoConnect extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mode.get() != Mode.Worker) return;
-
+        // Works outside world (TitleScreen) so you can start MC on host+worker and worker joins without touching it
         Swarm swarm = Modules.get().get(Swarm.class);
         if (swarm == null || !swarm.isActive()) return;
 
@@ -59,12 +58,42 @@ public class SwarmAutoConnect extends Module {
         if (currentSlot == lastSlot) return;
         lastScanMs = now;
 
-        if (!swarm.isWorker()) {
-            setSwarmSetting(swarm, "ipAddress", address.get());
-            setSwarmSetting(swarm, "serverPort", port.get());
-            swarm.close();
-            swarm.worker = new SwarmWorker(address.get(), port.get());
-            ChatUtils.infoPrefix("Swarm Auto Connect", "Starting worker -> (highlight)%s:%d", address.get(), port.get());
+        try {
+            boolean isWorker = false, isHost = false;
+            try { isWorker = swarm.isWorker(); } catch (Throwable ignored) {}
+            try { isHost = swarm.isHost(); } catch (Throwable ignored) {}
+            // Host/worker alive check — if already connected, do nothing
+            boolean hostAlive = false, workerAlive = false;
+            try { hostAlive = isHost && swarm.host != null && swarm.host.isAlive(); } catch (Throwable ignored) {}
+            try { workerAlive = isWorker && swarm.worker != null && swarm.worker.isAlive(); } catch (Throwable ignored) {}
+            if (hostAlive || workerAlive) return;
+
+            if (mode.get() == Mode.Worker) {
+                if (!isWorker) {
+                    setSwarmSetting(swarm, "ipAddress", address.get());
+                    setSwarmSetting(swarm, "serverPort", port.get());
+                    try { swarm.close(); } catch (Throwable ignored) {}
+                    swarm.worker = new SwarmWorker(address.get(), port.get());
+                    ChatUtils.infoPrefix("Swarm Auto Connect", "Starting worker -> (highlight)%s:%d", address.get(), port.get());
+                }
+            } else if (mode.get() == Mode.Host) {
+                if (!isHost) {
+                    setSwarmSetting(swarm, "serverPort", port.get());
+                    try { swarm.close(); } catch (Throwable ignored) {}
+                    // SwarmHost creation via reflection to avoid direct compile dependency on constructor
+                    try {
+                        Class<?> hostClass = Class.forName("meteordevelopment.meteorclient.systems.modules.misc.swarm.SwarmHost");
+                        Object hostInstance = hostClass.getConstructor(int.class).newInstance(port.get());
+                        java.lang.reflect.Field hostField = Swarm.class.getField("host");
+                        hostField.set(swarm, hostInstance);
+                        ChatUtils.infoPrefix("Swarm Auto Connect", "Started host on port (highlight)%d", port.get());
+                    } catch (Throwable e) {
+                        ChatUtils.error("Swarm Auto Connect host failed: " + e.getMessage());
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            ChatUtils.error("Swarm Auto Connect tick failed: " + t.getMessage());
         }
     }
 
