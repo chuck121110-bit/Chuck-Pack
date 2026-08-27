@@ -84,6 +84,13 @@ public class BaseModulesScreen extends TabScreen {
         if (theme.categoryIcons()) {
             // Lazy-resolve icon inside beforeHeaderInit so registry is bound (fixes early NPE that hid Search/Favorites)
             w.beforeHeaderInit = wContainer -> {
+                // Force printer/Litematica -> pink carpet as requested
+                if (category.name.equalsIgnoreCase("Litematica") || category.name.toLowerCase().contains("printer")) {
+                    try {
+                        ItemStack pink = Items.PINK_CARPET.getDefaultInstance();
+                        if (!pink.isEmpty()) { wContainer.add(theme.item(pink)).pad(2); return; }
+                    } catch (Throwable ignored) {}
+                }
                 try {
                     java.lang.reflect.Field iconField = Category.class.getField("icon");
                     Object icon = iconField.get(category);
@@ -101,7 +108,7 @@ public class BaseModulesScreen extends TabScreen {
                 } catch (Throwable ignored) {
                     // Swallow NPE from Holder$Reference.components before registry bound
                 }
-                // Fallback label when icon unavailable (Chuck Pack / Litematica before registry)
+                // Fallback text when icon unavailable
                 try {
                     String shortName = category.name.length() > 2 ? category.name.substring(0, 2) : category.name;
                     wContainer.add(theme.label(shortName)).pad(2);
