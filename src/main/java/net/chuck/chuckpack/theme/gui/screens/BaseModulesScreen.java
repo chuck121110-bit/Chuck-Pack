@@ -82,28 +82,25 @@ public class BaseModulesScreen extends TabScreen {
         w.id = category.name;
         w.padding = w.spacing = 0;
         if (theme.categoryIcons()) {
-            ItemStack iconStack = null;
-
-            try {
-                java.lang.reflect.Field iconField = Category.class.getField("icon");
-                Object icon = iconField.get(category);
-                if (icon instanceof java.util.function.Supplier<?> supplier) {
-                    Object resolved = supplier.get();
-                    if (resolved instanceof ItemStack stack) {
-                        iconStack = stack;
+            // Lazy-resolve icon inside beforeHeaderInit so registry is bound (fixes early NPE that hid Search/Favorites)
+            w.beforeHeaderInit = wContainer -> {
+                try {
+                    java.lang.reflect.Field iconField = Category.class.getField("icon");
+                    Object icon = iconField.get(category);
+                    ItemStack stack = null;
+                    if (icon instanceof java.util.function.Supplier<?> supplier) {
+                        Object resolved = supplier.get();
+                        if (resolved instanceof ItemStack s) stack = s;
+                    } else if (icon instanceof ItemStack s) {
+                        stack = s;
                     }
-                } else if (icon instanceof ItemStack stack) {
-                    iconStack = stack;
+                    if (stack != null && !stack.isEmpty()) {
+                        wContainer.add(theme.item(stack)).pad(2);
+                    }
+                } catch (Throwable ignored) {
+                    // Swallow NPE from Holder$Reference.components before registry bound
                 }
-            } catch (Throwable ignored) {
-                // Items may not be bound yet during early init (meteor_litematica_printer, Chuck Pack EMERALD etc.)
-                // Swallow NPE from Holder$Reference.components so Search/Favorites still render
-            }
-
-            if (iconStack != null) {
-                final ItemStack stack = iconStack;
-                w.beforeHeaderInit = wContainer -> wContainer.add(theme.item(stack)).pad(2);
-            }
+            };
         }
         c.add(w);
         w.view.scrollOnlyWhenMouseOver = true;
@@ -152,7 +149,7 @@ public class BaseModulesScreen extends TabScreen {
 
         if (theme.categoryIcons()) {
             w.beforeHeaderInit = wContainer -> {
-                try { addIcon(wContainer, Items.COMPASS.getDefaultInstance()); } catch (Exception ignored) {}
+                try { addIcon(wContainer, Items.COMPASS.getDefaultInstance()); } catch (Throwable ignored) {}
             };
         }
 
@@ -189,7 +186,7 @@ public class BaseModulesScreen extends TabScreen {
 
         if (theme.categoryIcons()) {
             w.beforeHeaderInit = wContainer -> {
-                try { addIcon(wContainer, Items.NETHER_STAR.getDefaultInstance()); } catch (Exception ignored) {}
+                try { addIcon(wContainer, Items.NETHER_STAR.getDefaultInstance()); } catch (Throwable ignored) {}
             };
         }
 
