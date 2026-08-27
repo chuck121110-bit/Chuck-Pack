@@ -280,12 +280,23 @@ public class SwarmWorkerMixin {
     private static void chuckpack$handleServerJoin(Minecraft mc, String raw) {
         boolean wasEmpty = raw.isEmpty();
         if (wasEmpty) {
-            // No address given — if run via swarm with no server, just ensure swarm is connected to host (so worker joins host)
+            // No address given — swarm server with no server should make workers join the host's current Minecraft server
+            String currentServerIp = null;
             try {
-                meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm swarm = Modules.get().get(meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm.class);
-                if (swarm != null) {
-                    // Try to (re)connect swarm worker to host when no Minecraft server specified
-                    try {
+                if (mc != null && mc.getCurrentServer() != null && mc.getCurrentServer().ip != null) {
+                    currentServerIp = mc.getCurrentServer().ip;
+                }
+                if (currentServerIp != null && !currentServerIp.trim().isEmpty() && !currentServerIp.equals("localhost") && !currentServerIp.toLowerCase().contains("swarm")) {
+                    raw = currentServerIp.trim();
+                    ChatUtils.infoPrefix("Swarm", "No address given — using current server (highlight)%s", raw);
+                    wasEmpty = false;
+                }
+            } catch (Throwable ignored) {}
+            if (wasEmpty) {
+                // No Minecraft server to join — just ensure swarm is connected to host (so worker joins host)
+                try {
+                    Swarm swarm = Modules.get().get(Swarm.class);
+                    if (swarm != null) {
                         String hostIp = "";
                         int hostPort = 6969;
                         try {
@@ -303,7 +314,6 @@ public class SwarmWorkerMixin {
                             } catch (Throwable ignored2) {}
                         }
                         if (hostIp == null || hostIp.trim().isEmpty()) hostIp = "localhost";
-                        // Ensure swarm worker/host is connected (works outside world — TitleScreen)
                         if (!swarm.isWorker() || swarm.worker == null || !swarm.worker.isAlive()) {
                             try { swarm.close(); } catch (Throwable ignored) {}
                             try {
@@ -312,7 +322,7 @@ public class SwarmWorkerMixin {
                                 java.lang.reflect.Field workerField = Swarm.class.getField("worker");
                                 workerField.set(swarm, workerInstance);
                                 ChatUtils.infoPrefix("Swarm", "No server given — joined swarm host (highlight)%s:%d", hostIp, hostPort);
-                                return; // Don't also try Minecraft join when no server specified
+                                return;
                             } catch (Throwable e) {
                                 ChatUtils.error("Failed to join swarm host: " + e.getMessage());
                                 return;
@@ -321,32 +331,8 @@ public class SwarmWorkerMixin {
                             ChatUtils.infoPrefix("Swarm", "Already connected to swarm host (highlight)%s:%d", hostIp, hostPort);
                             return;
                         }
-                    } catch (Throwable ignored) {}
-                }
-            } catch (Throwable ignored) {}
-            // Fallback to previous logic if swarm not available
-            try {
-                meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm swarm = Modules.get().get(meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm.class);
-                if (swarm != null) {
-                    try {
-                        Object ipSetting = swarm.getClass().getDeclaredField("ipAddress").get(swarm);
-                        Object portSetting = swarm.getClass().getDeclaredField("serverPort").get(swarm);
-                        String defaultIp = ipSetting.getClass().getMethod("get").invoke(ipSetting).toString();
-                        int defaultPort = ((Number) portSetting.getClass().getMethod("get").invoke(portSetting)).intValue();
-                        if (!defaultIp.isEmpty()) {
-                            raw = defaultIp + ":" + defaultPort;
-                            ChatUtils.infoPrefix("Swarm", "No address given, defaulting to swarm host (highlight)%s", raw);
-                        }
-                    } catch (Exception ignored) {}
-                    if (raw.isEmpty()) {
-                        try {
-                            net.chuck.chuckpack.modules.misc.SwarmAutoConnect sac = Modules.get().get(net.chuck.chuckpack.modules.misc.SwarmAutoConnect.class);
-                            if (sac != null) raw = sac.address.get() + ":" + sac.port.get();
-                        } catch (Exception ignored2) {}
                     }
-                }
-            } catch (Throwable ignored) {}
-            if (raw.isEmpty()) {
+                } catch (Throwable ignored) {}
                 ChatUtils.error("No server address - set Swarm ipAddress or .swarm server <address>");
                 return;
             }
