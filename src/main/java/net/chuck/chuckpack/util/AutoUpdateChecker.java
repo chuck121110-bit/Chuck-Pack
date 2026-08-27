@@ -67,7 +67,8 @@ public class AutoUpdateChecker {
                             for (var asset : json.getAsJsonArray("assets")) {
                                 JsonObject assetObj = asset.getAsJsonObject();
                                 String name = assetObj.get("name").getAsString();
-                                if (name.endsWith(".jar") && name.contains("chuck-pack")) {
+                                String lower = name.toLowerCase();
+                                if (name.endsWith(".jar") && lower.contains("chuck") && lower.contains("pack")) {
                                     downloadUrl = assetObj.get("browser_download_url").getAsString();
                                     latestFileName = name;
                                     ChuckPack.LOG.info("Download: {} (file: {})", downloadUrl, latestFileName);
@@ -141,17 +142,25 @@ public class AutoUpdateChecker {
                     if (currentJar != null && Files.exists(currentJar)) {
                         Path backup = modsDir.resolve("chuck-pack-backup.jar");
                         try {
-                            Files.move(currentJar, backup, StandardCopyOption.REPLACE_EXISTING);
+                            forceMove(currentJar, backup);
                             ChuckPack.LOG.info("Backed up old jar to {}", backup.getFileName());
                         } catch (Exception e) {
-                            ChuckPack.LOG.warn("Backup failed: {}", e.getMessage());
+                            ChuckPack.LOG.warn("Backup failed (file in use, will retry on restart): {}", e.getMessage());
+                            try { currentJar.toFile().deleteOnExit(); } catch (Throwable ignored) {}
                         }
-                        Files.move(tempJar, targetJar, StandardCopyOption.REPLACE_EXISTING);
+                        try {
+                            forceMove(tempJar, targetJar);
+                        } catch (Exception e) {
+                            // Fallback: copy and mark old for deletion (Windows file lock)
+                            try { Files.copy(tempJar, targetJar, StandardCopyOption.REPLACE_EXISTING); Files.deleteIfExists(tempJar); } catch (Throwable ignored) {}
+                            try { currentJar.toFile().deleteOnExit(); } catch (Throwable ignored) {}
+                            ChuckPack.LOG.warn("Force move fallback used for {}", targetJar.getFileName());
+                        }
                         splashStatus = "Chuck Pack updated & downloaded: " + latestVersion + " (restart)";
-                        ChuckPack.LOG.info("Update installed! Restart Minecraft to apply. File: {} Backup: {}", targetJar.getFileName(), backup.getFileName());
+                        ChuckPack.LOG.info("Update installed! Restart Minecraft to apply. File: {} Backup: {} (was {} in {})", targetJar.getFileName(), backup.getFileName(), currentJar.getFileName(), modsDir);
                         cleanOldDuplicates(modsDir, targetJar.getFileName().toString());
                     } else if (!targetJar.equals(tempJar)) {
-                        Files.move(tempJar, targetJar, StandardCopyOption.REPLACE_EXISTING);
+                        try { forceMove(tempJar, targetJar); } catch (Exception e) { try { Files.copy(tempJar, targetJar, StandardCopyOption.REPLACE_EXISTING); } catch (Throwable ignored) {} }
                         splashStatus = "Chuck Pack updated & downloaded: " + latestVersion + " (restart)";
                         ChuckPack.LOG.info("Update downloaded to: {}. Restart Minecraft to apply.", targetJar);
                         cleanOldDuplicates(modsDir, targetJar.getFileName().toString());
@@ -167,19 +176,38 @@ public class AutoUpdateChecker {
         });
     }
 
+    private static void forceMove(Path source, Path target) throws Exception {
+        try {
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+        } catch (java.nio.file.AccessDeniedException e) {
+            // File in use (Windows) — try to force via deleteOnExit + copy
+            System.gc();
+            Thread.sleep(100);
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+            try { Files.deleteIfExists(source); } catch (Throwable ignored) { source.toFile().deleteOnExit(); }
+        }
+    }
+
     private static void cleanOldDuplicates(Path modsDir, String keepFileName) {
-        try (java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(modsDir, "chuck-pack*.jar")) {
+        // Handles any file with Chuck pack in name (chuck-pack, Chuck Pack, chuckpack etc.) case-insensitive
+        try (java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(modsDir, "*.jar")) {
             for (Path p : stream) {
                 String fn = p.getFileName().toString();
+                String lower = fn.toLowerCase();
+                boolean isChuckPack = lower.contains("chuck") && lower.contains("pack");
+                if (!isChuckPack) continue;
                 if (fn.equals(keepFileName) || fn.equals("chuck-pack-backup.jar")) continue;
-                if (fn.equals("chuck-pack-update.jar")) {
-                    try { Files.deleteIfExists(p); } catch (Exception ignored) {}
+                if (fn.equals("chuck-pack-update.jar") || fn.equalsIgnoreCase("chuck-pack-update.jar")) {
+                    try { Files.deleteIfExists(p); } catch (Exception ignored) { p.toFile().deleteOnExit(); }
                     continue;
                 }
-                // Delete any other chuck-pack jar that is not the target (old version duplicate)
+                // Delete any other Chuck Pack jar that is not the target (old version duplicate, renamed etc.)
                 try {
                     Files.deleteIfExists(p);
                     ChuckPack.LOG.info("Deleted old duplicate mod: {}", fn);
+                } catch (java.nio.file.AccessDeniedException e) {
+                    p.toFile().deleteOnExit();
+                    ChuckPack.LOG.info("Marked old duplicate for deletion on restart (in use): {}", fn);
                 } catch (Exception e) {
                     ChuckPack.LOG.warn("Failed to delete duplicate {}: {}", fn, e.getMessage());
                 }
