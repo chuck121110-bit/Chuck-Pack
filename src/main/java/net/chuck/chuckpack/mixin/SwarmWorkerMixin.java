@@ -90,11 +90,27 @@ public class SwarmWorkerMixin {
             return;
         }
 
-        if (lower.equals(DISCONNECT_ALL_CMD)) {
+        if (lower.equals(DISCONNECT_ALL_CMD) || lower.equals("swarm disconnect")) {
             mc.execute(() -> {
-                SwarmGuard.get().deactivate();
-                mc.disconnectFromWorld(net.minecraft.network.chat.Component.literal("Disconnected by host"));
-                ChatUtils.infoPrefix("Swarm", "Disconnected from server by host.");
+                try {
+                    SwarmGuard guard = SwarmGuard.get();
+                    if (guard != null) guard.deactivate();
+                } catch (Throwable ignored) {}
+                try {
+                    // Force disconnect from Minecraft server (works even if not in world, and closes swarm)
+                    if (mc.player != null || mc.getCurrentServer() != null || mc.screen != null) {
+                        mc.disconnectFromWorld(net.minecraft.network.chat.Component.literal("Disconnected by host"));
+                    } else {
+                        // If not in world, just ensure swarm is closed
+                        try {
+                            meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm swarm = Modules.get().get(meteordevelopment.meteorclient.systems.modules.misc.swarm.Swarm.class);
+                            if (swarm != null) try { swarm.close(); } catch (Throwable ignored) {}
+                        } catch (Throwable ignored) {}
+                    }
+                    ChatUtils.infoPrefix("Swarm", "Disconnected from server by host.");
+                } catch (Throwable e) {
+                    ChatUtils.error("Disconnect failed: " + e.getMessage());
+                }
             });
             return;
         }
