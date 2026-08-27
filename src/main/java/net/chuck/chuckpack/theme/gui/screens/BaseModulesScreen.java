@@ -96,10 +96,16 @@ public class BaseModulesScreen extends TabScreen {
                     }
                     if (stack != null && !stack.isEmpty()) {
                         wContainer.add(theme.item(stack)).pad(2);
+                        return;
                     }
                 } catch (Throwable ignored) {
                     // Swallow NPE from Holder$Reference.components before registry bound
                 }
+                // Fallback label when icon unavailable (Chuck Pack / Litematica before registry)
+                try {
+                    String shortName = category.name.length() > 2 ? category.name.substring(0, 2) : category.name;
+                    wContainer.add(theme.label(shortName)).pad(2);
+                } catch (Throwable ignored2) {}
             };
         }
         c.add(w);
@@ -149,7 +155,11 @@ public class BaseModulesScreen extends TabScreen {
 
         if (theme.categoryIcons()) {
             w.beforeHeaderInit = wContainer -> {
-                try { addIcon(wContainer, Items.COMPASS.getDefaultInstance()); } catch (Throwable ignored) {}
+                try {
+                    ItemStack s = Items.COMPASS.getDefaultInstance();
+                    if (!s.isEmpty()) { addIcon(wContainer, s); return; }
+                } catch (Throwable ignored) {}
+                try { wContainer.add(theme.label("S")).pad(2); } catch (Throwable ignored2) {}
             };
         }
 
@@ -186,7 +196,11 @@ public class BaseModulesScreen extends TabScreen {
 
         if (theme.categoryIcons()) {
             w.beforeHeaderInit = wContainer -> {
-                try { addIcon(wContainer, Items.NETHER_STAR.getDefaultInstance()); } catch (Throwable ignored) {}
+                try {
+                    ItemStack s = Items.NETHER_STAR.getDefaultInstance();
+                    if (!s.isEmpty()) { addIcon(wContainer, s); return; }
+                } catch (Throwable ignored) {}
+                try { wContainer.add(theme.label("*")).pad(2); } catch (Throwable ignored2) {}
             };
         }
 
