@@ -53,7 +53,7 @@ public class AutoLogin extends Module {
     private final Setting<List<String>> commandsToHandle = sgGeneral.add(new StringListSetting.Builder()
             .name("commands-to-handle")
             .description("Commands to handle.")
-            .defaultValue("login", "log", "l", "register", "reg")
+            .defaultValue("login", "log", "l", "register", "reg", "signin", "sign", "auth", "authenticate", "premium", "account", "join")
             .visible(autoSave::get)
             .build()
     );

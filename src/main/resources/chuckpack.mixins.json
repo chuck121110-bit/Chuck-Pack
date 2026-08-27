@@ -41,7 +41,8 @@
     "TunnelChatMixin",
     "BaritoneSettingsMixin",
     "WWindowHeaderMixin",
-    "NoFallMixin"
+    "NoFallMixin",
+    "TitleScreenMixin"
   ],
   "injectors": { "defaultRequire": 0 }
 }

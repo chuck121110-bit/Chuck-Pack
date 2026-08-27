@@ -38,7 +38,14 @@ public class SwarmWorkerMixin {
 
     @Inject(method = "tick", at = @At("HEAD"))
     private void chuckpack$onTick(CallbackInfo ci) {
-        SwarmGuard.get().tick(Minecraft.getInstance());
+        try {
+            SwarmGuard guard = SwarmGuard.get();
+            Minecraft mc = Minecraft.getInstance();
+            if (guard == null || mc == null) return;
+            guard.tick(mc);
+        } catch (Throwable ignored) {
+            // Prevent worker crash when connecting to host before SwarmGuard init (NPE reported)
+        }
     }
 
     @Redirect(method = "run", at = @At(value = "INVOKE", target = "Lmeteordevelopment/meteorclient/commands/Commands;dispatch(Ljava/lang/String;)V"))

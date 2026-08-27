@@ -16,6 +16,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Swarm.class)
 public class SwarmMixin {
 
+    @org.spongepowered.asm.mixin.Unique
+    private long chuckpack$lastSyncMs = 0;
+
     @Inject(method = "onGameLeft", at = @At("HEAD"), cancellable = true)
     private void chuckpack$preventGameLeft(GameLeftEvent event, CallbackInfo ci) {
         ci.cancel();
@@ -30,6 +33,15 @@ public class SwarmMixin {
     private void chuckpack$onTick(TickEvent.Post event, CallbackInfo ci) {
         Swarm self = (Swarm) (Object) this;
         if (!self.isHost()) return;
+
+        // Auto-sync every 5s so workers never need manual .swarm sync (host auto-pushes)
+        try {
+            long now = System.currentTimeMillis();
+            if (now - chuckpack$lastSyncMs > 5000 && self.host != null && self.host.isAlive()) {
+                chuckpack$lastSyncMs = now;
+                try { self.host.sendMessage("swarm ChuckPack-sync "); } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {}
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;

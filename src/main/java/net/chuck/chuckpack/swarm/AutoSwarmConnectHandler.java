@@ -16,12 +16,19 @@ public class AutoSwarmConnectHandler {
     @EventHandler
     private void onTick(TickEvent.Post event) {
         try {
+            if (Modules.get() == null) return;
             Swarm swarm = Modules.get().get(Swarm.class);
-            if (swarm == null || !swarm.isActive()) return;
-
+            if (swarm == null) return;
             IAutoSwarmConnect autoConnect = (IAutoSwarmConnect) (Object) swarm;
-            if (!autoConnect.chuckpack$autoConnectSetting().get()) {
+            boolean autoOn = false;
+            try { autoOn = autoConnect.chuckpack$autoConnectSetting().get(); } catch (Throwable ignored) {}
+            if (!autoOn) {
                 lastScanMs = 0;
+                return;
+            }
+            // Auto-toggle Swarm active so it works from TitleScreen without clicking Play (never requires .swarm sync)
+            if (!swarm.isActive()) {
+                try { swarm.toggle(); ChatUtils.info("Auto Swarm Connect: auto-enabled Swarm"); } catch (Throwable ignored) {}
                 return;
             }
 
