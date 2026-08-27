@@ -21,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 public class AutoUpdateChecker {
     private static String latestVersion = "";
     private static String downloadUrl = "";
+    private static String latestFileName = "";
     private static boolean updateAvailable = false;
 
     public static void checkOnStartup() {
@@ -66,7 +67,8 @@ public class AutoUpdateChecker {
                                 String name = assetObj.get("name").getAsString();
                                 if (name.endsWith(".jar") && name.contains("chuck-pack")) {
                                     downloadUrl = assetObj.get("browser_download_url").getAsString();
-                                    ChuckPack.LOG.info("Download: {}", downloadUrl);
+                                    latestFileName = name;
+                                    ChuckPack.LOG.info("Download: {} (file: {})", downloadUrl, latestFileName);
                                     break;
                                 }
                             }
@@ -119,11 +121,24 @@ public class AutoUpdateChecker {
                 if (response.statusCode() == 200) {
                     Files.copy(response.body(), tempJar, StandardCopyOption.REPLACE_EXISTING);
 
+                    Path targetJar = latestFileName.isEmpty() ? currentJar : modsDir.resolve(latestFileName);
+                    if (targetJar == null) targetJar = tempJar;
+
                     if (currentJar != null && Files.exists(currentJar)) {
                         Path backup = modsDir.resolve("chuck-pack-backup.jar");
-                        Files.move(currentJar, backup, StandardCopyOption.REPLACE_EXISTING);
-                        Files.move(tempJar, currentJar, StandardCopyOption.REPLACE_EXISTING);
-                        ChuckPack.LOG.info("Update installed! Restart Minecraft to apply. Backup: {}", backup.getFileName());
+                        try {
+                            Files.move(currentJar, backup, StandardCopyOption.REPLACE_EXISTING);
+                            ChuckPack.LOG.info("Backed up old jar to {}", backup.getFileName());
+                        } catch (Exception e) {
+                            ChuckPack.LOG.warn("Backup failed: {}", e.getMessage());
+                        }
+                        Files.move(tempJar, targetJar, StandardCopyOption.REPLACE_EXISTING);
+                        ChuckPack.LOG.info("Update installed! Restart Minecraft to apply. File: {} Backup: {}", targetJar.getFileName(), backup.getFileName());
+                        cleanOldDuplicates(modsDir, targetJar.getFileName().toString());
+                    } else if (!targetJar.equals(tempJar)) {
+                        Files.move(tempJar, targetJar, StandardCopyOption.REPLACE_EXISTING);
+                        ChuckPack.LOG.info("Update downloaded to: {}. Restart Minecraft to apply.", targetJar);
+                        cleanOldDuplicates(modsDir, targetJar.getFileName().toString());
                     } else {
                         ChuckPack.LOG.info("Update downloaded to: {}. Manually replace current jar and restart.", tempJar);
                     }
@@ -134,6 +149,30 @@ public class AutoUpdateChecker {
                 ChuckPack.LOG.warn("Download failed: {}", e.getMessage());
             }
         });
+    }
+
+    private static void cleanOldDuplicates(Path modsDir, String keepFileName) {
+        try (java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(modsDir, "chuck-pack*.jar")) {
+            for (Path p : stream) {
+                String fn = p.getFileName().toString();
+                if (fn.equals(keepFileName) || fn.equals("chuck-pack-backup.jar")) continue;
+                if (fn.equals("chuck-pack-update.jar")) {
+                    try { Files.deleteIfExists(p); } catch (Exception ignored) {}
+                    continue;
+                }
+                // Delete any other chuck-pack jar that is not the target (old version duplicate)
+                try {
+                    Files.deleteIfExists(p);
+                    ChuckPack.LOG.info("Deleted old duplicate mod: {}", fn);
+                } catch (Exception e) {
+                    ChuckPack.LOG.warn("Failed to delete duplicate {}: {}", fn, e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            ChuckPack.LOG.warn("Failed to clean old duplicates: {}", e.getMessage());
+        }
+        // Also clean any lingering update file
+        try { Files.deleteIfExists(modsDir.resolve("chuck-pack-update.jar")); } catch (Exception ignored) {}
     }
 
     private static String getVersion() {
