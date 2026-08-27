@@ -95,7 +95,9 @@ public class BaseModulesScreen extends TabScreen {
                 } else if (icon instanceof ItemStack stack) {
                     iconStack = stack;
                 }
-            } catch (ReflectiveOperationException ignored) {
+            } catch (Throwable ignored) {
+                // Items may not be bound yet during early init (meteor_litematica_printer, Chuck Pack EMERALD etc.)
+                // Swallow NPE from Holder$Reference.components so Search/Favorites still render
             }
 
             if (iconStack != null) {
@@ -220,15 +222,28 @@ public class BaseModulesScreen extends TabScreen {
         @Override
         public void init() {
             for (Category category : Modules.loopCategories()) {
-                List<Module> modules = Modules.get().getGroup(category).stream()
-                        .filter(m -> !Config.get().hiddenModules.get().contains(m))
-                        .toList();
-                if (!modules.isEmpty()) {
-                    windows.add(createCategory(this, category, modules));
+                try {
+                    List<Module> modules = Modules.get().getGroup(category).stream()
+                            .filter(m -> !Config.get().hiddenModules.get().contains(m))
+                            .toList();
+                    if (!modules.isEmpty()) {
+                        windows.add(createCategory(this, category, modules));
+                    }
+                } catch (Throwable t) {
+                    // Prevent one broken category (e.g. meteor_litematica_printer icon NPE) from hiding Search/Favorites
+                    System.err.println("[Chuck Pack] Failed to create category window for " + category.name + ": " + t.getMessage());
                 }
             }
-            windows.add(createSearch(this));
-            refresh();
+            try {
+                windows.add(createSearch(this));
+            } catch (Throwable t) {
+                System.err.println("[Chuck Pack] Failed to create Search window: " + t.getMessage());
+            }
+            try {
+                refresh();
+            } catch (Throwable t) {
+                System.err.println("[Chuck Pack] Failed to create Favorites window: " + t.getMessage());
+            }
         }
 
         protected void refresh() {

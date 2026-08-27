@@ -37,6 +37,7 @@ import net.chuck.chuckpack.modules.world.BaseFinder;
 import net.chuck.chuckpack.modules.world.OreSim;
 import net.chuck.chuckpack.util.config.ChuckPackConfigModifier;
 import net.chuck.chuckpack.util.config.CategoryConfig;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +50,13 @@ import java.util.Map;
 public class ChuckPack extends MeteorAddon {
     public static final Logger LOG = LoggerFactory.getLogger("ChuckPack");
 
-    public static final Category CHUCK_CATEGORY = new Category("Chuck Pack", () -> Items.EMERALD.getDefaultInstance());
+    public static final Category CHUCK_CATEGORY = new Category("Chuck Pack", () -> {
+        try {
+            return Items.EMERALD.getDefaultInstance();
+        } catch (Throwable ignored) {
+            return ItemStack.EMPTY;
+        }
+    });
 
     private static final List<Module> aeroModules = new ArrayList<>();
     private static final Map<Module, Category> naturalCategories = new LinkedHashMap<>();
