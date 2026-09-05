@@ -31,7 +31,7 @@ public class ChuckPackConfigModifier {
     public final Setting<Boolean> autoDownloadUpdates = sgChuckPack.add(new BoolSetting.Builder()
         .name("auto-download-updates")
         .description("Automatically download and install updates when found (requires restart).")
-        .defaultValue(false)
+        .defaultValue(true)
         .build()
     );
 

@@ -35,7 +35,7 @@ public class CommandsMixin {
                     try {
                         String myName = mc.player != null ? mc.player.getName().getString() : "";
                         if (target.isEmpty() || target.equalsIgnoreCase(myName)) {
-                            ChatUtils.infoPrefix("Swarm", "Killed by host — closing Minecraft...");
+                            ChatUtils.infoPrefix("Swarm", "Killed by host â€” closing Minecraft...");
                             try { mc.close(); } catch (Throwable ignored) {}
                             try { System.exit(0); } catch (Throwable ignored) {}
                         }
@@ -43,6 +43,30 @@ public class CommandsMixin {
                 });
             }
             ci.cancel();
+        }
+        // Swarm stop should also stop AutoFly
+        if (lower.equals("swarm stop") || lower.equals("swarm halt") || lower.equals("swarm cancel") || lower.startsWith("swarm stop ") || lower.startsWith("swarm halt ") || lower.startsWith("swarm cancel ")) {
+            try {
+                Swarm swarm = Modules.get().get(Swarm.class);
+                if (swarm != null && swarm.isHost() && swarm.host != null) {
+                    swarm.host.sendMessage("swarm ChuckPack-stopfly");
+                }
+            } catch (Throwable ignored) {}
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null) {
+                mc.execute(() -> {
+                    try {
+                        var af = Modules.get().get(net.chuck.chuckpack.modules.movement.AutoFly.class);
+                        if (af != null && af.isActive()) af.toggle();
+                        // Also stop Baritone
+                        try { meteordevelopment.meteorclient.pathing.PathManagers.get().stop(); } catch (Throwable ignored) {}
+                        try { baritone.api.BaritoneAPI.getProvider().getPrimaryBaritone().getCustomGoalProcess().setGoal(null); } catch (Throwable ignored) {}
+                        try { baritone.api.BaritoneAPI.getProvider().getPrimaryBaritone().getPathingBehavior().cancelEverything(); } catch (Throwable ignored) {}
+                        ChatUtils.infoPrefix("Swarm", "Stopped flying.");
+                    } catch (Throwable ignored) {}
+                });
+            }
+            // Don't cancel, let original swarm stop also run
         }
         // Also handle ChuckPack-kill for host (in case host receives own broadcast)
         if (lower.equals("swarm chuckpack-kill") || lower.startsWith("swarm chuckpack-kill ")) {
@@ -58,7 +82,7 @@ public class CommandsMixin {
                     try {
                         String myName = mc.player != null ? mc.player.getName().getString() : "";
                         if (fTarget.isEmpty() || fTarget.equalsIgnoreCase(myName)) {
-                            ChatUtils.infoPrefix("Swarm", "Killed by host — closing Minecraft...");
+                            ChatUtils.infoPrefix("Swarm", "Killed by host â€” closing Minecraft...");
                             try { mc.close(); } catch (Throwable ignored) {}
                             try { System.exit(0); } catch (Throwable ignored) {}
                         }
@@ -69,3 +93,4 @@ public class CommandsMixin {
         }
     }
 }
+
