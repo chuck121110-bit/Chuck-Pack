@@ -40,6 +40,13 @@ public class FlightMixin {
             .sliderMax(0.1)
             .build()
         );
+
+        sgGeneral.add(new BoolSetting.Builder()
+            .name("no-sprint")
+            .description("Disable sprint while flying to save hunger.")
+            .defaultValue(true)
+            .build()
+        );
     }
 
     @Unique
@@ -61,5 +68,18 @@ public class FlightMixin {
     @Inject(method = "onDeactivate", at = @At("HEAD"), cancellable = true)
     private void chuckpack$nullCheckDeactivate(CallbackInfo ci) {
         if (chuckpack$mc.player == null) ci.cancel();
+    }
+
+    @Inject(method = "onPreTick", at = @At("HEAD"))
+    private void chuckpack$noSprint(TickEvent.Pre event, CallbackInfo ci) {
+        Flight self = (Flight)(Object)this;
+        if (!self.isActive() || chuckpack$mc.player == null) return;
+        try {
+            var s = self.settings.get("no-sprint");
+            if (s instanceof BoolSetting bs && bs.get()) {
+                chuckpack$mc.player.setSprinting(false);
+                chuckpack$mc.options.keySprint.setDown(false);
+            }
+        } catch (Throwable ignored) {}
     }
 }

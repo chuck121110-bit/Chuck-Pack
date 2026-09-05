@@ -149,13 +149,6 @@ public final class AutoFly extends Module
 		.build()
 	);
 
-	private final Setting<Boolean> noSprint = sgGeneral.add(new BoolSetting.Builder()
-		.name("no-sprint")
-		.description("Disable sprint while flying to save hunger.")
-		.defaultValue(true)
-		.build()
-	);
-
 	private final Setting<Boolean> waitChunksOverworld = sgGeneral.add(new BoolSetting.Builder()
 		.name("wait-chunks-overworld")
 		.description("Wait for chunks to load in the Overworld before continuing through them.")
@@ -320,14 +313,14 @@ public final class AutoFly extends Module
 	private final Setting<AntiKickMode> antiKickMode = sgAutomation.add(new EnumSetting.Builder<AntiKickMode>()
 		.name("anti-kick-mode")
 		.description("Anti-kick method: None (standard), Normal (minetick), Packet (packet edit).")
-		.defaultValue(AntiKickMode.None)
+		.defaultValue(AntiKickMode.Packet)
 		.build()
 	);
 
 	private final Setting<Boolean> autoAntiKick = sgAutomation.add(new BoolSetting.Builder()
 		.name("auto-anti-kick")
 		.description("Every 20 ticks, move down 0.035 blocks to prevent anti-cheat kicks.")
-		.defaultValue(false)
+		.defaultValue(true)
 		.build()
 	);
 
@@ -566,11 +559,6 @@ public final class AutoFly extends Module
 
 		pathFlightController.clientTick();
 
-		if (noSprint.get() && pathFlightController.isActive() && mc.player != null) {
-			mc.player.setSprinting(false);
-			mc.options.keySprint.setDown(false);
-		}
-
 		boolean reachedGoal = pathFlightController.hasReachedGoal();
 
 		boolean isPathingNow = pathFlightController.isActive();
@@ -688,6 +676,10 @@ public final class AutoFly extends Module
 				}
 				antiKickOffLeft--;
 			}
+		}
+
+		if (autoAntiKick.get() && pathFlightController.isActive() && mc.player != null && mc.player.tickCount % 20 == 0) {
+			mc.player.setPos(mc.player.getX(), mc.player.getY() - 0.035, mc.player.getZ());
 		}
 
 		syncConfig();
