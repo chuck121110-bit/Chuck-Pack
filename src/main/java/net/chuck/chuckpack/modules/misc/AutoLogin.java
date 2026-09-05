@@ -136,10 +136,12 @@ public class AutoLogin extends Module {
         if (!message.startsWith("/")) return;
 
         String command = message.substring(1);
-        String[] args = command.split(" ");
-        if (args.length < 2) return;
+        int firstSpace = command.indexOf(' ');
+        if (firstSpace == -1) return;
+        String cmdName = command.substring(0, firstSpace);
+        String password = command.substring(firstSpace + 1).trim();
+        if (password.isEmpty()) return;
 
-        String cmdName = args[0];
         boolean matched = false;
         for (String c : instance.commandsToHandle.get()) {
             if (c.equalsIgnoreCase(cmdName)) {
@@ -150,7 +152,7 @@ public class AutoLogin extends Module {
         if (!matched) return;
 
         BaseAutoLogin entry = new BaseAutoLogin();
-        entry.loginCommand.set(instance.loginCommand.get() + " " + args[1]);
+        entry.loginCommand.set(instance.loginCommand.get() + " " + password);
 
         if (instance.saveUsername.get()) {
             entry.usernameFilter.set(instance.mc.getUser().getName());

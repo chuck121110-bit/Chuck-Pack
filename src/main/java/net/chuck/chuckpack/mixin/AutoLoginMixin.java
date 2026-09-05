@@ -10,12 +10,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ClientPacketListener.class)
 public class AutoLoginMixin {
 
-    @Inject(method = "sendChatMessage", at = @At("HEAD"))
+    @Inject(method = "sendChat", at = @At("HEAD"))
     private void onSendChatMessage(String message, CallbackInfo ci) {
         AutoLogin.onChatSent(message);
     }
 
-    @Inject(method = "sendChatCommand", at = @At("HEAD"))
+    @Inject(method = "sendCommand", at = @At("HEAD"))
     private void onSendChatCommand(String command, CallbackInfo ci) {
         AutoLogin.onChatSent("/" + command);
     }

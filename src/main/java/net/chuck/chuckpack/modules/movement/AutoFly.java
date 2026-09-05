@@ -149,6 +149,13 @@ public final class AutoFly extends Module
 		.build()
 	);
 
+	private final Setting<Boolean> noSprint = sgGeneral.add(new BoolSetting.Builder()
+		.name("no-sprint")
+		.description("Disable sprint while flying to save hunger.")
+		.defaultValue(true)
+		.build()
+	);
+
 	private final Setting<Boolean> waitChunksOverworld = sgGeneral.add(new BoolSetting.Builder()
 		.name("wait-chunks-overworld")
 		.description("Wait for chunks to load in the Overworld before continuing through them.")
@@ -558,6 +565,11 @@ public final class AutoFly extends Module
 		}
 
 		pathFlightController.clientTick();
+
+		if (noSprint.get() && pathFlightController.isActive() && mc.player != null) {
+			mc.player.setSprinting(false);
+			mc.options.keySprint.setDown(false);
+		}
 
 		boolean reachedGoal = pathFlightController.hasReachedGoal();
 
