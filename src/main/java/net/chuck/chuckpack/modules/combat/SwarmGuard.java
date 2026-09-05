@@ -152,6 +152,11 @@ public class SwarmGuard extends Module {
             if (PathManagers.get().isPathing()) {
                 PathManagers.get().stop();
             }
+            try { net.chuck.chuckpack.autoflypath.PathFlightRuntime.controller().stop(); } catch (Throwable ignored) {}
+            try {
+                var af = meteordevelopment.meteorclient.systems.modules.Modules.get().get(net.chuck.chuckpack.modules.movement.AutoFly.class);
+                if (af != null && af.isActive()) af.toggle();
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -180,6 +185,8 @@ public class SwarmGuard extends Module {
         } catch (IOException ignored) {}
     }
 
+    private static final java.util.concurrent.ScheduledExecutorService chuckpack$executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+
     public void hostTick(Minecraft mc) {
         if (mc.player == null || mc.level == null) return;
 
@@ -193,7 +200,7 @@ public class SwarmGuard extends Module {
                 cleanInventoryFiles("inv-");
                 sendInventoryCommandToAllWorkers("swarm inventory-check");
 
-                java.util.concurrent.Executors.newSingleThreadScheduledExecutor().schedule(() -> {
+                chuckpack$executor.schedule(() -> {
                     mc.execute(() -> {
                         try (DirectoryStream<Path> stream = Files.newDirectoryStream(INVENTORY_DIR, "inv-*.txt")) {
                             for (Path file : stream) {
@@ -412,7 +419,7 @@ public class SwarmGuard extends Module {
         Entity best = null;
         double bestScore = Double.NEGATIVE_INFINITY;
 
-        for (Entity entity : mc.level.players()) {
+        for (Entity entity : mc.level.entitiesForRendering()) {
             if (entity == mc.player) continue;
             if (entity == host) continue;
             if (!(entity instanceof LivingEntity living) || living.isRemoved() || !living.isAlive()) continue;

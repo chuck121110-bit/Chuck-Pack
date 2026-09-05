@@ -27,11 +27,11 @@ public abstract class GuiMapMixin {
             ArrayList<RightClickOption> options = cir.getReturnValue();
             if (options == null) return;
 
-            int wx = rightClickX;
-            int wz = rightClickZ;
+            final int wx = rightClickX;
+            final int wz = rightClickZ;
 
             final int wy = Math.max(-64, Math.min(319, rightClickY));
-            boolean yKnown = wy != 319;
+            final boolean yKnown = wy != 319;
 
             for (int i = options.size() - 1; i >= 0; i--) {
                 String name = options.get(i).getDisplayName().getString();
@@ -63,10 +63,14 @@ public abstract class GuiMapMixin {
                                 ChatUtils.error("Swarm module must be active to use Swarm Fly Here.");
                                 return;
                             }
-                            String cmd = "swarm fly " + wx + " " + (yKnown ? wy + " " : "") + wz;
+                            String prefix = meteordevelopment.meteorclient.systems.config.Config.get().prefix.get();
+                            String cmd = prefix + "swarm fly " + wx + " " + (yKnown ? wy + " " : "") + wz;
                             Minecraft mc = Minecraft.getInstance();
                             if (mc.player != null) {
-                                meteordevelopment.meteorclient.utils.player.ChatUtils.sendPlayerMsg(cmd);
+                                mc.execute(() -> {
+                                    try { meteordevelopment.meteorclient.commands.Commands.dispatch(cmd.substring(1)); } catch (Exception ignored) {}
+                                });
+                                try { meteordevelopment.meteorclient.utils.player.ChatUtils.sendPlayerMsg(cmd); } catch (Throwable ignored) {}
                             }
                         }
                     });

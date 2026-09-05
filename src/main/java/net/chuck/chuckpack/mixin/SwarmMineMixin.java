@@ -205,6 +205,12 @@ public class SwarmMineMixin {
                             String cmd = "swarm ChuckPack-swarmfly " + x + " " + y + " " + z + " " + yKnown;
                             swarm.host.sendMessage(cmd);
                             ChatUtils.info("Telling workers to fly to (highlight)%d %d %d", x, y, z);
+                            // Host also flies
+                            net.chuck.chuckpack.modules.movement.AutoFly af2 = Modules.get().get(net.chuck.chuckpack.modules.movement.AutoFly.class);
+                            if (af2 != null) {
+                                if (!af2.isActive()) af2.toggle();
+                                af2.setTargetFromMap(x, y, z, yKnown, true);
+                            }
                         } else {
                             net.chuck.chuckpack.modules.movement.AutoFly af = Modules.get().get(net.chuck.chuckpack.modules.movement.AutoFly.class);
                             if (af != null) {
@@ -317,7 +323,6 @@ public class SwarmMineMixin {
                         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                         if (mc.level != null) {
                             for (net.minecraft.world.entity.player.Player p : mc.level.players()) {
-                                if (p == mc.player) continue;
                                 sb.suggest(p.getName().getString());
                             }
                         }
@@ -346,7 +351,6 @@ public class SwarmMineMixin {
                         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                         if (mc.level != null) {
                             for (net.minecraft.world.entity.player.Player p : mc.level.players()) {
-                                if (p == mc.player) continue;
                                 sb.suggest(p.getName().getString());
                             }
                         }
