@@ -25,7 +25,46 @@ public abstract class HoveredMapElementHolderMixin {
             java.util.ArrayList<RightClickOption> options = cir.getReturnValue();
             if (options == null) return;
             Object el = this.element;
-            if (!(el instanceof Waypoint)) return;
+            try { meteordevelopment.meteorclient.utils.player.ChatUtils.info("Waypoint hover: " + (el == null ? "null" : el.getClass().getName() + " isWP=" + (el instanceof Waypoint))); } catch (Throwable ignored) {}
+            if (!(el instanceof Waypoint)) {
+                // Try to handle via reflection for other waypoint types
+                try {
+                    Class<?> wpClass = Class.forName("xaero.common.minimap.waypoints.Waypoint");
+                    if (!wpClass.isInstance(el)) return;
+                    int wx = (int) wpClass.getMethod("getX").invoke(el);
+                    int wy = (int) wpClass.getMethod("getY").invoke(el);
+                    int wz = (int) wpClass.getMethod("getZ").invoke(el);
+                    boolean yKnown = (boolean) wpClass.getMethod("isYIncluded").invoke(el);
+                    for (int i = options.size() - 1; i >= 0; i--) {
+                        String name = options.get(i).getDisplayName().getString();
+                        if (name.equals("Auto Fly Here") || name.equals("Swarm Fly Here")) options.remove(i);
+                    }
+                    int insertIdx = Math.max(0, options.size() - 1);
+                    options.add(insertIdx, new RightClickOption("Auto Fly Here", insertIdx, (xaero.map.gui.IRightClickableElement) (Object) this) {
+                        @Override
+                        public void onAction(net.minecraft.client.gui.screens.Screen screen) {
+                            AutoFly af = Modules.get().get(AutoFly.class);
+                            if (af != null) {
+                                if (!af.isActive()) af.toggle();
+                                af.setTargetFromMap(wx, wy, wz, yKnown, false);
+                            }
+                        }
+                    });
+                    Swarm swarm = Modules.get().get(Swarm.class);
+                    if (swarm != null && swarm.isActive()) {
+                        insertIdx = Math.max(0, options.size() - 1);
+                        options.add(insertIdx, new RightClickOption("Swarm Fly Here", insertIdx, (xaero.map.gui.IRightClickableElement) (Object) this) {
+                            @Override
+                            public void onAction(net.minecraft.client.gui.screens.Screen screen) {
+                                String cmd = "swarm fly " + wx + " " + (yKnown ? wy + " " : "") + wz;
+                                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                                if (mc.player != null) meteordevelopment.meteorclient.utils.player.ChatUtils.sendPlayerMsg(cmd);
+                            }
+                        });
+                    }
+                    return;
+                } catch (Throwable ignored2) { return; }
+            }
             Waypoint wp = (Waypoint) el;
             int wx = wp.getX();
             int wy = wp.getY();
