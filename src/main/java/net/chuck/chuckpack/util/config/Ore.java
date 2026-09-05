@@ -1,46 +1,43 @@
 /*
- * Adapted from Nora Tweaks (CC0-1.0, https://github.com/noramibu/Nora-Tweaks)
- * which was partially adapted from Meteor Rejects.
+ * This code partially adapted from Meteor Rejects
+ * Original source: https://github.com/AntiCope/meteor-rejects/
+ * Credit: Meteor Rejects contributors
+ * If Meteor Rejects gets updated, adapted features will get removed.
  */
 package net.chuck.chuckpack.util.config;
 
+import net.chuck.chuckpack.mixin.CountPlacementModifierAccessor;
+import net.chuck.chuckpack.mixin.HeightRangePlacementModifierAccessor;
+import net.chuck.chuckpack.mixin.RarityFilterPlacementModifierAccessor;
 import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.Setting;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.world.Dimension;
-import net.chuck.chuckpack.mixin.CountPlacementModifierAccessor;
-import net.chuck.chuckpack.mixin.HeightRangePlacementModifierAccessor;
-import net.chuck.chuckpack.mixin.RarityFilterPlacementModifierAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.data.registries.VanillaRegistries;
+import net.minecraft.data.worldgen.placement.OrePlacements;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.valueproviders.ConstantInt;
 import net.minecraft.util.valueproviders.IntProvider;
+import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.biome.BiomeSource;
-import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.biome.FeatureSorter;
 import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.levelgen.WorldGenerationContext;
-import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.feature.configurations.FeatureConfiguration;
 import net.minecraft.world.level.levelgen.feature.configurations.OreConfiguration;
-import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.heightproviders.HeightProvider;
 import net.minecraft.world.level.levelgen.placement.CountPlacement;
 import net.minecraft.world.level.levelgen.placement.HeightRangePlacement;
-import net.minecraft.world.level.levelgen.placement.PlacementContext;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.placement.PlacementModifier;
 import net.minecraft.world.level.levelgen.placement.RarityFilter;
-
+import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import java.util.*;
-import java.util.stream.Collectors;
-
-import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class Ore {
     private static final Setting<Boolean> coal = new BoolSetting.Builder().name("Coal").build();
@@ -63,19 +60,19 @@ public class Ore {
     public Setting<Boolean> active;
     public IntProvider count = ConstantInt.of(1);
     public HeightProvider heightProvider;
-    public PlacementContext placementCtx;
+    public WorldGenerationContext heightContext;
     public float rarity = 1.0F;
     public float discardOnAirChance;
     public int size;
     public Color color;
     public boolean scattered;
 
-    private Ore(PlacedFeature feature, int step, int index, Setting<Boolean> active, Color color, PlacementContext placementCtx) {
+    private Ore(PlacedFeature feature, int step, int index, Setting<Boolean> active, Color color, WorldGenerationContext heightContext) {
         this.step = step;
         this.index = index;
         this.active = active;
         this.color = color;
-        this.placementCtx = placementCtx;
+        this.heightContext = heightContext;
 
         for (PlacementModifier modifier : feature.placement()) {
             if (modifier instanceof CountPlacement countPlacement) {
@@ -87,12 +84,12 @@ public class Ore {
             }
         }
 
-        FeatureConfiguration featureConfiguration = feature.feature().value().config();
-        if (featureConfiguration instanceof OreConfiguration oc) {
-            this.discardOnAirChance = oc.discardChanceOnAirExposure;
-            this.size = oc.size;
+        FeatureConfiguration featureConfig = feature.feature().value().config();
+        if (featureConfig instanceof OreConfiguration oreFeatureConfig) {
+            this.discardOnAirChance = oreFeatureConfig.discardChanceOnAirExposure;
+            this.size = oreFeatureConfig.size;
         } else {
-            throw new IllegalStateException("Config for " + feature + " is not an OreConfiguration");
+            throw new IllegalStateException("Config for " + feature + " is not an OreFeatureConfig");
         }
 
         if (feature.feature().value().feature() instanceof net.minecraft.world.level.levelgen.feature.ScatteredOreFeature) {
@@ -100,138 +97,88 @@ public class Ore {
         }
     }
 
-    private static ResourceKey<PlacedFeature> oreKey(String name) {
-        return ResourceKey.create(Registries.PLACED_FEATURE, Identifier.fromNamespaceAndPath("minecraft", name));
-    }
-
-    private static final List<String> OVERWORLD_ORES = List.of(
-        "ore_coal_lower", "ore_coal_upper",
-        "ore_iron_middle", "ore_iron_small", "ore_iron_upper",
-        "ore_gold", "ore_gold_lower", "ore_gold_extra",
-        "ore_redstone", "ore_redstone_lower",
-        "ore_diamond", "ore_diamond_buried", "ore_diamond_large", "ore_diamond_medium",
-        "ore_lapis", "ore_lapis_buried",
-        "ore_copper", "ore_copper_large",
-        "ore_emerald"
-    );
-
-    private static final List<String> NETHER_ORES = List.of(
-        "ore_gold_nether", "ore_gold_deltas",
-        "ore_quartz_nether", "ore_quartz_deltas",
-        "ore_debris_small", "ore_ancient_debris_large"
-    );
-
     public static Map<ResourceKey<Biome>, List<Ore>> getRegistry(Dimension dimension) {
-        if (mc.level == null || mc.level.getServer() == null) return Collections.emptyMap();
+        HolderLookup.Provider lookup = VanillaRegistries.createLookup();
+        HolderLookup.RegistryLookup<PlacedFeature> features = lookup.lookupOrThrow(Registries.PLACED_FEATURE);
+        var dimensionMap = lookup.lookupOrThrow(Registries.WORLD_PRESET).getOrThrow(WorldPresets.NORMAL).value().createWorldDimensions().dimensions();
 
-        MinecraftServer server = mc.level.getServer();
-        var registryAccess = mc.level.registryAccess();
-
-        ResourceKey<LevelStem> stemKey = switch (dimension) {
-            case Nether -> LevelStem.NETHER;
-            case End -> LevelStem.END;
-            default -> LevelStem.OVERWORLD;
+        var dimensionOptions = switch (dimension) {
+            case Overworld -> dimensionMap.get(LevelStem.OVERWORLD);
+            case Nether -> dimensionMap.get(LevelStem.NETHER);
+            case End -> dimensionMap.get(LevelStem.END);
         };
 
-        ServerLevel serverLevel = server.getLevel(switch (dimension) {
-            case Nether -> net.minecraft.world.level.Level.NETHER;
-            case End -> net.minecraft.world.level.Level.END;
-            default -> net.minecraft.world.level.Level.OVERWORLD;
-        });
+        var biomes = new ArrayList<>(dimensionOptions.generator().getBiomeSource().possibleBiomes());
 
-        if (serverLevel == null) return Collections.emptyMap();
+        // Build a valid HeightContext using the target dimension's chunk generator and current world's height limits
+        WorldGenerationContext heightContext;
+        if (Minecraft.getInstance().level != null) {
+            int bottom = Minecraft.getInstance().level.getMinY();
+            int logical = Minecraft.getInstance().level.dimensionType().logicalHeight();
+            heightContext = new WorldGenerationContext(dimensionOptions.generator(), LevelHeightAccessor.create(bottom, logical));
+        } else {
+            // Fallback safe defaults matching typical world limits; avoids NPE before a world is loaded
+            heightContext = new WorldGenerationContext(dimensionOptions.generator(), LevelHeightAccessor.create(-64, 384));
+        }
 
-        ChunkGenerator chunkGenerator = serverLevel.getChunkSource().getGenerator();
-        BiomeSource biomeSource = chunkGenerator.getBiomeSource();
-
-        Set<Holder<Biome>> biomes = biomeSource.possibleBiomes();
-
-        WorldGenerationContext heightContext = new WorldGenerationContext(chunkGenerator, serverLevel);
-        PlacementContext placementCtx = new PlacementContext(serverLevel, chunkGenerator, Optional.empty());
+        List<FeatureSorter.StepFeatureData> indexer = FeatureSorter.buildFeaturesPerStep(
+            biomes,
+            biomeEntry -> biomeEntry.value().getGenerationSettings().features(),
+            true
+        );
 
         Map<PlacedFeature, Ore> featureToOre = new HashMap<>();
-
-        List<String> oreNames = switch (dimension) {
-            case Nether -> NETHER_ORES;
-            default -> OVERWORLD_ORES;
-        };
-
-        int stepIndex = switch (dimension) {
-            case Nether -> 7;
-            default -> 6;
-        };
-
-        var featureRegistry = registryAccess.lookupOrThrow(Registries.PLACED_FEATURE);
-
-        for (int i = 0; i < oreNames.size(); i++) {
-            String oreName = oreNames.get(i);
-            ResourceKey<PlacedFeature> key = oreKey(oreName);
-            Optional<Holder.Reference<PlacedFeature>> holder = featureRegistry.get(key);
-            if (holder.isEmpty()) continue;
-
-            PlacedFeature feature = holder.get().value();
-            Setting<Boolean> active = getActiveSetting(oreName);
-            Color oreColor = getColor(oreName);
-
-            if (active != null) {
-                featureToOre.put(feature, new Ore(feature, stepIndex, i, active, oreColor, placementCtx));
-            }
-        }
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_COAL_LOWER, 6, coal, new Color(47, 44, 54), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_COAL_UPPER, 6, coal, new Color(47, 44, 54), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_IRON_MIDDLE, 6, iron, new Color(236, 173, 119), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_IRON_SMALL, 6, iron, new Color(236, 173, 119), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_IRON_UPPER, 6, iron, new Color(236, 173, 119), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_GOLD, 6, gold, new Color(247, 229, 30), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_GOLD_LOWER, 6, gold, new Color(247, 229, 30), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_GOLD_EXTRA, 6, gold, new Color(247, 229, 30), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_GOLD_NETHER, 7, gold, new Color(247, 229, 30), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_GOLD_DELTAS, 7, gold, new Color(247, 229, 30), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_REDSTONE, 6, redstone, new Color(245, 7, 23), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_REDSTONE_LOWER, 6, redstone, new Color(245, 7, 23), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_DIAMOND, 6, diamond, new Color(33, 244, 255), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_DIAMOND_BURIED, 6, diamond, new Color(33, 244, 255), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_DIAMOND_LARGE, 6, diamond, new Color(33, 244, 255), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_DIAMOND_MEDIUM, 6, diamond, new Color(33, 244, 255), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_LAPIS, 6, lapis, new Color(8, 26, 189), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_LAPIS_BURIED, 6, lapis, new Color(8, 26, 189), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_COPPER, 6, copper, new Color(239, 151, 0), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_COPPER_LARGE, 6, copper, new Color(239, 151, 0), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_EMERALD, 6, emerald, new Color(27, 209, 45), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_QUARTZ_NETHER, 7, quartz, new Color(205, 205, 205), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_QUARTZ_DELTAS, 7, quartz, new Color(205, 205, 205), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_ANCIENT_DEBRIS_SMALL, 7, debris, new Color(209, 27, 245), heightContext);
+        registerOre(featureToOre, indexer, features, OrePlacements.ORE_ANCIENT_DEBRIS_LARGE, 7, debris, new Color(209, 27, 245), heightContext);
 
         Map<ResourceKey<Biome>, List<Ore>> biomeOreMap = new HashMap<>();
         for (Holder<Biome> biome : biomes) {
-            ResourceKey<Biome> biomeKey = biome.unwrapKey().orElse(null);
-            if (biomeKey == null) continue;
-
-            List<Ore> ores = new ArrayList<>();
-            biomeOreMap.put(biomeKey, ores);
-
-            var genSettings = biome.value().getGenerationSettings();
-            List<HolderSet<PlacedFeature>> featureSets = genSettings.features();
-
-            for (HolderSet<PlacedFeature> featureSet : featureSets) {
-                for (Holder<PlacedFeature> featureHolder : featureSet) {
-                    PlacedFeature feature = featureHolder.value();
-                    Ore ore = featureToOre.get(feature);
-                    if (ore != null) {
-                        ores.add(ore);
-                    }
-                }
-            }
+            biomeOreMap.put(biome.unwrapKey().get(), new ArrayList<>());
+            biome.value().getGenerationSettings().features().stream()
+                .flatMap(HolderSet::stream)
+                .map(Holder::value)
+                .filter(featureToOre::containsKey)
+                .forEach(feature -> biomeOreMap.get(biome.unwrapKey().get()).add(featureToOre.get(feature)));
         }
 
         return biomeOreMap;
     }
 
-    private static Setting<Boolean> getActiveSetting(String oreName) {
-        return switch (oreName) {
-            case "ore_coal_lower", "ore_coal_upper" -> coal;
-            case "ore_iron_middle", "ore_iron_small", "ore_iron_upper" -> iron;
-            case "ore_gold", "ore_gold_lower", "ore_gold_extra", "ore_gold_nether", "ore_gold_deltas" -> gold;
-            case "ore_redstone", "ore_redstone_lower" -> redstone;
-            case "ore_diamond", "ore_diamond_buried", "ore_diamond_large", "ore_diamond_medium" -> diamond;
-            case "ore_lapis", "ore_lapis_buried" -> lapis;
-            case "ore_copper", "ore_copper_large" -> copper;
-            case "ore_emerald" -> emerald;
-            case "ore_quartz_nether", "ore_quartz_deltas" -> quartz;
-            case "ore_debris_small", "ore_ancient_debris_large" -> debris;
-            default -> null;
-        };
-    }
-
-    private static Color getColor(String oreName) {
-        return switch (oreName) {
-            case "ore_coal_lower", "ore_coal_upper" -> new Color(47, 44, 54);
-            case "ore_iron_middle", "ore_iron_small", "ore_iron_upper" -> new Color(236, 173, 119);
-            case "ore_gold", "ore_gold_lower", "ore_gold_extra", "ore_gold_nether", "ore_gold_deltas" -> new Color(247, 229, 30);
-            case "ore_redstone", "ore_redstone_lower" -> new Color(245, 7, 23);
-            case "ore_diamond", "ore_diamond_buried", "ore_diamond_large", "ore_diamond_medium" -> new Color(33, 244, 255);
-            case "ore_lapis", "ore_lapis_buried" -> new Color(8, 26, 189);
-            case "ore_copper", "ore_copper_large" -> new Color(239, 151, 0);
-            case "ore_emerald" -> new Color(27, 209, 45);
-            case "ore_quartz_nether", "ore_quartz_deltas" -> new Color(205, 205, 205);
-            case "ore_debris_small", "ore_ancient_debris_large" -> new Color(209, 27, 245);
-            default -> new Color(255, 255, 255);
-        };
+    private static void registerOre(
+        Map<PlacedFeature, Ore> map,
+        List<FeatureSorter.StepFeatureData> indexer,
+        HolderLookup.RegistryLookup<PlacedFeature> oreRegistry,
+        ResourceKey<PlacedFeature> oreKey,
+        int genStep,
+        Setting<Boolean> active,
+        Color color,
+        WorldGenerationContext heightContext
+    ) {
+        PlacedFeature placedFeature = oreRegistry.getOrThrow(oreKey).value();
+        int idx = indexer.get(genStep).indexMapping().applyAsInt(placedFeature);
+        map.put(placedFeature, new Ore(placedFeature, genStep, idx, active, color, heightContext));
     }
 }
