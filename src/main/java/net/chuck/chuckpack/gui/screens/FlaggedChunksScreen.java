@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class FlaggedChunksScreen extends WindowScreen {
     private final BaseFinder module;
     private final Set<ChunkPos> baseChunks;
-    private final Map<ChunkPos, Set<String>> chunkTriggerReasons;
+    private final Map<ChunkPos, Map<String, Integer>> chunkTriggerReasons;
     private final Map<ChunkPos, Map<Block, Integer>> chunkBlockCounts;
     private final Map<ChunkPos, Map<String, Integer>> chunkEntityCounts;
     private ChunkPos selectedChunk;
@@ -56,7 +56,7 @@ public class FlaggedChunksScreen extends WindowScreen {
     );
 
     public FlaggedChunksScreen(GuiTheme theme, BaseFinder module, Set<ChunkPos> baseChunks,
-                                Map<ChunkPos, Set<String>> chunkTriggerReasons,
+                                Map<ChunkPos, Map<String, Integer>> chunkTriggerReasons,
                                 Map<ChunkPos, Map<Block, Integer>> chunkBlockCounts,
                                 Map<ChunkPos, Map<String, Integer>> chunkEntityCounts) {
         super(theme, "Flagged Chunks");
@@ -94,7 +94,7 @@ public class FlaggedChunksScreen extends WindowScreen {
 
     private int computeSnapshotHash() {
         int h = baseChunks.size();
-        for (Map.Entry<ChunkPos, Set<String>> e : chunkTriggerReasons.entrySet()) {
+        for (Map.Entry<ChunkPos, Map<String, Integer>> e : chunkTriggerReasons.entrySet()) {
             h = h * 31 + e.getValue().size();
         }
         for (Map.Entry<ChunkPos, Map<Block, Integer>> e : chunkBlockCounts.entrySet()) {
@@ -161,30 +161,36 @@ public class FlaggedChunksScreen extends WindowScreen {
     }
 
     private void buildTriggersSection(WSection section) {
-        Set<String> reasons = chunkTriggerReasons.get(selectedChunk);
+        Map<String, Integer> reasons = chunkTriggerReasons.get(selectedChunk);
         if (reasons == null || reasons.isEmpty()) {
             section.add(theme.label("No trigger data for this LevelChunk")).expandX();
             return;
         }
 
-        List<String> filtered = new ArrayList<>();
-        for (String reason : reasons) {
+        Map<String, Integer> filtered = new HashMap<>();
+        for (Map.Entry<String, Integer> e : reasons.entrySet()) {
+            String reason = e.getKey();
             if (reason.startsWith("List ")) continue;
             if (ENTITY_ICONS.containsKey(reason)) continue;
-            filtered.add(reason);
+            filtered.put(reason, e.getValue());
         }
-        filtered.sort(Comparator.naturalOrder());
 
         if (filtered.isEmpty()) {
             section.add(theme.label("No trigger data for this LevelChunk")).expandX();
             return;
         }
 
+        List<Map.Entry<String, Integer>> sorted = new ArrayList<>(filtered.entrySet());
+        sorted.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
+
         WTable triggerTable = section.add(theme.table()).expandX().widget();
-        for (String reason : filtered) {
+        for (Map.Entry<String, Integer> entry : sorted) {
+            String reason = entry.getKey();
+            int count = entry.getValue();
             ItemStack icon = TRIGGER_ICONS.getOrDefault(reason, new ItemStack(Items.REDSTONE_TORCH));
             triggerTable.add(theme.item(icon));
-            triggerTable.add(theme.label(reason)).expandX();
+            String label = reason + (count > 1 ? " x" + count : "");
+            triggerTable.add(theme.label(label)).expandX();
             triggerTable.row();
         }
     }

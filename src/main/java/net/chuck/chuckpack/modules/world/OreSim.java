@@ -17,11 +17,15 @@ import meteordevelopment.meteorclient.events.world.ChunkDataEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.gui.GuiTheme;
 import meteordevelopment.meteorclient.gui.widgets.WWidget;
+import baritone.api.BaritoneAPI;
+import baritone.api.IBaritone;
 import meteordevelopment.meteorclient.pathing.BaritoneUtils;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.render.Xray;
 import meteordevelopment.meteorclient.utils.Utils;
+import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -33,6 +37,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -75,14 +81,14 @@ public class OreSim extends Module {
         .defaultValue(AirCheck.RECHECK)
         .build());
 
-    private final Setting<Boolean> baritone = sgGeneral.add(new BoolSetting.Builder()
+    private final Setting<Boolean> baritoneSetting = sgGeneral.add(new BoolSetting.Builder()
         .name("baritone")
         .description("Set baritone ore positions to the simulated ones.")
         .defaultValue(true)
         .build());
 
     public boolean baritone() {
-        return isActive() && baritone.get() && BaritoneUtils.IS_AVAILABLE;
+        return isActive() && baritoneSetting.get() && BaritoneUtils.IS_AVAILABLE;
     }
 
     @Override
@@ -165,7 +171,67 @@ public class OreSim extends Module {
         if (baritone()) {
             oreGoals.clear();
             oreGoals.addAll(getBaritoneGoals());
+            // Inject into Baritone MineProcess for anti-xray bypass
+            injectBaritoneGoals();
         }
+    }
+
+    private void injectBaritoneGoals() {
+        if (oreGoals.isEmpty()) return;
+        try {
+            IBaritone ib = BaritoneAPI.getProvider().getPrimaryBaritone();
+            if (ib == null) return;
+            Object mineProcess = ib.getMineProcess();
+            if (mineProcess == null) return;
+            java.lang.reflect.Method isActive = mineProcess.getClass().getMethod("isActive");
+            boolean active = (boolean) isActive.invoke(mineProcess);
+            if (!active) return;
+            // Find filter for precise ore filtering
+            Object filter = null;
+            for (java.lang.reflect.Field f : mineProcess.getClass().getDeclaredFields()) {
+                if (f.getType().getName().contains("BlockOptionalMetaLookup")) {
+                    f.setAccessible(true);
+                    filter = f.get(mineProcess);
+                    break;
+                }
+            }
+            if (filter == null) {
+                // Fallback: try any field that looks like filter
+                for (java.lang.reflect.Field f : mineProcess.getClass().getDeclaredFields()) {
+                    f.setAccessible(true);
+                    Object val = f.get(mineProcess);
+                    if (val != null && val.getClass().getName().contains("BlockOptionalMetaLookup")) {
+                        filter = val;
+                        break;
+                    }
+                }
+            }
+            List<BlockPos> toInject = filter != null ? getBaritoneGoalsForFilter(filter) : oreGoals;
+            if (toInject.isEmpty()) return;
+            for (java.lang.reflect.Field f : mineProcess.getClass().getDeclaredFields()) {
+                if (java.util.List.class.isAssignableFrom(f.getType())) {
+                    f.setAccessible(true);
+                    Object val = f.get(mineProcess);
+                    if (val instanceof List) {
+                        String typeStr = f.getGenericType().toString();
+                        if (typeStr.contains("BlockPos") || typeStr.contains("class_2338")) {
+                            List<BlockPos> list = (List<BlockPos>) val;
+                            if (list != null) {
+                                for (BlockPos pos : toInject) {
+                                    if (!list.contains(pos)) list.add(pos);
+                                }
+                                if (list.size() > 64) {
+                                    BlockPos playerPos = mc.player.blockPosition();
+                                    list.sort(java.util.Comparator.comparingDouble(p -> p.distSqr(playerPos)));
+                                    while (list.size() > 64) list.remove(list.size() - 1);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
     }
 
     /**
@@ -202,6 +268,127 @@ public class OreSim extends Module {
         BlockPos playerPos = mc.player.blockPosition();
         goals.sort(Comparator.comparingDouble(pos -> pos.distSqr(playerPos)));
         return goals;
+    }
+
+    // Filtered goals for Baritone - only return ores that match requested blocks (for anti-xray bypass)
+    public List<BlockPos> getBaritoneGoalsForBlocks(Set<Block> requestedBlocks) {
+        if (mc.player == null || oreConfig == null || requestedBlocks == null || requestedBlocks.isEmpty()) {
+            return getBaritoneGoals();
+        }
+        // Map ore setting name to blocks
+        Set<String> oreNamesForFilter = new HashSet<>();
+        for (Block block : requestedBlocks) {
+            String blockName = block.toString(); // will be filtered via registry name check below
+            // Fallback via registry key string contains
+            String keyStr = block.toString().toLowerCase();
+            // Use hardcoded mapping to ore names
+            if (keyStr.contains("coal")) oreNamesForFilter.add("Coal");
+            else if (keyStr.contains("iron")) oreNamesForFilter.add("Iron");
+            else if (keyStr.contains("gold")) oreNamesForFilter.add("Gold");
+            else if (keyStr.contains("redstone")) oreNamesForFilter.add("Redstone");
+            else if (keyStr.contains("diamond")) oreNamesForFilter.add("Diamond");
+            else if (keyStr.contains("lapis")) oreNamesForFilter.add("Lapis");
+            else if (keyStr.contains("copper")) oreNamesForFilter.add("Copper");
+            else if (keyStr.contains("emerald")) oreNamesForFilter.add("Emerald");
+            else if (keyStr.contains("quartz")) oreNamesForFilter.add("Quartz");
+            else if (keyStr.contains("debris") || keyStr.contains("ancient")) oreNamesForFilter.add("Ancient Debris");
+        }
+        // Also check via Ore settings directly
+        Set<BlockPos> filtered = new HashSet<>();
+        for (long chunkKey : chunkRenderers.keySet()) {
+            Map<Ore, Set<Vec3>> chunk = chunkRenderers.get(chunkKey);
+            if (chunk == null) continue;
+            for (Map.Entry<Ore, Set<Vec3>> entry : chunk.entrySet()) {
+                Ore ore = entry.getKey();
+                if (!ore.active.get()) continue;
+                String oreName = ore.active.name; // "Coal", "Iron" etc.
+                if (!oreNamesForFilter.isEmpty() && !oreNamesForFilter.contains(oreName)) continue;
+                for (Vec3 v : entry.getValue()) {
+                    filtered.add(BlockPos.containing(v.x, v.y, v.z));
+                }
+            }
+        }
+        ArrayList<BlockPos> goals = new ArrayList<>(filtered);
+        BlockPos playerPos = mc.player.blockPosition();
+        goals.sort(Comparator.comparingDouble(pos -> pos.distSqr(playerPos)));
+        return goals;
+    }
+
+    public List<BlockPos> getBaritoneGoalsForFilter(Object blockOptionalMetaLookup) {
+        if (blockOptionalMetaLookup == null) return getBaritoneGoals();
+        try {
+            // Use reflection to get filter blocks without hard API dependency
+            java.lang.reflect.Method blocksMethod = blockOptionalMetaLookup.getClass().getMethod("blocks");
+            Collection<?> blocks = (Collection<?>) blocksMethod.invoke(blockOptionalMetaLookup);
+            Set<Block> requested = new HashSet<>();
+            for (Object bom : blocks) {
+                java.lang.reflect.Method getBlock = bom.getClass().getMethod("getBlock");
+                Block b = (Block) getBlock.invoke(bom);
+                if (b != null) requested.add(b);
+            }
+            return getBaritoneGoalsForBlocks(requested);
+        } catch (Throwable t) {
+            return getBaritoneGoals();
+        }
+    }
+
+    // Swarm helper: enable/disable ores by name, with sync
+    public static void handleSwarmSimulate(String[] oreArgs, boolean isSwarm) {
+        OreSim oreSim = Modules.get().get(OreSim.class);
+        if (oreSim == null) {
+            ChatUtils.error("OreSim not found");
+            return;
+        }
+        if (!oreSim.isActive()) oreSim.toggle();
+        // If no args, just enable OreSim with current settings
+        if (oreArgs == null || oreArgs.length == 0 || (oreArgs.length == 1 && oreArgs[0].isBlank())) {
+            ChatUtils.info("OreSim enabled (all active ores)");
+            if (isSwarm) oreSim.info("OreSim enabled via swarm");
+            return;
+        }
+        // Parse ore names, support comma or space separated
+        Set<String> requested = new HashSet<>();
+        for (String arg : oreArgs) {
+            if (arg == null) continue;
+            for (String part : arg.split("[,\\s]+")) {
+                if (!part.isBlank()) requested.add(part.trim().toLowerCase(Locale.ROOT));
+            }
+        }
+        // If contains "all", enable all
+        if (requested.contains("all")) {
+            Ore.oreSettings.forEach(s -> s.set(true));
+            ChatUtils.info("OreSim: all ores enabled");
+            return;
+        }
+        // Map lower name to setting
+        Map<String, Setting<Boolean>> nameToSetting = new HashMap<>();
+        for (Setting<Boolean> s : Ore.oreSettings) {
+            nameToSetting.put(s.name.toLowerCase(Locale.ROOT), s);
+            // also handle aliases without space
+            nameToSetting.put(s.name.toLowerCase(Locale.ROOT).replace(" ", "" ), s);
+            nameToSetting.put(s.name.toLowerCase(Locale.ROOT).replace(" ", "_"), s);
+            if (s.name.equalsIgnoreCase("Ancient Debris")) {
+                nameToSetting.put("debris", s);
+                nameToSetting.put("ancientdebris", s);
+                nameToSetting.put("ancient_debris", s);
+            }
+        }
+        // Enable requested, disable others? User wants to pick which ores to simulate - enable selected, keep others as is or disable?
+        // We'll enable requested and disable non-requested if user provided list (to match "pick which ores")
+        boolean anyMatched = false;
+        for (String req : requested) {
+            Setting<Boolean> s = nameToSetting.get(req);
+            if (s != null) {
+                s.set(true);
+                anyMatched = true;
+            } else {
+                ChatUtils.warning("Unknown ore: " + req + " (valid: coal, iron, gold, redstone, diamond, lapis, copper, emerald, quartz, debris, all)");
+            }
+        }
+        if (anyMatched) {
+            // Optionally disable ores not in list? For now keep others as is, but inform
+            ChatUtils.info("OreSim simulate enabled for: " + String.join(", ", requested));
+        }
     }
 
     @Override

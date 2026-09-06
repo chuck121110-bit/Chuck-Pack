@@ -110,14 +110,14 @@ public class BaseFinder extends Module {
             .build()
     );
     private final Setting<Boolean> autoChunkDelete = sgGeneral.add(new BoolSetting.Builder()
-            .name("Auto LevelChunk Delete")
-            .description("Automatically stops flagging a LevelChunk as a base once you have spent enough time near it.")
+            .name("Auto delete flagged chunks")
+            .description("Automatically stops flagging a chunk as a base once you have spent enough time near it.")
             .defaultValue(false)
             .build()
     );
     private final Setting<Integer> chunkDeleteDelay = sgGeneral.add(new IntSetting.Builder()
-            .name("LevelChunk Delete Delay")
-            .description("How many seconds you must continuously stay within the delete radius of a flagged LevelChunk before it is removed.")
+            .name("Delete time")
+            .description("How many seconds you must continuously stay within the delete radius of a flagged chunk before it is removed.")
             .min(1)
             .sliderRange(1, 60)
             .defaultValue(2)
@@ -125,8 +125,8 @@ public class BaseFinder extends Module {
             .build()
     );
     private final Setting<Integer> chunkDeleteRadius = sgGeneral.add(new IntSetting.Builder()
-            .name("LevelChunk Delete Radius")
-            .description("How close in chunks you need to be to a flagged LevelChunk for its delete timer to count.")
+            .name("Delete radius")
+            .description("How close in chunks you need to be to a flagged chunk for its delete timer to count.")
             .min(0)
             .sliderRange(0, 20)
             .defaultValue(1)
@@ -815,19 +815,19 @@ public class BaseFinder extends Module {
     private ChunkPos basepos;
     private BlockPos blockposi;
     private final Set<ChunkPos> baseChunks = Collections.synchronizedSet(new HashSet<>());
-    // Chunks that Auto LevelChunk Delete has removed. Kept separate from baseChunks
+    // Chunks that Auto delete flagged chunks has removed. Kept separate from baseChunks
     // (which represents "currently flagged") so detection logic can permanently
     // skip these instead of re-flagging them on the very next scan pass.
-    // Chunks that Auto LevelChunk Delete has removed, suppressed only while the
+    // Chunks that Auto delete flagged chunks has removed, suppressed only while the
     // LevelChunk stays loaded on the client. The moment a suppressed LevelChunk unloads
     // (player moves far enough away), it's dropped from this set with no
     // memory kept - if it loads again later, it gets scanned completely
-    // fresh, exactly as if Auto LevelChunk Delete never touched it.
+    // fresh, exactly as if Auto delete flagged chunks never touched it.
     private final Set<ChunkPos> suppressedChunks = Collections.synchronizedSet(new HashSet<>());
-    private final java.util.Map<ChunkPos, Set<String>> chunkTriggerReasons = Collections.synchronizedMap(new java.util.LinkedHashMap<>());
+    private final java.util.Map<ChunkPos, Map<String, Integer>> chunkTriggerReasons = Collections.synchronizedMap(new java.util.LinkedHashMap<>());
     // Tracks how many consecutive ticks the player has continuously stayed
-    // within LevelChunk Delete Radius of each flagged LevelChunk. Reset to 0 the moment
-    // the player leaves range, per LevelChunk Delete Delay setting.
+    // within Delete radius of each flagged LevelChunk. Reset to 0 the moment
+    // the player leaves range, per Delete time setting.
     private final Map<ChunkPos, Integer> chunkDeleteProgress = new HashMap<>();
     private static int isBaseFinderModuleOn=0;
     private int autoreloadticks=0;
@@ -868,14 +868,14 @@ public class BaseFinder extends Module {
     }
 
     private void addTrigger(ChunkPos pos, String reason) {
-        chunkTriggerReasons.computeIfAbsent(pos, k -> Collections.synchronizedSet(new HashSet<>())).add(reason);
+        chunkTriggerReasons.computeIfAbsent(pos, k -> Collections.synchronizedMap(new HashMap<>())).merge(reason, 1, Integer::sum);
     }
 
     private void notifyBaseFound(ChunkPos pos) {
         if (!baseNotifier.get()) return;
         MutableComponent openGuiBtn = Component.literal("[Open GUI]")
             .setStyle(Style.EMPTY
-                .withColor(ChatFormatting.GRAY)
+                .withColor(ChatFormatting.DARK_GRAY)
                 .withUnderlined(true)
                 .withHoverEvent(new HoverEvent.ShowText(Component.literal("Open flagged chunks GUI")))
                 .withClickEvent(new ClickEvent.RunCommand(".openflaggedchunks")));
@@ -1859,7 +1859,7 @@ public class BaseFinder extends Module {
                 if (newlyFound && baseNotifier.get()) {
                     MutableComponent openGuiBtn = Component.literal("[Open GUI]")
                         .setStyle(Style.EMPTY
-                            .withColor(ChatFormatting.GRAY)
+                            .withColor(ChatFormatting.DARK_GRAY)
                             .withUnderlined(true)
                             .withHoverEvent(new HoverEvent.ShowText(Component.literal("Open flagged chunks GUI")))
                             .withClickEvent(new ClickEvent.RunCommand(".openflaggedchunks")));
@@ -1993,9 +1993,9 @@ public class BaseFinder extends Module {
 
     /**
      * Checks every currently flagged LevelChunk independently: if the player is
-     * within LevelChunk Delete Radius of a flagged LevelChunk, its progress counter
+     * within Delete radius of a flagged LevelChunk, its progress counter
      * increments; otherwise it resets to 0. Chunks that reach the full
-     * LevelChunk Delete Delay (in ticks) get removed. Multiple chunks can be in
+     * Delete time (in ticks) get removed. Multiple chunks can be in
      * range and progressing/deleting at the same time — only chunks the
      * player is actually within radius of are ever touched.
      */

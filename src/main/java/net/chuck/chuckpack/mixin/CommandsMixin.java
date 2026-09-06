@@ -91,6 +91,118 @@ public class CommandsMixin {
             }
             ci.cancel();
         }
+        // Swarm OreSim simulate - host side: enable locally and broadcast to workers
+        if (lower.equals("swarm simulate") || lower.startsWith("swarm simulate ") || lower.equals("swarm oresim") || lower.startsWith("swarm oresim ") || lower.equals("swarm orsim") || lower.startsWith("swarm orsim ")) {
+            String args = "";
+            try {
+                if (lower.startsWith("swarm simulate")) args = message.substring("swarm simulate".length()).trim();
+                else if (lower.startsWith("swarm oresim")) args = message.substring("swarm oresim".length()).trim();
+                else if (lower.startsWith("swarm orsim")) args = message.substring("swarm orsim".length()).trim();
+            } catch (Throwable ignored) {}
+            final String fArgs = args;
+            // Broadcast to workers
+            try {
+                Swarm swarm = Modules.get().get(Swarm.class);
+                if (swarm != null && swarm.isHost() && swarm.host != null) {
+                    String msg = fArgs.isEmpty() ? "swarm ChuckPack-oresim" : "swarm ChuckPack-oresim " + fArgs;
+                    swarm.host.sendMessage(msg);
+                    ChatUtils.infoPrefix("Swarm", fArgs.isEmpty() ? "Sent OreSim enable to workers" : "Sent OreSim simulate to workers: " + fArgs);
+                }
+            } catch (Throwable ignored) {}
+            // Execute locally
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null) {
+                mc.execute(() -> {
+                    try {
+                        String[] split = fArgs.isEmpty() ? new String[0] : fArgs.split("\\s+");
+                        net.chuck.chuckpack.modules.world.OreSim.handleSwarmSimulate(split, false);
+                    } catch (Throwable t) {
+                        ChatUtils.error("OreSim swarm failed: " + t.getMessage());
+                    }
+                });
+            }
+            ci.cancel();
+        }
+        // Swarm seed - host side: set seed locally and broadcast to workers
+        if (lower.equals("swarm seed") || lower.startsWith("swarm seed ")) {
+            String args = "";
+            try {
+                args = message.substring("swarm seed".length()).trim();
+            } catch (Throwable ignored) {}
+            final String fArgs = args;
+            // Broadcast to workers
+            try {
+                Swarm swarm = Modules.get().get(Swarm.class);
+                if (swarm != null && swarm.isHost() && swarm.host != null) {
+                    String msg = fArgs.isEmpty() ? "swarm ChuckPack-seed" : "swarm ChuckPack-seed " + fArgs;
+                    swarm.host.sendMessage(msg);
+                    ChatUtils.infoPrefix("Swarm", fArgs.isEmpty() ? "Sent seed request to workers" : "Sent seed to workers: " + fArgs);
+                }
+            } catch (Throwable ignored) {}
+            // Execute locally - use same logic as SeedCommand
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null) {
+                mc.execute(() -> {
+                    try {
+                        if (fArgs.isEmpty()) {
+                            // Show current seed
+                            var seed = net.chuck.chuckpack.util.config.Seeds.get().getSeed();
+                            if (seed != null) ChatUtils.info("Seed: " + seed.seed + " (" + seed.version + ")");
+                            else ChatUtils.error("No seed for current world");
+                        } else {
+                            String[] parts = fArgs.split("\\s+");
+                            String seedStr = parts[0];
+                            String ver = parts.length > 1 ? parts[1] : net.chuck.chuckpack.util.config.Seeds.DEFAULT_VERSION;
+                            net.chuck.chuckpack.util.config.Seeds.get().setSeed(seedStr, ver);
+                            ChatUtils.info("Seed set to " + seedStr + " (" + ver + ") via swarm");
+                        }
+                    } catch (Throwable t) {
+                        ChatUtils.error("Swarm seed failed: " + t.getMessage());
+                    }
+                });
+            }
+            ci.cancel();
+        }
+        // Direct ChuckPack-oresim/seed from workers (should be handled in SwarmWorkerMixin, but also handle here for host self)
+        if (lower.equals("swarm chuckpack-oresim") || lower.startsWith("swarm chuckpack-oresim ")) {
+            String args = "";
+            try {
+                args = message.substring("swarm ChuckPack-oresim".length()).trim();
+            } catch (Throwable ignored) {}
+            final String fArgs = args;
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null) {
+                mc.execute(() -> {
+                    try {
+                        String[] split = fArgs.isEmpty() ? new String[0] : fArgs.split("\\s+");
+                        net.chuck.chuckpack.modules.world.OreSim.handleSwarmSimulate(split, true);
+                    } catch (Throwable t) {}
+                });
+            }
+            ci.cancel();
+        }
+        if (lower.equals("swarm chuckpack-seed") || lower.startsWith("swarm chuckpack-seed ")) {
+            String args = "";
+            try {
+                args = message.substring("swarm ChuckPack-seed".length()).trim();
+            } catch (Throwable ignored) {}
+            final String fArgs = args;
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null) {
+                mc.execute(() -> {
+                    try {
+                        if (!fArgs.isEmpty()) {
+                            String[] parts = fArgs.split("\\s+");
+                            String seedStr = parts[0];
+                            String ver = parts.length > 1 ? parts[1] : net.chuck.chuckpack.util.config.Seeds.DEFAULT_VERSION;
+                            net.chuck.chuckpack.util.config.Seeds.get().setSeed(seedStr, ver);
+                            ChatUtils.info("Seed set via swarm: " + seedStr);
+                        }
+                    } catch (Throwable ignored) {}
+                });
+            }
+            ci.cancel();
+        }
     }
 }
 

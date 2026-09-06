@@ -11,12 +11,10 @@ public class ChuckPackConfigModifier {
 
     public static final SettingGroup sgChuckPack = Config.get().settings.createGroup("Chuck Pack");
 
-    // TEMP TEST: hidden for updater test 1.0.9 — remove separate-category button so you can verify auto-update by checking if button gone
     public final Setting<Boolean> separateCategory = sgChuckPack.add(new BoolSetting.Builder()
         .name("separate-category")
         .description("Moves all Chuck Pack modules into their own 'Chuck Pack' category instead of their natural categories.")
         .defaultValue(false)
-        .visible(() -> false)
         .onChanged(ChuckPackConfigModifier::onSeparateCategoryChanged)
         .build()
     );
