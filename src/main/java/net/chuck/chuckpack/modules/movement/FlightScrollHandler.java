@@ -11,13 +11,23 @@ import meteordevelopment.meteorclient.systems.modules.movement.Flight;
 import meteordevelopment.meteorclient.systems.modules.render.Freecam;
 import meteordevelopment.orbit.EventHandler;
 
+import com.mojang.blaze3d.platform.InputConstants;
+import org.lwjgl.glfw.GLFW;
+
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 public class FlightScrollHandler {
     @EventHandler
     private void onMouseScroll(MouseScrollEvent event) {
         if (mc.screen != null) return;
-        if (!mc.options.keyShift.isDown()) return;
+        // Robust shift detection: Window direct check (left/right) + key mapping fallback. Fixes hot switches and no speed change.
+        boolean shiftHeld = false;
+        try {
+            shiftHeld = InputConstants.isKeyDown(mc.getWindow(), InputConstants.KEY_LSHIFT) || InputConstants.isKeyDown(mc.getWindow(), InputConstants.KEY_RSHIFT) || mc.options.keyShift.isDown();
+        } catch (Throwable t) {
+            shiftHeld = mc.options.keyShift.isDown();
+        }
+        if (!shiftHeld) return;
 
         Module flight = Modules.get().get(Flight.class);
         if (flight == null || !flight.isActive()) return;
