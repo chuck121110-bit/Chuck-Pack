@@ -50,13 +50,7 @@ import java.util.Map;
 public class ChuckPack extends MeteorAddon {
     public static final Logger LOG = LoggerFactory.getLogger("ChuckPack");
 
-    public static final Category CHUCK_CATEGORY = new Category("Chuck Pack", () -> {
-        try {
-            return Items.EMERALD.getDefaultInstance();
-        } catch (Throwable ignored) {
-            return ItemStack.EMPTY;
-        }
-    });
+    public static final Category CHUCK_CATEGORY = new Category("Chuck Pack", () -> new ItemStack(Items.EMERALD));
 
     private static final List<Module> aeroModules = new ArrayList<>();
     private static final Map<Module, Category> naturalCategories = new LinkedHashMap<>();
