@@ -1,18 +1,8 @@
 package net.chuck.chuckpack.modules.misc.villagerroller;
 
 import it.unimi.dsi.fastutil.Pair;
-import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectIntImmutablePair;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import net.chuck.chuckpack.modules.misc.villagerroller.EnchantmentSelectScreen;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.events.entity.player.InteractEntityEvent;
 import meteordevelopment.meteorclient.events.entity.player.StartBreakingBlockEvent;
@@ -33,6 +23,7 @@ import meteordevelopment.meteorclient.gui.widgets.pressable.WMinus;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.meteorclient.utils.misc.ISerializable;
 import meteordevelopment.meteorclient.utils.misc.Names;
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
@@ -54,7 +45,6 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundMerchantOffersPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -70,7 +60,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.EnchantmentInstance;
-import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.block.Block;
@@ -87,91 +76,201 @@ import java.nio.file.Path;
 import java.util.*;
 
 public class VillagerRoller extends Module {
-    private static final Path CONFIG_PATH = MeteorClient.FOLDER.toPath().resolve("VillagerRoller");
-
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgSound = settings.createGroup("Sound");
     private final SettingGroup sgChatFeedback = settings.createGroup("Chat feedback", false);
 
     private final Setting<Boolean> disableIfFound = sgGeneral.add(new BoolSetting.Builder()
-        .name("disable-when-found").description("Disable enchantment from list if found")
-        .defaultValue(true).build());
+        .name("disable-when-found")
+        .description("Disable enchantment from list if found")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> disconnectIfFound = sgGeneral.add(new BoolSetting.Builder()
-        .name("disconnect-when-found").description("Disconnect from server when enchantment from list if found")
-        .defaultValue(false).build());
+        .name("disconnect-when-found")
+        .description("Disconnect from server when enchantment from list if found")
+        .defaultValue(false)
+        .build()
+    );
+
     private final Setting<Boolean> saveListToConfig = sgGeneral.add(new BoolSetting.Builder()
-        .name("save-list-to-config").description("Toggles saving and loading of rolling list to config and copypaste buffer")
-        .defaultValue(true).build());
+        .name("save-list-to-config")
+        .description("Toggles saving and loading of rolling list to config and copypaste buffer")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> enablePlaySound = sgGeneral.add(new BoolSetting.Builder()
-        .name("enable-sound").description("Plays sound when it finds desired trade")
-        .defaultValue(true).build());
+        .name("enable-sound")
+        .description("Plays sound when it finds desired trade")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<List<SoundEvent>> sound = sgSound.add(new SoundEventListSetting.Builder()
-        .name("sound-to-play").description("Sound that will be played when desired trade is found if enabled")
-        .defaultValue(Collections.singletonList(SoundEvents.AMETHYST_CLUSTER_BREAK)).build());
+        .name("sound-to-play")
+        .description("Sound that will be played when desired trade is found if enabled")
+        .defaultValue(Collections.singletonList(SoundEvents.AMETHYST_CLUSTER_BREAK))
+        .build()
+    );
+
     private final Setting<Double> soundPitch = sgSound.add(new DoubleSetting.Builder()
-        .name("sound-pitch").description("Playing sound pitch")
-        .defaultValue(1.0).min(0).sliderRange(0, 8).build());
+        .name("sound-pitch")
+        .description("Playing sound pitch")
+        .defaultValue(1.0)
+        .min(0)
+        .sliderRange(0, 8)
+        .build()
+    );
+
     private final Setting<Double> soundVolume = sgSound.add(new DoubleSetting.Builder()
-        .name("sound-volume").description("Playing sound volume")
-        .defaultValue(1.0).min(0).sliderRange(0, 1).build());
+        .name("sound-volume")
+        .description("Playing sound volume")
+        .defaultValue(1.0)
+        .min(0)
+        .sliderRange(0, 1)
+        .build()
+    );
+
     private final Setting<Boolean> pauseOnScreen = sgGeneral.add(new BoolSetting.Builder()
-        .name("pause-on-screens").description("Pauses rolling if any screen is open")
-        .defaultValue(true).build());
+        .name("pause-on-screens")
+        .description("Pauses rolling if any screen is open")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> headRotateOnPlace = sgGeneral.add(new BoolSetting.Builder()
-        .name("rotate-place").description("Look to the block while placing it?")
-        .defaultValue(true).build());
+        .name("rotate-place")
+        .description("Look to the block while placing it?")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Integer> failedToPlaceDelay = sgGeneral.add(new IntSetting.Builder()
-        .name("place-fail-delay").description("Delay after failed block place (milliseconds)")
-        .defaultValue(1500).min(0).sliderRange(0, 10000).build());
+        .name("place-fail-delay")
+        .description("Delay after failed block place (milliseconds)")
+        .defaultValue(1500)
+        .min(0)
+        .sliderRange(0, 10000)
+        .build()
+    );
+
     private final Setting<Boolean> failedToPlaceDisable = sgGeneral.add(new BoolSetting.Builder()
-        .name("place-fail-disable").description("Disables roller if block placement fails")
-        .defaultValue(false).build());
+        .name("place-fail-disable")
+        .description("Disables roller if block placement fails")
+        .defaultValue(false)
+        .build()
+    );
+
     private final Setting<Integer> maxProfessionWaitTime = sgGeneral.add(new IntSetting.Builder()
-        .name("max-profession-wait-time").description("Time to wait if villager does not take profession (milliseconds). Zero = unlimited.")
-        .defaultValue(0).min(0).sliderRange(0, 10000).build());
+        .name("max-profession-wait-time")
+        .description("Time to wait if villager does not take profession (milliseconds). Zero = unlimited.")
+        .defaultValue(0)
+        .min(0)
+        .sliderRange(0, 10000)
+        .build()
+    );
+
     private final Setting<Boolean> onlyTradeable = sgGeneral.add(new BoolSetting.Builder()
-        .name("only-tradeable").description("Hide enchantments that are not marked as tradeable")
-        .defaultValue(false).build());
+        .name("only-tradeable")
+        .description("Hide enchantments that are not marked as tradeable")
+        .defaultValue(false)
+        .build()
+    );
+
     private final Setting<Boolean> sortEnchantments = sgGeneral.add(new BoolSetting.Builder()
-        .name("sort-enchantments").description("Show enchantments sorted by their name")
-        .defaultValue(true).build());
+        .name("sort-enchantments")
+        .description("Show enchantments sorted by their name")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> instantRebreak = sgGeneral.add(new BoolSetting.Builder()
-        .name("CivBreak").description("Uses CivBreak to mine the lectern instantly. Best to just stay over the lectern slot.")
-        .defaultValue(false).build());
+        .name("CivBreak")
+        .description("Uses CivBreak to mine the lectern instantly. Best to just stay over the lectern slot.")
+        .defaultValue(false)
+        .build()
+    );
+
     private final Setting<Integer> interactRetry = sgGeneral.add(new IntSetting.Builder()
-        .name("interact-retry").description("If server did not acknowledge villager interact packet, send another one after this many ticks. Zero = no retries.")
-        .defaultValue(0).min(0).sliderRange(0, 200).build());
+        .name("interact-retry")
+        .description("If server did not acknowledge villager interact packet, send another one after this many ticks. Zero = no retries.")
+        .defaultValue(0)
+        .min(0)
+        .sliderRange(0, 200)
+        .build()
+    );
 
     private final Setting<Boolean> cfSetup = sgChatFeedback.add(new BoolSetting.Builder()
-        .name("setup").description("Hints on what to do in the beginning (otherwise denoted in modules list state)")
-        .defaultValue(true).build());
+        .name("setup")
+        .description("Hints on what to do in the beginning (otherwise denoted in modules list state)")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> cfPausedOnScreen = sgChatFeedback.add(new BoolSetting.Builder()
-        .name("paused-on-screen").description("Rolling paused, interact with villager to continue")
-        .defaultValue(true).build());
+        .name("paused-on-screen")
+        .description("Rolling paused, interact with villager to continue")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> cfLowerLevel = sgChatFeedback.add(new BoolSetting.Builder()
-        .name("found-lower-level").description("Found enchant %s but it is not max level: %d (max) > %d (found)")
-        .defaultValue(true).build());
+        .name("found-lower-level")
+        .description("Found enchant %s but it is not max level: %d (max) > %d (found)")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> cfTooExpensive = sgChatFeedback.add(new BoolSetting.Builder()
-        .name("found-too-expensive").description("Found enchant %s but it costs too much: %s (max price) < %d (cost)")
-        .defaultValue(true).build());
+        .name("found-too-expensive")
+        .description("Found enchant %s but it costs too much: %s (max price) < %d (cost)")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> cfIgnored = sgChatFeedback.add(new BoolSetting.Builder()
-        .name("found-not-on-the-list").description("Found enchant %s but it is not in the list.")
-        .defaultValue(true).build());
+        .name("found-not-on-the-list")
+        .description("Found enchant %s but it is not in the list.")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> cfProfessionTimeout = sgChatFeedback.add(new BoolSetting.Builder()
-        .name("profession-timeout").description("Villager did not take profession within the specified time")
-        .defaultValue(true).build());
+        .name("profession-timeout")
+        .description("Villager did not take profession within the specified time")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> cfPlaceFailed = sgChatFeedback.add(new BoolSetting.Builder()
-        .name("place-failed").description("Failed placing, can't place or can't get lectern to hotbar (they still trigger place-failed settings)")
-        .defaultValue(true).build());
+        .name("place-failed")
+        .description("Failed placing, can't place or can't get lectern to hotbar (they still trigger place-failed settings)")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> cfDiscrepancy = sgChatFeedback.add(new BoolSetting.Builder()
-        .name("discrepancy").description("Somehow roller got into state it was not expecting (likely AC mess)")
-        .defaultValue(true).build());
+        .name("discrepancy")
+        .description("Somehow roller got into state it was not expecting (likely AC mess)")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> cfSentRetryInteract = sgChatFeedback.add(new BoolSetting.Builder()
-        .name("sent-retry-interact").description("Lets you know server dropping initial interact packets and additional was sent.")
-        .defaultValue(true).build());
+        .name("sent-retry-interact")
+        .description("Lets you know server dropping initial interact packets and additional was sent.")
+        .defaultValue(true)
+        .build()
+    );
+
     private final Setting<Boolean> cfBlockPlaceBounce = sgChatFeedback.add(new BoolSetting.Builder()
-        .name("block-place-bounce").description("Lets you know if placement was momentarily reverted and then placed again.")
-        .defaultValue(true).build());
+        .name("block-place-bounce")
+        .description("Lets you know if placement was momentarily reverted and then placed again.")
+        .defaultValue(true)
+        .build()
+    );
 
     private enum State {
         DISABLED,
@@ -184,6 +283,7 @@ public class VillagerRoller extends Module {
         ROLLING_WAITING_FOR_VILLAGER_TRADES
     }
 
+    private static final Path CONFIG_PATH = MeteorClient.FOLDER.toPath().resolve("VillagerRoller");
     private State currentState = State.DISABLED;
     private Villager rollingVillager;
     private BlockPos rollingBlockPos;
@@ -191,7 +291,6 @@ public class VillagerRoller extends Module {
     private final List<RollingEnchantment> searchingEnchants = new ArrayList<>();
     private long failedToPlacePrevMsg = System.currentTimeMillis();
     private long currentProfessionWaitTime;
-    private long waitingForTradesTicks = 0;
 
     public VillagerRoller() {
         super(Categories.Misc, "villager-roller", "Rolls trades.");
@@ -238,10 +337,10 @@ public class VillagerRoller extends Module {
     public Module fromTag(CompoundTag tag) {
         super.fromTag(tag);
         if (saveListToConfig.get()) {
-            ListTag l = tag.getList("rolling").orElse(new ListTag());
+            ListTag l = tag.getListOrEmpty("rolling");
             searchingEnchants.clear();
             for (Tag e : l) {
-                if (e.getId() != 10) {
+                if (e.getId() != Tag.TAG_COMPOUND) {
                     info("Invalid list element");
                     continue;
                 }
@@ -266,10 +365,10 @@ public class VillagerRoller extends Module {
             error("Failed to load nbt from file");
             return false;
         }
-        ListTag l = r.getList("rolling").orElse(new ListTag());
+        ListTag l = r.getListOrEmpty("rolling");
         searchingEnchants.clear();
         for (Tag e : l) {
-            if (e.getId() != 10) {
+            if (e.getId() != Tag.TAG_COMPOUND) {
                 error("Invalid list element");
                 return false;
             }
@@ -307,7 +406,9 @@ public class VillagerRoller extends Module {
 
     private void fillWidget(GuiTheme theme, WVerticalList list) {
         WSection loadDataSection = list.add(theme.section("Config Saving")).expandX().widget();
+
         WTable control = loadDataSection.add(theme.table()).expandX().widget();
+
         WTextBox savedConfigName = control.add(theme.textBox("default")).expandWidgetX().expandCellX().expandX().widget();
         WButton save = control.add(theme.button("Save")).expandX().widget();
         save.action = () -> {
@@ -316,7 +417,8 @@ public class VillagerRoller extends Module {
             } else {
                 error("Save failed");
             }
-            list.clear(); fillWidget(theme, list);
+            list.clear();
+            fillWidget(theme, list);
         };
         control.row();
 
@@ -337,7 +439,8 @@ public class VillagerRoller extends Module {
             WButton load = control.add(theme.button("Load")).expandX().widget();
             load.action = () -> {
                 if (loadSearchingFromFile(new File(new File(MeteorClient.FOLDER, "VillagerRoller"), loadedConfigName.get() + ".nbt"))) {
-                    list.clear(); fillWidget(theme, list);
+                    list.clear();
+                    fillWidget(theme, list);
                     info("Loaded successfully");
                 } else {
                     error("Failed to load file.");
@@ -346,6 +449,7 @@ public class VillagerRoller extends Module {
         }
 
         WSection enchantments = list.add(theme.section("Enchantments")).expandX().widget();
+
         WTable table = enchantments.add(theme.table()).expandX().widget();
         table.add(theme.item(Items.BOOK.getDefaultInstance()));
         table.add(theme.label("Enchantment"));
@@ -355,8 +459,8 @@ public class VillagerRoller extends Module {
         table.add(theme.label("Remove"));
         table.row();
         if (sortEnchantments.get()) {
-            searchingEnchants.removeIf(ench -> ench.getEnchantment() == null);
-            searchingEnchants.sort(Comparator.comparing(RollingEnchantment::getEnchantment));
+            searchingEnchants.removeIf(ench -> ench.enchantment == null);
+            searchingEnchants.sort(Comparator.comparing(o -> o.enchantment));
         }
 
         Optional<Registry<Enchantment>> reg;
@@ -370,7 +474,7 @@ public class VillagerRoller extends Module {
             RollingEnchantment e = searchingEnchants.get(i);
             Optional<Holder.Reference<Enchantment>> en;
             if (reg.isPresent()) {
-                en = reg.get().get(e.getEnchantment());
+                en = reg.get().get(e.enchantment);
             } else {
                 en = Optional.empty();
             }
@@ -387,34 +491,35 @@ public class VillagerRoller extends Module {
             WButton c = label.add(theme.button("Change")).widget();
             c.action = () -> mc.setScreen(new EnchantmentSelectScreen(theme, onlyTradeable.get(), sel -> {
                 searchingEnchants.set(si, sel);
-                list.clear(); fillWidget(theme, list);
+                list.clear();
+                fillWidget(theme, list);
             }));
             if (en.isPresent()) {
                 label.add(theme.label(Names.get(en.get())));
             } else {
-                label.add(theme.label(e.getEnchantment().toString()));
+                label.add(theme.label(e.enchantment.toString()));
             }
             table.add(label);
 
-            WIntEdit lev = table.add(theme.intEdit(e.getMinLevel(), 0, maxlevel, true)).minWidth(40).expandX().widget();
-            lev.action = () -> e.setMinLevel(lev.get());
+            WIntEdit lev = table.add(theme.intEdit(e.minLevel, 0, maxlevel, true)).minWidth(40).expandX().widget();
+            lev.action = () -> e.minLevel = lev.get();
             lev.tooltip = "Minimum enchantment level, 0 acts as maximum possible only (for custom 0 acts like 1)";
 
             WHorizontalList costbox = table.add(theme.horizontalList()).minWidth(50).expandX().widget();
-            WIntEdit cost = costbox.add(theme.intEdit(e.getMaxCost(), 0, 64, false)).minWidth(40).expandX().widget();
-            cost.action = () -> e.setMaxCost(cost.get());
+            WIntEdit cost = costbox.add(theme.intEdit(e.maxCost, 0, 64, false)).minWidth(40).expandX().widget();
+            cost.action = () -> e.maxCost = cost.get();
             cost.tooltip = "Maximum cost in emeralds, 0 means no limit";
 
             WButton setOptimal = costbox.add(theme.button("O")).widget();
             setOptimal.tooltip = "Set to optimal price (2 + maxLevel*3) (double if treasure) (if known)";
             setOptimal.action = () -> {
                 list.clear();
-                en.ifPresent(enchantmentReference -> e.setMaxCost(RollingEnchantment.getMinimumPrice(enchantmentReference)));
+                en.ifPresent(enchantmentReference -> e.maxCost = getMinimumPrice(enchantmentReference));
                 fillWidget(theme, list);
             };
 
-            WCheckbox enabled = table.add(theme.checkbox(e.isEnabled())).widget();
-            enabled.action = () -> e.setEnabled(enabled.checked);
+            WCheckbox enabled = table.add(theme.checkbox(e.enabled)).widget();
+            enabled.action = () -> e.enabled = enabled.checked;
             enabled.tooltip = "Enabled?";
 
             WMinus del = table.add(theme.minus()).widget();
@@ -427,25 +532,31 @@ public class VillagerRoller extends Module {
         }
 
         WTable controls = list.add(theme.table()).expandX().widget();
+
         WButton removeAll = controls.add(theme.button("Remove all")).expandX().widget();
         removeAll.action = () -> {
-            list.clear(); searchingEnchants.clear(); fillWidget(theme, list);
+            list.clear();
+            searchingEnchants.clear();
+            fillWidget(theme, list);
         };
+
         WButton add = controls.add(theme.button("Add")).expandX().widget();
         add.action = () -> mc.setScreen(new EnchantmentSelectScreen(theme, onlyTradeable.get(), e -> {
-            e.setMinLevel(1); e.setMaxCost(64); e.setEnabled(true);
-            searchingEnchants.add(e); list.clear(); fillWidget(theme, list);
+            e.minLevel = 1;
+            e.maxCost = 64;
+            e.enabled = true;
+            searchingEnchants.add(e);
+            list.clear();
+            fillWidget(theme, list);
         }));
+
         WButton addAll = controls.add(theme.button("Add all")).expandX().widget();
         addAll.action = () -> {
-            list.clear(); searchingEnchants.clear();
+            list.clear();
+            searchingEnchants.clear();
             if (reg.isPresent()) {
-                for (Holder<Enchantment> entry : getEnchants(onlyTradeable.get())) {
-                    Identifier id = entry.unwrapKey().map(ResourceKey::identifier).orElse(null);
-                    if (id != null) {
-                        searchingEnchants.add(new RollingEnchantment(id, entry.value().getMaxLevel(),
-                            RollingEnchantment.getMinimumPrice(entry), true));
-                    }
+                for (Holder<Enchantment> e : getEnchants(onlyTradeable.get())) {
+                    searchingEnchants.add(new RollingEnchantment(reg.get().getKey(e.value()), e.value().getMaxLevel(), getMinimumPrice(e), true));
                 }
             }
             fillWidget(theme, list);
@@ -457,25 +568,26 @@ public class VillagerRoller extends Module {
             list.clear();
             if (reg.isPresent()) {
                 for (RollingEnchantment e : searchingEnchants) {
-                    reg.get().get(e.getEnchantment()).ifPresent(en ->
-                        e.setMaxCost(RollingEnchantment.getMinimumPrice(en)));
+                    reg.get().get(e.enchantment).ifPresent(enchantmentReference -> e.maxCost = getMinimumPrice(enchantmentReference));
                 }
             }
             fillWidget(theme, list);
         };
+
         WButton priceBumpUp = controls.add(theme.button("+1 to price for all")).expandX().widget();
         priceBumpUp.action = () -> {
             list.clear();
             for (RollingEnchantment e : searchingEnchants) {
-                if (e.getMaxCost() < 64) e.setMaxCost(e.getMaxCost() + 1);
+                if (e.maxCost < 64) e.maxCost++;
             }
             fillWidget(theme, list);
         };
+
         WButton priceBumpDown = controls.add(theme.button("-1 to price for all")).expandX().widget();
         priceBumpDown.action = () -> {
             list.clear();
             for (RollingEnchantment e : searchingEnchants) {
-                if (e.getMaxCost() > 0) e.setMaxCost(e.getMaxCost() - 1);
+                if (e.maxCost > 0) e.maxCost--;
             }
             fillWidget(theme, list);
         };
@@ -485,44 +597,59 @@ public class VillagerRoller extends Module {
         setZeroForAll.action = () -> {
             list.clear();
             for (RollingEnchantment e : searchingEnchants) {
-                e.setMaxCost(0);
+                e.maxCost = 0;
             }
             fillWidget(theme, list);
         };
+
         WButton enableAll = controls.add(theme.button("Enable all")).expandX().widget();
         enableAll.action = () -> {
             list.clear();
             for (RollingEnchantment e : searchingEnchants) {
-                e.setEnabled(true);
+                e.enabled = true;
             }
             fillWidget(theme, list);
         };
+
         WButton disableAll = controls.add(theme.button("Disable all")).expandX().widget();
         disableAll.action = () -> {
             list.clear();
             for (RollingEnchantment e : searchingEnchants) {
-                e.setEnabled(false);
+                e.enabled = false;
             }
             fillWidget(theme, list);
         };
         controls.row();
+
     }
 
-    private List<Holder<Enchantment>> getEnchants(boolean onlyTradeable) {
-        if (mc.level == null) return Collections.emptyList();
-        var reg = mc.level.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+    public List<Holder<Enchantment>> getEnchants(boolean onlyTradeable) {
+        if (mc.level == null) {
+            return Collections.emptyList();
+        }
+        var reg = mc.level.registryAccess().lookup(Registries.ENCHANTMENT);
+        if (reg.isEmpty()) {
+            return Collections.emptyList();
+        }
         List<Holder<Enchantment>> available = new ArrayList<>();
         if (onlyTradeable) {
-            var i = reg.getTagOrEmpty(EnchantmentTags.TRADEABLE);
+            var i = reg.get().getTagOrEmpty(EnchantmentTags.TRADEABLE);
             i.iterator().forEachRemaining(available::add);
             return available;
         } else {
-            for (var a : reg.asHolderIdMap()) {
+            for (var a : reg.get().asHolderIdMap()) {
                 available.add(a);
             }
             return available;
         }
     }
+
+    public static int getMinimumPrice(Holder<Enchantment> e) {
+        if (e == null) return 0;
+        return e.is(EnchantmentTags.DOUBLE_TRADE_PRICE) ? (2 + 3 * e.value().getMaxLevel()) * 2 : 2 + 3 * e.value().getMaxLevel();
+    }
+
+    private long waitingForTradesTicks = 0;
 
     public void triggerInteract() {
         if (pauseOnScreen.get() && mc.screen != null) {
@@ -534,6 +661,7 @@ public class VillagerRoller extends Module {
             Vec3 villagerPos = rollingVillager.getEyePosition();
             EntityHitResult entityHitResult = ProjectileUtil.getEntityHitResult(mc.player, playerPos, villagerPos, rollingVillager.getBoundingBox(), Entity::isPickable, playerPos.distanceToSqr(villagerPos));
             if (entityHitResult == null) {
+                // Raycast didn't find villager entity?
                 mc.gameMode.interact(mc.player, rollingVillager, entityHitResult, InteractionHand.MAIN_HAND);
                 waitingForTradesTicks = 0;
             } else {
@@ -546,13 +674,10 @@ public class VillagerRoller extends Module {
         }
     }
 
-    private List<Pair<Holder<Enchantment>, Integer>> getEnchants(ItemStack stack) {
+    public List<Pair<Holder<Enchantment>, Integer>> getEnchants(ItemStack stack) {
         List<Pair<Holder<Enchantment>, Integer>> ret = new ArrayList<>();
-        ItemEnchantments component = stack.get(DataComponents.STORED_ENCHANTMENTS);
-        if (component != null) {
-            for (Object2IntMap.Entry<Holder<Enchantment>> e : component.entrySet()) {
-                ret.add(ObjectIntImmutablePair.of(e.getKey(), e.getIntValue()));
-            }
+        for (var e : EnchantmentHelper.getEnchantmentsForCrafting(stack).entrySet()) {
+            ret.add(ObjectIntImmutablePair.of(e.getKey(), e.getIntValue()));
         }
         return ret;
     }
@@ -573,15 +698,15 @@ public class VillagerRoller extends Module {
             for (Pair<Holder<Enchantment>, Integer> enchant : getEnchants(sellItem)) {
                 int enchantLevel = enchant.right();
                 var reg = mc.level.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
-                String enchantIdString = reg.getKey(enchant.left().value()).toString();
-                String enchantName = Names.get(enchant.left());
+                String enchantIdString = reg.getKey(enchant.key().value()).toString();
+                String enchantName = Names.get(enchant.key());
 
                 boolean found = false;
                 for (RollingEnchantment e : searchingEnchants) {
-                    if (!e.isEnabled() || !e.getEnchantment().toString().equals(enchantIdString)) continue;
+                    if (!e.enabled || !e.enchantment.toString().equals(enchantIdString)) continue;
                     found = true;
-                    if (e.getMinLevel() <= 0) {
-                        int ml = enchant.left().value().getMaxLevel();
+                    if (e.minLevel <= 0) {
+                        int ml = enchant.key().value().getMaxLevel();
                         if (enchantLevel < ml) {
                             if (cfLowerLevel.get()) {
                                 info(String.format("Found enchant %s but it is not max level: %d (max) > %d (found)",
@@ -589,28 +714,28 @@ public class VillagerRoller extends Module {
                             }
                             continue;
                         }
-                    } else if (e.getMinLevel() > enchantLevel) {
+                    } else if (e.minLevel > enchantLevel) {
                         if (cfLowerLevel.get()) {
                             info(String.format("Found enchant %s but it has too low level: %d (requested level) > %d (rolled level)",
-                                enchantName, e.getMinLevel(), enchantLevel));
+                                enchantName, e.minLevel, enchantLevel));
                         }
                         continue;
                     }
-                    if (e.getMaxCost() > 0 && offer.getBaseCostA().getCount() > e.getMaxCost()) {
+                    if (e.maxCost > 0 && offer.getBaseCostA().getCount() > e.maxCost) {
                         if (cfTooExpensive.get()) {
                             info(String.format("Found enchant %s but it costs too much: %s (max price) < %d (cost)",
-                                enchantName, e.getMaxCost(), offer.getBaseCostA().getCount()));
+                                enchantName, e.maxCost, offer.getBaseCostA().getCount()));
                         }
                         continue;
                     }
-                    if (disableIfFound.get()) e.setEnabled(false);
+                    if (disableIfFound.get()) e.enabled = false;
                     toggle();
                     if (enablePlaySound.get() && !sound.get().isEmpty()) {
                         mc.getSoundManager().play(SimpleSoundInstance.forUI(sound.get().get(0),
                             soundPitch.get().floatValue(), soundVolume.get().floatValue()));
                     }
                     if (disconnectIfFound.get()) {
-                        String levelText = (enchantLevel > 1 || enchant.left().value().getMaxLevel() > 1) ? " " + enchantLevel : "";
+                        String levelText = (enchantLevel > 1 || enchant.key().value().getMaxLevel() > 1) ? " " + enchantLevel : "";
                         String message = String.format(
                             "%s[%s%s%s] Found enchant %s%s%s%s for %s%d%s emeralds and automatically disconnected.",
                             ChatFormatting.GRAY,
@@ -660,7 +785,7 @@ public class VillagerRoller extends Module {
         rollingBlock = mc.level.getBlockState(rollingBlockPos).getBlock();
         currentState = State.WAITING_FOR_TARGET_VILLAGER;
         if (instantRebreak.get()) {
-            mc.getConnection().getConnection().send(new ServerboundPlayerActionPacket(ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, rollingBlockPos, Direction.UP));
+            mc.getConnection().send(new ServerboundPlayerActionPacket(ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, rollingBlockPos, Direction.UP));
         }
         if (cfSetup.get()) {
             info("Rolling block selected, now interact with villager you want to roll");
@@ -682,9 +807,10 @@ public class VillagerRoller extends Module {
         switch (currentState) {
             case ROLLING_BREAKING_BLOCK -> {
                 if (instantRebreak.get()) {
-                    mc.getConnection().getConnection().send(new ServerboundPlayerActionPacket(ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, rollingBlockPos, Direction.DOWN));
+                    mc.getConnection().send(new ServerboundPlayerActionPacket(ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, rollingBlockPos, Direction.DOWN));
                 }
                 if (mc.level.getBlockState(rollingBlockPos) == Blocks.AIR.defaultBlockState()) {
+                    // info("Block is broken, waiting for villager to clean profession...");
                     currentState = State.ROLLING_WAITING_FOR_VILLAGER_PROFESSION_CLEAR;
                 } else if (!instantRebreak.get() && !BlockUtils.breakBlock(rollingBlockPos, true)) {
                     error("Can not break specified block");
@@ -701,6 +827,7 @@ public class VillagerRoller extends Module {
                 }
                 rollingVillager.getVillagerData().profession().unwrapKey().ifPresent(profession -> {
                     if (profession == VillagerProfession.NONE) {
+                        // info("Profession cleared");
                         currentState = State.ROLLING_PLACING_BLOCK;
                     }
                 });
@@ -776,6 +903,46 @@ public class VillagerRoller extends Module {
             default -> {
                 // Wait for another state
             }
+        }
+    }
+
+    public static class RollingEnchantment implements ISerializable<RollingEnchantment> {
+        private Identifier enchantment;
+        private int minLevel;
+        private int maxCost;
+        private boolean enabled;
+
+        public RollingEnchantment(Identifier enchantment, int minLevel, int maxCost, boolean enabled) {
+            this.enchantment = enchantment;
+            this.minLevel = minLevel;
+            this.maxCost = maxCost;
+            this.enabled = enabled;
+        }
+
+        public RollingEnchantment() {
+            enchantment = Identifier.fromNamespaceAndPath("minecraft", "protection");
+            minLevel = 0;
+            maxCost = 0;
+            enabled = false;
+        }
+
+        @Override
+        public CompoundTag toTag() {
+            CompoundTag tag = new CompoundTag();
+            tag.putString("enchantment", enchantment.toString());
+            tag.putInt("minLevel", minLevel);
+            tag.putInt("maxCost", maxCost);
+            tag.putBoolean("enabled", enabled);
+            return tag;
+        }
+
+        @Override
+        public RollingEnchantment fromTag(CompoundTag tag) {
+            enchantment = Identifier.tryParse(tag.getStringOr("enchantment", ""));
+            minLevel = tag.getIntOr("minLevel", 1);
+            maxCost = tag.getIntOr("maxCost", 64);
+            enabled = tag.getBooleanOr("enabled", true);
+            return this;
         }
     }
 }
