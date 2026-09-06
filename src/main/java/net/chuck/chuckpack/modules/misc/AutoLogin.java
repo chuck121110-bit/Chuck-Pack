@@ -139,7 +139,18 @@ public class AutoLogin extends Module {
         int firstSpace = command.indexOf(' ');
         if (firstSpace == -1) return;
         String cmdName = command.substring(0, firstSpace);
-        String password = command.substring(firstSpace + 1).trim();
+        String remainder = command.substring(firstSpace + 1).trim();
+        if (remainder.isEmpty()) return;
+        // Handle password extraction: for register-like commands, only first token is password (second is confirm), for login-like, whole remainder (supports spaces)
+        String lowerCmd = cmdName.toLowerCase();
+        boolean isRegister = lowerCmd.equals("register") || lowerCmd.equals("reg");
+        String password;
+        if (isRegister) {
+            int secondSpace = remainder.indexOf(' ');
+            password = secondSpace == -1 ? remainder : remainder.substring(0, secondSpace).trim();
+        } else {
+            password = remainder;
+        }
         if (password.isEmpty()) return;
 
         boolean matched = false;
