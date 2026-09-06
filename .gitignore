@@ -11,6 +11,8 @@ run/
 out/
 *.bat
 AGENTS.md
+FINISHED_LOG.md
+setback-plan.txt
 Source References/
 meteor-client-*/
 build-log*.txt
