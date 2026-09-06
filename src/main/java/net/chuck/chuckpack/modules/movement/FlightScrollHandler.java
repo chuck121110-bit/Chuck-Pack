@@ -17,7 +17,7 @@ public class FlightScrollHandler {
     @EventHandler
     private void onMouseScroll(MouseScrollEvent event) {
         if (mc.screen != null) return;
-        if (!mc.options.keySprint.isDown()) return;
+        if (!mc.options.keyShift.isDown()) return;
 
         Module flight = Modules.get().get(Flight.class);
         if (flight == null || !flight.isActive()) return;

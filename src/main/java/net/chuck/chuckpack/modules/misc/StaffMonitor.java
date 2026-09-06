@@ -1,6 +1,7 @@
 package net.chuck.chuckpack.modules.misc;
 
 import meteordevelopment.meteorclient.MeteorClient;
+import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.EnumSetting;
@@ -15,31 +16,44 @@ import meteordevelopment.meteorclient.systems.modules.misc.AutoReconnect;
 import meteordevelopment.meteorclient.utils.entity.fakeplayer.FakePlayerManager;
 import meteordevelopment.meteorclient.utils.player.ChatUtils;
 import meteordevelopment.orbit.EventHandler;
+import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.multiplayer.ServerData;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.sounds.SoundEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.configuration.ClientboundSelectKnownPacks;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.repository.KnownPack;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.jar.JarFile;
+import java.util.zip.ZipEntry;
 
 public class StaffMonitor extends Module {
     private enum AlertSound {
@@ -77,6 +91,50 @@ public class StaffMonitor extends Module {
     }
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
+
+    private final Setting<Boolean> toastAlert = sgGeneral.add(new BoolSetting.Builder()
+        .name("Toast alerts")
+        .description("Shows StaffMonitor toast notifications.")
+        .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<Boolean> ignoreFriends = sgGeneral.add(new BoolSetting.Builder()
+        .name("Ignore friends")
+        .description("Do not monitor players on your friends list.")
+        .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<Boolean> vanishDetection = sgGeneral.add(new BoolSetting.Builder()
+        .name("Vanish detection")
+        .description("Detects probable vanish cycles after filtering tab-list rotations and player initialization.")
+        .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<Boolean> vanishKnownStaffOnly = sgGeneral.add(new BoolSetting.Builder()
+        .name("Vanish: known ops only")
+        .description("Only tracks players in StaffMonitor's saved, configured, or bundled staff lists.")
+        .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<Integer> vanishPlayerLimit = sgGeneral.add(new IntSetting.Builder()
+        .name("Vanish player limit")
+        .description("Disables vanish-cycle detection when the server advertises or shows this many players. Set to 0 or Infinite (after 1000) to disable the limit.")
+        .defaultValue(20)
+        .range(0, 1001)
+        .sliderRange(0, 1001)
+        .build()
+    );
+
+    private final Setting<Boolean> suppressTabRotations = sgGeneral.add(new BoolSetting.Builder()
+        .name("Suppress tab rotations")
+        .description("Ignores balanced add/remove player-info batches, which servers commonly use to rotate a synthetic tab list.")
+        .defaultValue(true)
+        .build()
+    );
 
     private final Setting<Boolean> chatAlert = sgGeneral.add(new BoolSetting.Builder()
         .name("Chat alert")
@@ -159,11 +217,20 @@ public class StaffMonitor extends Module {
     private String lastServerKey = "unknown";
     private String savedStaffServerKey = "unknown";
     private boolean hiddenPlayerAlertsActive;
+    // Vanish detection state (ported from Wurst 0.59+)
+    private boolean serverHasVanish;
+    private final Map<UUID, Long> vanishCandidates = Collections.synchronizedMap(new HashMap<>());
+    private final Map<UUID, Long> pendingVanishCycles = Collections.synchronizedMap(new HashMap<>());
+    private final Map<UUID, Long> recentEntitySpawns = Collections.synchronizedMap(new HashMap<>());
+    private final List<PlayerInfoEvent> pendingPlayerInfoEvents = Collections.synchronizedList(new ArrayList<>());
+    private final Map<UUID, String> playerNames = new HashMap<>();
+    private long nextMojangStaffRetry;
+    private long lastMojangStaffError;
     private int staffQuitTicks = -1;
     private String staffQuitReason;
 
     public StaffMonitor() {
-        super(Categories.Misc, "Staff Monitor", "Detects staff members, GameType switches and hidden (off-tab) players, and can auto-quit when staff are present.");
+        super(Categories.Misc, "Staff Monitor", "Detects staff members, GameType switches and hidden (off-tab) players, and can auto-quit when staff are present. Ported from Wurst StaffMonitor (vanish-cycle detection, toast alerts).");
     }
 
     /** Used by safety-aware modules without invoking StaffMonitor's action. */
@@ -174,9 +241,15 @@ public class StaffMonitor extends Module {
     @Override
     public void onActivate() {
         gamemodeStates.clear();
+        vanishCandidates.clear();
+        pendingVanishCycles.clear();
+        recentEntitySpawns.clear();
+        pendingPlayerInfoEvents.clear();
+        serverHasVanish = false;
         hiddenPlayers.clear();
         alertedStaff.clear();
         savedStaffNames.clear();
+        playerNames.clear();
         lastServerKey = resolveServerKey();
         savedStaffServerKey = resolveStorageServerKey();
         hiddenPlayerAlertsActive = hiddenPlayerAlerts.get();
@@ -192,14 +265,172 @@ public class StaffMonitor extends Module {
     @Override
     public void onDeactivate() {
         gamemodeStates.clear();
+        vanishCandidates.clear();
+        pendingVanishCycles.clear();
+        recentEntitySpawns.clear();
+        pendingPlayerInfoEvents.clear();
+        serverHasVanish = false;
         hiddenPlayers.clear();
         alertedStaff.clear();
         staffNames.clear();
         mojangStaffNames.clear();
         mojangStaffUuids.clear();
         savedStaffNames.clear();
+        playerNames.clear();
         hiddenPlayerAlertsActive = false;
         cancelStaffQuit();
+    }
+
+    @EventHandler
+    private void onPacketReceive(PacketEvent.Receive event) {
+        if (!vanishDetection.get()) return;
+        Packet<?> packet = event.packet;
+        if (packet instanceof ClientboundSelectKnownPacks packs) {
+            for (KnownPack pack : packs.knownPacks()) {
+                String id = (pack.namespace() + ":" + pack.id() + ":" + pack.version()).toLowerCase(Locale.ROOT);
+                if (id.contains("vanish")) serverHasVanish = true;
+            }
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (packet instanceof ClientboundAddEntityPacket add) {
+            UUID id = add.getUUID();
+            if (id != null) {
+                recentEntitySpawns.put(id, now);
+                pendingVanishCycles.remove(id);
+            }
+            return;
+        }
+        if (packet instanceof ClientboundPlayerInfoRemovePacket removed) {
+            for (UUID id : removed.profileIds()) {
+                String name = playerNames.get(id);
+                // Fallback: try to resolve name from current tab list cache if missing
+                if (name == null) {
+                    // Attempt to keep name from hiddenPlayers or gamemodeStates? Use UNKNOWN
+                    name = "unknown";
+                }
+                pendingPlayerInfoEvents.add(new PlayerInfoEvent(id, name, false, now));
+            }
+            return;
+        }
+        if (packet instanceof ClientboundPlayerInfoUpdatePacket update
+            && update.actions().contains(ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER)) {
+            for (ClientboundPlayerInfoUpdatePacket.Entry entry : update.entries()) {
+                if (entry.profile() == null) continue;
+                String name = entry.profile().name();
+                UUID pid = entry.profileId();
+                playerNames.put(pid, name);
+                pendingPlayerInfoEvents.add(new PlayerInfoEvent(pid, name, true, now));
+            }
+        }
+    }
+
+    private void processPlayerInfoEvents() {
+        long now = System.currentTimeMillis();
+        List<PlayerInfoEvent> ready = new ArrayList<>();
+        synchronized (pendingPlayerInfoEvents) {
+            for (int i = pendingPlayerInfoEvents.size() - 1; i >= 0; i--) {
+                PlayerInfoEvent ev = pendingPlayerInfoEvents.get(i);
+                if (now - ev.timestamp < 125) continue;
+                ready.add(0, ev);
+                pendingPlayerInfoEvents.remove(i);
+            }
+        }
+        for (int start = 0; start < ready.size();) {
+            long batchStart = ready.get(start).timestamp;
+            int end = start + 1;
+            while (end < ready.size() && ready.get(end).timestamp - batchStart <= 125) end++;
+            processPlayerInfoBatch(ready.subList(start, end), now);
+            start = end;
+        }
+    }
+
+    private void processPlayerInfoBatch(List<PlayerInfoEvent> batch, long now) {
+        Set<UUID> added = new HashSet<>();
+        Set<UUID> removed = new HashSet<>();
+        for (PlayerInfoEvent ev : batch) if (ev.added) added.add(ev.id); else removed.add(ev.id);
+
+        boolean initialization = !Collections.disjoint(added, removed);
+        for (UUID id : added) {
+            Long spawnedAt = recentEntitySpawns.get(id);
+            if (spawnedAt != null && now - spawnedAt < 1500) initialization = true;
+        }
+        boolean rotation = suppressTabRotations.get() && !added.isEmpty() && !removed.isEmpty()
+            && Math.abs(added.size() - removed.size()) <= 1;
+        if (initialization || rotation) {
+            for (UUID id : added) vanishCandidates.remove(id);
+            for (UUID id : removed) vanishCandidates.remove(id);
+            return;
+        }
+
+        for (PlayerInfoEvent ev : batch) {
+            if (!shouldTrackVanish(ev.id, ev.name)) continue;
+            if (!ev.added) {
+                vanishCandidates.put(ev.id, ev.timestamp);
+                continue;
+            }
+            Long removedAt = vanishCandidates.remove(ev.id);
+            if (removedAt == null) continue;
+            Long spawnedAt = recentEntitySpawns.get(ev.id);
+            if (spawnedAt == null || now - spawnedAt >= 1500) {
+                pendingVanishCycles.put(ev.id, removedAt);
+            }
+        }
+    }
+
+    private boolean shouldTrackVanish(UUID id, String name) {
+        int limit = vanishPlayerLimit.get();
+        if (limit > 0 && limit <= 1000 && getObservedPlayerCount() >= limit) return false;
+        return !vanishKnownStaffOnly.get() || isStaff(id, name);
+    }
+
+    private int getObservedPlayerCount() {
+        if (mc.getConnection() == null) return 0;
+        int count = mc.getConnection().getOnlinePlayers().size();
+        ServerData server = mc.getCurrentServer();
+        if (server != null && server.players != null) {
+            try {
+                // server.players is ServerData.Players or similar containing online count
+                // Use reflection-safe access via string? But we can just use size above.
+                // Keep max logic if field accessible.
+                if (server.players.online() > count) count = server.players.online();
+            } catch (Throwable ignored) {}
+        }
+        return count;
+    }
+
+    private static final class PlayerInfoEvent {
+        final UUID id;
+        final String name;
+        final boolean added;
+        final long timestamp;
+        PlayerInfoEvent(UUID id, String name, boolean added, long timestamp) {
+            this.id = id;
+            this.name = name;
+            this.added = added;
+            this.timestamp = timestamp;
+        }
+    }
+
+    private void processPendingVanishCycles() {
+        long now = System.currentTimeMillis();
+        for (Map.Entry<UUID, Long> entry : new HashMap<>(pendingVanishCycles).entrySet()) {
+            if (now - entry.getValue() < 1500) continue;
+            if (!pendingVanishCycles.remove(entry.getKey(), entry.getValue())) continue;
+            String name = playerNames.get(entry.getKey());
+            if (name == null) continue;
+            long seconds = Math.max(0, (now - entry.getValue()) / 1000);
+            String message = name + " Vanish cycle detected (" + seconds + "s hidden" + (serverHasVanish ? ", Vanish installed" : "") + ")";
+            if (chatAlert.get()) ChatUtils.sendMsg(Component.literal("[StaffMonitor] " + message));
+            if (toastAlert.get()) showToast(Component.literal("Vanish cycle detected"), Component.literal(message));
+            if (soundAlert.get() && mc.level != null && mc.player != null) {
+                SoundEvent event = sound.get().resolve();
+                float target = (float) (volume.get() / 100.0);
+                if (event != null && target > 0F) {
+                    mc.level.playLocalSound(mc.player.getX(), mc.player.getY(), mc.player.getZ(), event, SoundSource.PLAYERS, Math.max(0.2F, target), 1.6F, false);
+                }
+            }
+        }
     }
 
     @EventHandler
@@ -214,15 +445,21 @@ public class StaffMonitor extends Module {
             cancelStaffQuit();
             return;
         }
-        if (mojangStaff.get() && mojangStaffNames.isEmpty()
-            && mojangStaffUuids.isEmpty())
+        if (mojangStaff.get() && mojangStaffNames.isEmpty() && mojangStaffUuids.isEmpty())
             loadMojangStaff();
+
+        processPlayerInfoEvents();
+        processPendingVanishCycles();
 
         String serverKeyNow = resolveServerKey();
         if (!serverKeyNow.equals(lastServerKey)) {
             gamemodeStates.clear();
             hiddenPlayers.clear();
             alertedStaff.clear();
+            vanishCandidates.clear();
+            pendingVanishCycles.clear();
+            pendingPlayerInfoEvents.clear();
+            serverHasVanish = false;
             lastServerKey = serverKeyNow;
             savedStaffServerKey = resolveStorageServerKey();
             hiddenPlayerAlertsActive = hiddenPlayerAlerts.get();
@@ -248,6 +485,7 @@ public class StaffMonitor extends Module {
                 continue;
 
             GameType currentMode = entry.getGameMode();
+            playerNames.put(id, name);
             nextStates.put(id, currentMode);
 
             // Hidden staff alert
@@ -334,6 +572,7 @@ public class StaffMonitor extends Module {
                 continue;
 
             gamemodeStates.put(id, entry.getGameMode());
+            playerNames.put(id, name);
         }
     }
 
@@ -358,12 +597,11 @@ public class StaffMonitor extends Module {
         if (player == null || FakePlayerManager.getFakePlayers().contains(player))
             return true;
 
-        if (ignoreNpcNames.get()
-            && isLikelyNpcName(player.getName().getString()))
+        String nameStr = player.getName().getString();
+        if (ignoreNpcNames.get() && isLikelyNpcName(nameStr))
             return true;
 
-        return shouldIgnorePlayer(player.getUUID(),
-            player.getName().getString());
+        return shouldIgnorePlayer(player.getUUID(), nameStr);
     }
 
     private boolean isLikelyNpcName(String name) {
@@ -383,9 +621,21 @@ public class StaffMonitor extends Module {
             || lower.endsWith("_bot");
     }
 
+    private void showToast(Component title, Component message) {
+        try {
+            if (mc.getToastManager() == null) return;
+            Runnable show = () -> SystemToast.add(mc.getToastManager(), SystemToast.SystemToastId.PERIODIC_NOTIFICATION, title, message);
+            if (mc.isSameThread()) show.run();
+            else mc.execute(show);
+        } catch (Throwable ignored) {}
+    }
+
     private void alert(PlayerInfo entry, GameType mode, boolean entered) {
         String name = entry.getProfile().name();
-        String modeLabel = mode.getSerializedName(); // "survival", "creative", "spectator", "adventure"
+        String modeLabel = mode == null ? "unknown" : mode.getSerializedName();
+        if (toastAlert.get()) {
+            showToast(Component.literal("StaffMonitor"), Component.literal(name + " " + modeLabel));
+        }
         if (chatAlert.get()) {
             String action = entered ? "entered" : "left";
             ChatUtils.sendMsg(Component.literal(String.format(Locale.ROOT,
@@ -417,6 +667,8 @@ public class StaffMonitor extends Module {
         if (chatAlert.get())
             ChatUtils.sendMsg(Component.literal(String.format(Locale.ROOT,
                 "[StaffMonitor] Staff member %s is online.", name)));
+        if (toastAlert.get())
+            showToast(Component.literal("StaffMonitor"), Component.literal("Staff " + name + " online"));
 
         if (soundAlert.get() && mc.level != null && mc.player != null) {
             SoundEvent event = sound.get().resolve();
@@ -435,6 +687,9 @@ public class StaffMonitor extends Module {
             String action = appeared ? "appeared off-tab" : "disappeared";
             ChatUtils.sendMsg(Component.literal(String.format(Locale.ROOT,
                 "[StaffMonitor] %s %s.", name, action)));
+        }
+        if (toastAlert.get()) {
+            showToast(Component.literal("Hidden player"), Component.literal(name + (appeared ? " appeared off-tab" : " disappeared")));
         }
 
         if (soundAlert.get() && mc.level != null && mc.player != null) {
@@ -460,35 +715,80 @@ public class StaffMonitor extends Module {
     }
 
     private void loadMojangStaff() {
+        if (!mojangStaff.get()) return;
+        long now = System.currentTimeMillis();
+        if (now < nextMojangStaffRetry) return;
+
         mojangStaffNames.clear();
         mojangStaffUuids.clear();
-        if (!mojangStaff.get())
-            return;
+
         loadMojangStaffFile("/ChuckPack/staff/mojang-names.txt", false);
+        // Fallback to Wurst resource path if ChuckPack path not found (for compatibility)
+        if (mojangStaffNames.isEmpty()) loadMojangStaffFile("/wurst/staff/mojang-names.txt", false);
         loadMojangStaffFile("/ChuckPack/staff/mojang-uuids.txt", true);
+        if (mojangStaffUuids.isEmpty()) loadMojangStaffFile("/wurst/staff/mojang-uuids.txt", true);
+
+        if (mojangStaffNames.isEmpty() && mojangStaffUuids.isEmpty()) {
+            nextMojangStaffRetry = now + 5 * 60_000L;
+            if (now - lastMojangStaffError >= 10 * 60_000L) {
+                lastMojangStaffError = now;
+                ChatUtils.error("StaffMonitor: couldn't load the bundled Mojang staff list, so \"Mojang Staff\" won't work.");
+            }
+        }
     }
 
     private void loadMojangStaffFile(String resource, boolean uuidFile) {
-        try (InputStream stream = StaffMonitor.class.getResourceAsStream(resource)) {
-            if (stream == null)
-                return;
-            String content = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-            for (String line : content.split("\\R")) {
-                String value = line.strip();
-                if (value.isEmpty() || value.startsWith("#"))
-                    continue;
-                if (uuidFile) {
-                    try {
-                        mojangStaffUuids.add(UUID.fromString(value));
-                    } catch (IllegalArgumentException ignored) {
-                        // Ignore malformed bundled entries.
-                    }
-                } else {
-                    mojangStaffNames.add(value.toLowerCase(Locale.ROOT));
+        String content = readBundledResource(resource);
+        if (content == null) return;
+        for (String line : content.split("\\R")) {
+            String value = line.strip();
+            if (value.isEmpty() || value.startsWith("#"))
+                continue;
+            if (uuidFile) {
+                try {
+                    mojangStaffUuids.add(UUID.fromString(value));
+                } catch (IllegalArgumentException ignored) {
+                    // Ignore malformed bundled entries.
+                }
+            } else {
+                mojangStaffNames.add(value.toLowerCase(Locale.ROOT));
+            }
+        }
+    }
+
+    private static String readBundledResource(String resource) {
+        try (InputStream in = StaffMonitor.class.getResourceAsStream(resource)) {
+            if (in != null) return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            // fall through
+        }
+        return readFromOwnJar(resource);
+    }
+
+    private static String readFromOwnJar(String resource) {
+        try {
+            URL codeSource = StaffMonitor.class.getProtectionDomain().getCodeSource().getLocation();
+            if (codeSource == null) return null;
+            Path jarPath;
+            if (codeSource.getProtocol().equals("file")) {
+                Path p = Paths.get(codeSource.toURI());
+                if (Files.isDirectory(p)) return null;
+                jarPath = p;
+            } else if (codeSource.getProtocol().equals("jar")) {
+                String spec = codeSource.getFile();
+                int bang = spec.indexOf("!/");
+                if (bang < 0) return null;
+                jarPath = Paths.get(URI.create(spec.substring(0, bang)));
+            } else return null;
+            try (JarFile jar = new JarFile(jarPath.toFile())) {
+                ZipEntry entry = jar.getEntry(resource.substring(1));
+                if (entry == null) return null;
+                try (InputStream in = jar.getInputStream(entry)) {
+                    return new String(in.readAllBytes(), StandardCharsets.UTF_8);
                 }
             }
-        } catch (IOException e) {
-            ChatUtils.error("StaffMonitor Mojang staff list failed: " + e.getMessage());
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -681,7 +981,8 @@ public class StaffMonitor extends Module {
             && name.equalsIgnoreCase(mc.getUser().getName()))
             return true;
 
-        return Friends.get() != null && Friends.get().get(name) != null;
+        if (ignoreFriends.get() && Friends.get() != null && Friends.get().get(name) != null) return true;
+        return false;
     }
 
     private String resolveServerKey() {
@@ -694,7 +995,7 @@ public class StaffMonitor extends Module {
             if (info.name != null && !info.name.isEmpty())
                 return "server_" + info.name;
         }
-        if (mc.isSingleplayer())
+        if (mc.hasSingleplayerServer())
             return "singleplayer";
         return "unknown";
     }
