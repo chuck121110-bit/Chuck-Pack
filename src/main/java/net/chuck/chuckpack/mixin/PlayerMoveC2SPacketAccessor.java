@@ -14,4 +14,7 @@ public interface PlayerMoveC2SPacketAccessor {
     @Mutable
     @Accessor("onGround")
     void chuckpack$setOnGround(boolean value);
+
+    @Accessor("onGround")
+    boolean chuckpack$getOnGround();
 }
