@@ -6,6 +6,7 @@ import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.gui.GuiTheme;
+import meteordevelopment.meteorclient.gui.GuiThemes;
 import meteordevelopment.meteorclient.gui.widgets.WWidget;
 import meteordevelopment.meteorclient.gui.widgets.containers.WTable;
 import meteordevelopment.meteorclient.gui.widgets.pressable.WButton;
@@ -705,11 +706,9 @@ public class BaseFinder extends Module {
     }
 
     public void openFlaggedChunksScreen() {
-        if (cachedTheme == null) {
-            error("Open BaseFinder settings first to load the GUI theme.");
-            return;
-        }
-        mc.setScreenAndShow(new net.chuck.chuckpack.gui.screens.FlaggedChunksScreen(cachedTheme, this, baseChunks, chunkTriggerReasons, chunkBlockCounts, chunkEntityCounts));
+        // Use the live GUI theme when settings were never opened (cachedTheme unset).
+        GuiTheme theme = cachedTheme != null ? cachedTheme : GuiThemes.get();
+        mc.setScreenAndShow(new net.chuck.chuckpack.gui.screens.FlaggedChunksScreen(theme, this, baseChunks, chunkTriggerReasons, chunkBlockCounts, chunkEntityCounts));
     }
 
     // render
