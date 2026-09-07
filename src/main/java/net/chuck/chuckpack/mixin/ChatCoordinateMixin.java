@@ -1,12 +1,13 @@
 package net.chuck.chuckpack.mixin;
 
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.HoverEvent;
-import net.minecraft.ChatFormatting;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
@@ -16,24 +17,60 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+// Highlights coordinates in chat (cyan) — clicking creates a "chat waypoint"
+// (random color) via .chatwaypoint. Supports 3D and 2D (player Y) formats.
 @Mixin(ChatComponent.class)
 public class ChatCoordinateMixin {
 
-    private static final Pattern COORD_XYZ_LABELED = Pattern.compile(
-        "[Xx]\\s*[:=]?\\s*(-?\\d{1,10})\\s+[Yy]\\s*[:=]?\\s*(-?\\d{1,10})\\s+[Zz]\\s*[:=]?\\s*(-?\\d{1,10})"
+    private static final String NUM = "(-?\\d{1,9}(?:\\.\\d+)?)";
+
+    // 3D formats
+    private static final Pattern P_LABELED = Pattern.compile(
+        "(?i)\\bx\\s*[:=]?\\s*" + NUM + "[\\s,;]+y\\s*[:=]?\\s*" + NUM + "[\\s,;]+z\\s*[:=]?\\s*" + NUM + "(?![\\w.])"
+    );
+    private static final Pattern P_PAREN3 = Pattern.compile(
+        "\\(\\s*" + NUM + "\\s*[,;\\s]\\s*" + NUM + "\\s*[,;\\s]\\s*" + NUM + "\\s*\\)"
+    );
+    private static final Pattern P_BRACKET3 = Pattern.compile(
+        "\\[\\s*" + NUM + "\\s*[,;\\s]\\s*" + NUM + "\\s*[,;\\s]\\s*" + NUM + "\\s*\\]"
+    );
+    private static final Pattern P_TP = Pattern.compile(
+        "(?i)(?:/tp|/teleport|\\btp|\\bteleport)(?:\\s+@[\\w]+)?\\s+" + NUM + "\\s+" + NUM + "\\s+" + NUM
+    );
+    private static final Pattern P_BARITONE = Pattern.compile(
+        "(?i)#(?:goto|mine|thisway|path|goal)\\s+" + NUM + "\\s+" + NUM + "\\s+" + NUM
+    );
+    private static final Pattern P_COMMA3 = Pattern.compile(
+        "(?<![\\w.\\-])" + NUM + "\\s*,\\s*" + NUM + "\\s*,\\s*" + NUM + "(?![\\w.\\-])"
+    );
+    private static final Pattern P_SLASH3 = Pattern.compile(
+        "(?<![\\w.\\-])" + NUM + "\\s*/\\s*" + NUM + "\\s*/\\s*" + NUM + "(?![\\w.\\-])"
+    );
+    private static final Pattern P_SPACE3 = Pattern.compile(
+        "(?<![\\w.\\-#:])" + NUM + "\\s+" + NUM + "\\s+" + NUM + "(?![\\w.\\-:])"
     );
 
-    private static final Pattern COORD_XYZ_BRACKET = Pattern.compile(
-        "\\(\\s*(-?\\d{1,10})\\s*,\\s*(-?\\d{1,10})\\s*,\\s*(-?\\d{1,10})\\s*\\)"
+    // 2D formats (Y falls back to the player's current Y)
+    private static final Pattern P_XZ_LABELED = Pattern.compile(
+        "(?i)\\bx\\s*[:=]?\\s*" + NUM + "\\s*[,;\\s]\\s*z\\s*[:=]?\\s*" + NUM + "(?![\\w.])"
+    );
+    private static final Pattern P_PAREN2 = Pattern.compile(
+        "\\(\\s*" + NUM + "\\s*[,;\\s]\\s*" + NUM + "\\s*\\)"
+    );
+    private static final Pattern P_BRACKET2 = Pattern.compile(
+        "\\[\\s*" + NUM + "\\s*[,;\\s]\\s*" + NUM + "\\s*\\]"
+    );
+    private static final Pattern P_COMMA2 = Pattern.compile(
+        "(?<![\\w.\\-])" + NUM + "\\s*,\\s*" + NUM + "(?![\\w.\\-])"
+    );
+    private static final Pattern P_SPACE2 = Pattern.compile(
+        "(?<![\\w.\\-#:])" + NUM + "\\s+" + NUM + "(?![\\w.\\-:])"
+    );
+    private static final Pattern P_SLASH2 = Pattern.compile(
+        "(?<![\\w.\\-])" + NUM + "\\s*/\\s*" + NUM + "(?![\\w.\\-])"
     );
 
-    private static final Pattern COORD_XYZ_PLAIN = Pattern.compile(
-        "(?<![\\w.-])(-?\\d{1,10})\\s*,\\s*(-?\\d{1,10})\\s*,\\s*(-?\\d{1,10})(?![\\w.-])"
-    );
-
-    private static final Pattern COORD_XYZ_SPACE = Pattern.compile(
-        "(?<![\\w.-])(-?\\d{1,10})\\s+(-?\\d{1,10})\\s+(-?\\d{1,10})(?![\\w.-])"
-    );
+    private static final int MAX_HORIZONTAL = 30000000;
 
     @ModifyVariable(method = "addMessage(Lnet/minecraft/network/chat/Component;)V", at = @At("HEAD"), argsOnly = true)
     private Component highlightCoords(Component message) {
@@ -56,15 +93,13 @@ public class ChatCoordinateMixin {
 
                 MutableComponent coordComponent = Component.literal(coordText);
                 Style coordStyle = Style.EMPTY
-                    .withColor(ChatFormatting.GREEN)
-                    .withBold(true)
+                    .withColor(ChatFormatting.AQUA)
                     .withHoverEvent(new HoverEvent.ShowText(
-                        Component.literal("Click to copy coordinates")
+                        Component.literal("Click to create waypoint at " + match.x + ", " + match.y + ", " + match.z)
                             .withStyle(ChatFormatting.YELLOW)
-                            .append(Component.literal("\nShift+click to teleport").withStyle(ChatFormatting.GRAY))
                     ))
-                    .withClickEvent(new ClickEvent.CopyToClipboard(
-                        match.x + " " + match.y + " " + match.z
+                    .withClickEvent(new ClickEvent.RunCommand(
+                        ".chatwaypoint " + match.x + " " + match.y + " " + match.z
                     ));
 
                 coordComponent.setStyle(coordStyle);
@@ -86,48 +121,91 @@ public class ChatCoordinateMixin {
     private List<CoordinateMatch> findCoordinates(String text) {
         List<CoordinateMatch> matches = new ArrayList<>();
 
-        Matcher m1 = COORD_XYZ_LABELED.matcher(text);
-        while (m1.find()) {
-            matches.add(new CoordinateMatch(m1.start(), m1.end(),
-                Integer.parseInt(m1.group(1)),
-                Integer.parseInt(m1.group(2)),
-                Integer.parseInt(m1.group(3))));
-        }
+        add3(matches, P_LABELED, text);
+        add3(matches, P_PAREN3, text);
+        add3(matches, P_BRACKET3, text);
+        addTp(matches, P_TP, text);
+        addTp(matches, P_BARITONE, text);
+        add3(matches, P_COMMA3, text);
+        add3(matches, P_SLASH3, text);
+        add3y(matches, P_SPACE3, text);
 
-        Matcher m2 = COORD_XYZ_BRACKET.matcher(text);
-        while (m2.find()) {
-            if (!overlaps(matches, m2.start(), m2.end())) {
-                matches.add(new CoordinateMatch(m2.start(), m2.end(),
-                    Integer.parseInt(m2.group(1)),
-                    Integer.parseInt(m2.group(2)),
-                    Integer.parseInt(m2.group(3))));
-            }
-        }
-
-        Matcher m3 = COORD_XYZ_PLAIN.matcher(text);
-        while (m3.find()) {
-            if (!overlaps(matches, m3.start(), m3.end())) {
-                matches.add(new CoordinateMatch(m3.start(), m3.end(),
-                    Integer.parseInt(m3.group(1)),
-                    Integer.parseInt(m3.group(2)),
-                    Integer.parseInt(m3.group(3))));
-            }
-        }
-
-        Matcher m4 = COORD_XYZ_SPACE.matcher(text);
-        while (m4.find()) {
-            if (!overlaps(matches, m4.start(), m4.end())) {
-                int x = Integer.parseInt(m4.group(1));
-                int y = Integer.parseInt(m4.group(2));
-                int z = Integer.parseInt(m4.group(3));
-                if (y >= -64 && y <= 320) {
-                    matches.add(new CoordinateMatch(m4.start(), m4.end(), x, y, z));
-                }
-            }
+        int playerY = playerY();
+        if (playerY != Integer.MIN_VALUE) {
+            add2(matches, P_XZ_LABELED, text, playerY);
+            add2(matches, P_PAREN2, text, playerY);
+            add2(matches, P_BRACKET2, text, playerY);
+            add2(matches, P_COMMA2, text, playerY);
+            add2(matches, P_SPACE2, text, playerY);
+            add2(matches, P_SLASH2, text, playerY);
         }
 
         matches.sort((a, b) -> Integer.compare(a.start, b.start));
-        return matches;
+        List<CoordinateMatch> deduped = new ArrayList<>();
+        int lastEnd = -1;
+        for (CoordinateMatch m : matches) {
+            if (m.start < lastEnd) continue;
+            deduped.add(m);
+            lastEnd = m.end;
+        }
+        return deduped;
+    }
+
+    private int playerY() {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null && mc.player != null) return mc.player.blockPosition().getY();
+        } catch (Throwable ignored) {}
+        return Integer.MIN_VALUE;
+    }
+
+    private void add3(List<CoordinateMatch> out, Pattern p, String text) {
+        Matcher m = p.matcher(text);
+        while (m.find()) {
+            tryAdd(out, m.start(), m.end(), m.group(1), m.group(2), m.group(3));
+        }
+    }
+
+    private void addTp(List<CoordinateMatch> out, Pattern p, String text) {
+        Matcher m = p.matcher(text);
+        while (m.find()) {
+            if (!overlaps(out, m.start(), m.end())) {
+                tryAdd(out, m.start(), m.end(), m.group(1), m.group(2), m.group(3));
+            }
+        }
+    }
+
+    private void add3y(List<CoordinateMatch> out, Pattern p, String text) {
+        Matcher m = p.matcher(text);
+        while (m.find()) {
+            if (!overlaps(out, m.start(), m.end())) {
+                try {
+                    int y = (int) Math.round(Double.parseDouble(m.group(2)));
+                    if (y < -64 || y > 320) continue;
+                    tryAdd(out, m.start(), m.end(), m.group(1), m.group(2), m.group(3));
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+    }
+
+    private void add2(List<CoordinateMatch> out, Pattern p, String text, int y) {
+        Matcher m = p.matcher(text);
+        while (m.find()) {
+            if (!overlaps(out, m.start(), m.end())) {
+                tryAdd(out, m.start(), m.end(), m.group(1), String.valueOf(y), m.group(2));
+            }
+        }
+    }
+
+    private void tryAdd(List<CoordinateMatch> out, int s, int e, String xs, String ys, String zs) {
+        try {
+            int x = (int) Math.round(Double.parseDouble(xs));
+            int y = (int) Math.round(Double.parseDouble(ys));
+            int z = (int) Math.round(Double.parseDouble(zs));
+            if (Math.abs((long) x) > MAX_HORIZONTAL || Math.abs((long) z) > MAX_HORIZONTAL) return;
+            if (y < -64 || y > 320) return;
+            out.add(new CoordinateMatch(s, e, x, y, z));
+        } catch (NumberFormatException ignored) {}
     }
 
     private boolean overlaps(List<CoordinateMatch> existing, int start, int end) {

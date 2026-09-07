@@ -107,6 +107,9 @@ public class ChuckPack extends MeteorAddon {
         meteordevelopment.meteorclient.commands.Commands.add(
             new net.chuck.chuckpack.commands.AutoFlyCommand()
         );
+        meteordevelopment.meteorclient.commands.Commands.add(
+            new net.chuck.chuckpack.commands.ChatWaypointCommand()
+        );
 
         meteordevelopment.meteorclient.systems.hud.Hud.get().register(
             net.chuck.chuckpack.hud.KeybindsHud.INFO
