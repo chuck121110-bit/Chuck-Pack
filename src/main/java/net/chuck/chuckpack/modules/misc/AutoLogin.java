@@ -328,8 +328,8 @@ public class AutoLogin extends Module {
                 debugLogger.info("Delay check passed");
 
                 BaseAutoLogin.ExecutionMode executionMode = autoLogin.executionMode.get();
-                if (executionMode == BaseAutoLogin.ExecutionMode.Multiplayer && mc.isSingleplayer()) continue;
-                if (executionMode == BaseAutoLogin.ExecutionMode.Singleplayer && !mc.isSingleplayer()) continue;
+                if (executionMode == BaseAutoLogin.ExecutionMode.Multiplayer && mc.hasSingleplayerServer()) continue;
+                if (executionMode == BaseAutoLogin.ExecutionMode.Singleplayer && !mc.hasSingleplayerServer()) continue;
                 debugLogger.info("Execution mode check passed");
 
                 String serverIpFilter = autoLogin.serverIpFilter.get();

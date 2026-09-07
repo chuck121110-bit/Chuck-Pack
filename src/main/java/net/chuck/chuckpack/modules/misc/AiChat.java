@@ -547,7 +547,7 @@ public class AiChat extends Module {
             serverName = mc.getCurrentServer().name.isBlank()
                 ? mc.getCurrentServer().ip
                 : mc.getCurrentServer().name;
-        } else if (mc.isSingleplayer()) {
+        } else if (mc.hasSingleplayerServer()) {
             serverName = "Singleplayer";
         }
         return DEFAULT_PROMPT.replace("{SERVER_NAME}", serverName);

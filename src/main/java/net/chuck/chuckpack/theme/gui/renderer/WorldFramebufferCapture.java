@@ -9,7 +9,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 // import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.textures.TextureFormat;
+import com.mojang.blaze3d.GpuFormat;
 import meteordevelopment.meteorclient.MeteorClient;
 import meteordevelopment.meteorclient.events.game.GameLeftEvent;
 import meteordevelopment.meteorclient.events.game.ResolutionChangedEvent;
@@ -138,7 +138,7 @@ public class WorldFramebufferCapture {
         ensureInitialized();
         if (!initialized) return;
 
-        boolean needsBlur = hudBlurRequested || (mc.screen instanceof WidgetScreen);
+        boolean needsBlur = hudBlurRequested || (mc.gui.screen() instanceof WidgetScreen);
         hudBlurRequested = false; // consume — next frame's HUD must re-request if still needed
 
         if (blurIterations > 0 && needsBlur) {
@@ -148,7 +148,7 @@ public class WorldFramebufferCapture {
             blurAppliedThisTick = false;
         }
 
-        if (mc.screen instanceof WidgetScreen) {
+        if (mc.gui.screen() instanceof WidgetScreen) {
             capturedThisTick = true;
         }
     }
@@ -215,7 +215,7 @@ public class WorldFramebufferCapture {
         GpuTexture texture = RenderSystem.getDevice().createTexture(
             "BaseTheme Blur FBO " + level,
             15,
-            TextureFormat.RGBA8,
+            GpuFormat.RGBA8_UNORM,
             width,
             height,
             1,
@@ -232,7 +232,7 @@ public class WorldFramebufferCapture {
     public GpuTextureView getBlurredTexture() {
         if (!initialized) return null;
         if (!capturedThisTick) return null;
-        if (!(mc.screen instanceof WidgetScreen)) return null;
+        if (!(mc.gui.screen() instanceof WidgetScreen)) return null;
 
         if (blurIterations > 0 && blurFbos != null && blurFbos.length > 0 && blurFbos[0] != null) {
             return blurFbos[0];

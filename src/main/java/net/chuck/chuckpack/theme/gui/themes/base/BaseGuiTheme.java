@@ -65,7 +65,7 @@ public class BaseGuiTheme extends GuiTheme {
         .sliderRange(0.75, 4)
         .onSliderRelease()
         .onChanged(aDouble -> {
-            if (mc.screen instanceof WidgetScreen) ((WidgetScreen) mc.screen).invalidate();
+            if (mc.gui.screen() instanceof WidgetScreen) ((WidgetScreen) mc.gui.screen()).invalidate();
         })
         .build()
     );
@@ -89,8 +89,15 @@ public class BaseGuiTheme extends GuiTheme {
         .description("Hide HUD when in GUI.")
         .defaultValue(false)
         .onChanged(v -> {
-            if (mc.screen instanceof WidgetScreen) mc.options.hideGui = v;
+            if (mc.gui.screen() instanceof WidgetScreen && mc.gui.hud.isHidden() != v) mc.gui.hud.toggle();
         })
+        .build()
+    );
+
+    public final Setting<Boolean> modulesHelpText = sgGeneral.add(new BoolSetting.Builder()
+        .name("modules-help-text")
+        .description("Shows help text for modules in the GUI.")
+        .defaultValue(true)
         .build()
     );
 
@@ -566,6 +573,11 @@ public class BaseGuiTheme extends GuiTheme {
     @Override
     public boolean hideHUD() {
         return hideHUD.get();
+    }
+
+    @Override
+    public boolean modulesHelpText() {
+        return modulesHelpText.get();
     }
 
     // Smart slide tracking methods

@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Minecraft.class)
 public class AutoResourcePackMixin {
 
-    @Inject(method = "setScreen", at = @At("TAIL"))
+    @Inject(method = "setScreenAndShow", at = @At("TAIL"))
     private void chuckpack$autoAcceptResourcePack(Screen screen, CallbackInfo ci) {
         if (screen == null) return;
         Minecraft mc = Minecraft.getInstance();
@@ -23,9 +23,9 @@ public class AutoResourcePackMixin {
 
     @Unique
     private static void chuckpack$tryAccept(Minecraft mc) {
-        if (mc.screen == null) return;
+        if (mc.gui.screen() == null) return;
 
-        if (mc.screen instanceof ConfirmScreen confirmScreen) {
+        if (mc.gui.screen() instanceof ConfirmScreen confirmScreen) {
             ConfirmScreenAccessor accessor = (ConfirmScreenAccessor) confirmScreen;
             var yesButton = accessor.chuckpack$getYesButton();
             if (yesButton != null && yesButton.active) {

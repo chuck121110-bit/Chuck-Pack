@@ -146,7 +146,7 @@ public class WBaseModule extends WPressable implements BaseWidget {
     @Override
     protected void onPressed(int button) {
         if (button == GLFW_MOUSE_BUTTON_LEFT) module.toggle();
-        else if (button == GLFW_MOUSE_BUTTON_RIGHT) mc.setScreen(theme().moduleScreen(module));
+        else if (button == GLFW_MOUSE_BUTTON_RIGHT) mc.setScreenAndShow(theme().moduleScreen(module));
     }
 
     @Override

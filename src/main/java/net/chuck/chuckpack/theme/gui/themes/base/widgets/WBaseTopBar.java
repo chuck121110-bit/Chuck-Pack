@@ -40,7 +40,7 @@ public class WBaseTopBar extends WTopBar implements BaseWidget {
         @Override
         protected void onRender(GuiRenderer renderer, double mouseX, double mouseY, double delta) {
             double pad = pad();
-            Screen screen = mc.screen;
+            Screen screen = mc.gui.screen();
             boolean isActiveTab = screen instanceof TabScreen && ((TabScreen) screen).tab == myTab;
             Color color = getButtonColor(pressed || isActiveTab, mouseOver);
 

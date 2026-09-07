@@ -407,7 +407,7 @@ public class SwarmMineMixin {
                     net.minecraft.client.multiplayer.ServerData.Type.OTHER
                 );
                 net.minecraft.client.gui.screens.Screen returnScreen =
-                    mc.screen != null ? mc.screen : new net.minecraft.client.gui.screens.TitleScreen();
+                    mc.gui.screen() != null ? mc.gui.screen() : new net.minecraft.client.gui.screens.TitleScreen();
                 net.minecraft.client.gui.screens.ConnectScreen.startConnecting(
                     returnScreen, mc, serverAddress, serverInfo, false,
                     new net.minecraft.client.multiplayer.TransferState(java.util.Map.of(), java.util.Map.of(), false)

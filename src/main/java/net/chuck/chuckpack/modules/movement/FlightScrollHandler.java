@@ -19,7 +19,7 @@ import static meteordevelopment.meteorclient.MeteorClient.mc;
 public class FlightScrollHandler {
     @EventHandler
     private void onMouseScroll(MouseScrollEvent event) {
-        if (mc.screen != null) return;
+        if (mc.gui.screen() != null) return;
         // Robust shift detection: Window direct check (left/right) + key mapping fallback. Fixes hot switches and no speed change.
         boolean shiftHeld = false;
         try {

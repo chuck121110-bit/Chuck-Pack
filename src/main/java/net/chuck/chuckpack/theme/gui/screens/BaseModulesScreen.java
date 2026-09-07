@@ -18,7 +18,7 @@ import meteordevelopment.meteorclient.utils.misc.NbtUtils;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
-import net.minecraft.util.Tuple;
+import com.mojang.datafixers.util.Pair;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -87,7 +87,7 @@ public class BaseModulesScreen extends TabScreen {
                 // Force printer/Litematica -> pink carpet as requested
                 if (category.name.equalsIgnoreCase("Litematica") || category.name.toLowerCase().contains("printer")) {
                     try {
-                        ItemStack pink = Items.PINK_CARPET.getDefaultInstance();
+                        ItemStack pink = Items.CARPET.pink().getDefaultInstance();
                         if (!pink.isEmpty()) { wContainer.add(theme.item(pink)).pad(2); return; }
                     } catch (Throwable ignored) {}
                 }
@@ -131,7 +131,7 @@ public class BaseModulesScreen extends TabScreen {
 
         for (int i = 0; i < Math.min(items.size(), max); i++) {
             Module m = toModule.apply(items.get(i));
-            String highlight = items.get(i) instanceof Tuple ? ((Tuple<Module, String>) items.get(i)).getB() : null;
+            String highlight = items.get(i) instanceof Pair ? ((Pair<Module, String>) items.get(i)).getSecond() : null;
             var cell = container.add(highlight != null ? theme.module(m, highlight) : theme.module(m)).expandX();
             if (i == 0) cell.padTop(scaled);
             if (i == Math.min(items.size(), max) - 1) cell.padBottom(scaled);
@@ -141,11 +141,11 @@ public class BaseModulesScreen extends TabScreen {
     protected void createSearchW(WContainer w, String text) {
         if (text.isEmpty()) return;
 
-        List<Tuple<Module, String>> modules = Modules.get().searchTitles(text);
+        List<Pair<Module, String>> modules = Modules.get().searchTitles(text);
         if (!modules.isEmpty()) {
             WSection section = w.add(theme.section("Modules")).expandX().widget();
             section.spacing = spacing();
-            addSearchItemsWithPadding(section, modules, Tuple::getA);
+            addSearchItemsWithPadding(section, modules, Pair::getFirst);
         }
 
         Set<Module> settings = Modules.get().searchSettingTitles(text);

@@ -677,7 +677,7 @@ public class NewChunks extends Module {
 		}
 		if ((save.get() || load.get()) && mc.level != null) {
 			levelName= mc.level.dimension().identifier().toString().replaceAll("[^a-zA-Z0-9._\\-]", "_");
-			if (mc.isSingleplayer()){
+			if (mc.hasSingleplayerServer()){
 				Path worldPath = mc.getSingleplayerServer().getServerDirectory();
 				Path savesDir = worldPath.getParent();
 				if (savesDir != null) {
@@ -793,7 +793,7 @@ public class NewChunks extends Module {
 		if (deletewarningTicks<=100) deletewarningTicks++;
 		else deletewarning=0;
 		if (deletewarning>=2){
-			if (mc.isSingleplayer()){
+			if (mc.hasSingleplayerServer()){
 				Path worldPath = mc.getSingleplayerServer().getServerDirectory();
 				Path savesDir = worldPath.getParent();
 				if (savesDir != null) {

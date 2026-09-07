@@ -489,7 +489,7 @@ public class VillagerRoller extends Module {
 
             WHorizontalList label = theme.horizontalList();
             WButton c = label.add(theme.button("Change")).widget();
-            c.action = () -> mc.setScreen(new EnchantmentSelectScreen(theme, onlyTradeable.get(), sel -> {
+            c.action = () -> mc.setScreenAndShow(new EnchantmentSelectScreen(theme, onlyTradeable.get(), sel -> {
                 searchingEnchants.set(si, sel);
                 list.clear();
                 fillWidget(theme, list);
@@ -541,7 +541,7 @@ public class VillagerRoller extends Module {
         };
 
         WButton add = controls.add(theme.button("Add")).expandX().widget();
-        add.action = () -> mc.setScreen(new EnchantmentSelectScreen(theme, onlyTradeable.get(), e -> {
+        add.action = () -> mc.setScreenAndShow(new EnchantmentSelectScreen(theme, onlyTradeable.get(), e -> {
             e.minLevel = 1;
             e.maxCost = 64;
             e.enabled = true;
@@ -652,7 +652,7 @@ public class VillagerRoller extends Module {
     private long waitingForTradesTicks = 0;
 
     public void triggerInteract() {
-        if (pauseOnScreen.get() && mc.screen != null) {
+        if (pauseOnScreen.get() && mc.gui.screen() != null) {
             if (cfPausedOnScreen.get()) {
                 info("Rolling paused, interact with villager to continue");
             }

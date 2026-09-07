@@ -262,8 +262,8 @@ public class NbtFilter extends Module {
         // The server may have opened the screen before sending its contents.
         // Remove that screen as well so the oversized container data cannot be
         // interacted with after its contents packet was rejected.
-        if (mc.screen instanceof AbstractContainerScreen<?>)
-            mc.setScreen(null);
+        if (mc.gui.screen() instanceof AbstractContainerScreen<?>)
+            mc.setScreenAndShow(null);
         recordBlocked(result);
     }
 

@@ -44,7 +44,7 @@ public class EditSeedEntryScreen extends WindowScreen {
             entry.worldName = worldBox.get();
             entry.seed = seedBox.get();
             onComplete.run();
-            minecraft.setScreen(null);
+            minecraft.setScreenAndShow(null);
         };
     }
 }

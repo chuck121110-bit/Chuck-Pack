@@ -126,7 +126,7 @@ public class SwarmWorkerMixin {
                 } catch (Throwable ignored) {}
                 try {
                     // Force disconnect from Minecraft server (works even if not in world, and closes swarm)
-                    if (mc.player != null || mc.getCurrentServer() != null || mc.screen != null) {
+                    if (mc.player != null || mc.getCurrentServer() != null || mc.gui.screen() != null) {
                         mc.disconnectFromWorld(net.minecraft.network.chat.Component.literal("Disconnected by host"));
                     } else {
                         // If not in world, just ensure swarm is closed
@@ -500,7 +500,7 @@ public class SwarmWorkerMixin {
                 }
                 net.minecraft.client.multiplayer.resolver.ServerAddress sa = new net.minecraft.client.multiplayer.resolver.ServerAddress(fHost, fPort);
                 net.minecraft.client.multiplayer.ServerData si = new net.minecraft.client.multiplayer.ServerData(fHost, fHost + ":" + fPort, net.minecraft.client.multiplayer.ServerData.Type.OTHER);
-                net.minecraft.client.gui.screens.Screen rs = mc.screen != null ? mc.screen : new net.minecraft.client.gui.screens.TitleScreen();
+                net.minecraft.client.gui.screens.Screen rs = mc.gui.screen() != null ? mc.gui.screen() : new net.minecraft.client.gui.screens.TitleScreen();
                 // Works outside world (TitleScreen) so you can start MC on host+worker and worker joins without touching it
                 net.minecraft.client.gui.screens.ConnectScreen.startConnecting(rs, mc, sa, si, false, new net.minecraft.client.multiplayer.TransferState(java.util.Map.of(), java.util.Map.of(), false));
                 ChatUtils.infoPrefix("Swarm", "Joining (highlight)%s:%d", fHost, fPort);

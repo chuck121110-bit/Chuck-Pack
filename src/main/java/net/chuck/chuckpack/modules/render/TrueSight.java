@@ -8,6 +8,7 @@ import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 
 import java.util.Set;
 
@@ -24,7 +25,7 @@ public class TrueSight extends Module {
     private final Setting<Set<EntityType<?>>> entityTypes = sgGeneral.add(new EntityTypeListSetting.Builder()
         .name("Entity Types")
         .description("The entity types to reveal when 'Only Listed Types' is enabled. Players are revealed so spectator players render their skin.")
-        .defaultValue(EntityType.PLAYER)
+        .defaultValue(EntityTypes.PLAYER)
         .build()
     );
 

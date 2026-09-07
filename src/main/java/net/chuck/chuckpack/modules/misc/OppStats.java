@@ -388,14 +388,14 @@ public class OppStats extends Module {
             if (info.name != null && !info.name.isEmpty())
                 return "server_" + info.name;
         }
-        if (mc.isSingleplayer())
+        if (mc.hasSingleplayerServer())
             return "singleplayer";
         return "unknown";
     }
 
     public void openScreen() {
-        Screen prev = mc.screen;
-        mc.setScreen(new OppStatsScreen(prev, this));
+        Screen prev = mc.gui.screen();
+        mc.setScreenAndShow(new OppStatsScreen(prev, this));
     }
 
     @Override

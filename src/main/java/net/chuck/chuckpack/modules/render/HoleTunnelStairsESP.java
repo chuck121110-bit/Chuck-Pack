@@ -403,7 +403,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
     }
 
     private boolean isBoxVisible(AABB AABB) {
-        Frustum frustum = mc.gameRenderer.getMainCamera().getCullFrustum();
+        Frustum frustum = mc.gameRenderer.mainCamera().getCullFrustum();
         if (frustum == null) return true;
         return frustum.isVisible(AABB);
     }
@@ -456,7 +456,7 @@ public class HoleTunnelStairsESP extends Module implements AeroShaderSource {
 
     private void renderBoxesShader(MeshBuilder mesh, Set<AABB> boxSet, Color color) {
         Color shaderColor = new Color(color.r, color.g, color.b, 255);
-        Frustum frustum = frustumCulling.get() ? mc.gameRenderer.getMainCamera().getCullFrustum() : null;
+        Frustum frustum = frustumCulling.get() ? mc.gameRenderer.mainCamera().getCullFrustum() : null;
         for (AABB AABB : boxSet) {
             if (frustum != null && !frustum.isVisible(AABB)) continue;
             meshBox(mesh, AABB.minX, AABB.minY, AABB.minZ, AABB.maxX, AABB.maxY, AABB.maxZ, shaderColor);

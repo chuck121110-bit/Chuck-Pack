@@ -144,7 +144,7 @@ public final class OppStatsScreen extends Screen {
 
     @Override
     public void onClose() {
-        Minecraft.getInstance().setScreen(previous);
+        Minecraft.getInstance().setScreenAndShow(previous);
     }
 
     @Override

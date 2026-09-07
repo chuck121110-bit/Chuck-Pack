@@ -74,7 +74,7 @@ public class MapIntegration extends Module {
             for (java.lang.reflect.Constructor<?> ctor : guiClass.getConstructors()) {
                 if (ctor.getParameterTypes().length == 9) {
                     Object gui = ctor.newInstance(hudMod, session, null, null, wpList, path, currentWorld, setId, true);
-                    net.minecraft.client.Minecraft.getInstance().setScreen((net.minecraft.client.gui.screens.Screen) gui);
+                    net.minecraft.client.Minecraft.getInstance().setScreenAndShow((net.minecraft.client.gui.screens.Screen) gui);
                     return;
                 }
             }

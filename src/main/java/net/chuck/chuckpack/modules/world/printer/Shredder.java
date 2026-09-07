@@ -138,7 +138,7 @@ public class Shredder extends Module {
                 if (fm == FilterMode.BLACKLIST ? inList : !inList) return;
             }
 
-            double dist = mc.player.getEyePosition().distanceTo(pos.getCenter());
+            double dist = mc.player.getEyePosition().distanceTo(Vec3.atCenterOf(pos));
             if (!isBlockVisible(pos) && dist > wr) return;
 
             toBreak.add(new BlockPos(pos));
@@ -176,7 +176,7 @@ public class Shredder extends Module {
 
     private boolean isBlockVisible(BlockPos pos) {
         Vec3 eyePos = mc.player.getEyePosition();
-        Vec3 blockCenter = pos.getCenter();
+            Vec3 blockCenter = Vec3.atCenterOf(pos);
         return mc.level.clip(new net.minecraft.world.level.ClipContext(
             eyePos, blockCenter,
             net.minecraft.world.level.ClipContext.Block.COLLIDER,

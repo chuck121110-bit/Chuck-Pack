@@ -623,8 +623,8 @@ public class StaffMonitor extends Module {
 
     private void showToast(Component title, Component message) {
         try {
-            if (mc.getToastManager() == null) return;
-            Runnable show = () -> SystemToast.add(mc.getToastManager(), SystemToast.SystemToastId.PERIODIC_NOTIFICATION, title, message);
+            if (mc.gui.toastManager() == null) return;
+            Runnable show = () -> SystemToast.add(mc.gui.toastManager(), SystemToast.SystemToastId.PERIODIC_NOTIFICATION, title, message);
             if (mc.isSameThread()) show.run();
             else mc.execute(show);
         } catch (Throwable ignored) {}

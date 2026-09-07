@@ -181,9 +181,9 @@ public class SwarmDropHelper {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         if (mc.player == null || mc.gameMode == null) return;
 
-        if (mc.screen != null) {
+        if (mc.gui.screen() != null) {
             mc.player.closeContainer();
-            mc.setScreen(null);
+            mc.setScreenAndShow(null);
         }
 
         net.minecraft.world.entity.player.Inventory inv = mc.player.getInventory();

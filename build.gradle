@@ -38,11 +38,15 @@ dependencies {
     implementation "meteordevelopment:meteor-client:${project.minecraft_version}-SNAPSHOT"
 
     // Baritone (required runtime dependency)
-    implementation files('libs/baritone-meteor-1.21.11.jar')
+    implementation files('libs/baritone-meteor-26.2.jar')
 
     // Xaero's World Map + Minimap (compile-only, for "Auto Fly Here" button)
     compileOnly files('libs/xaeroworldmap-fabric-26.1.2-1.44.2.jar')
     compileOnly files('libs/xaerominimap-fabric-26.1.2-26.4.2.jar')
+
+    // Litematica + MaLiLib (compile-only, for absorbed printer/shredder modules)
+    compileOnly files('libs/litematica-fabric-26.2-0.28.8.jar')
+    compileOnly files('libs/malilib-fabric-26.2-0.29.6.jar')
 
     // Fabric resource loader (needed for DataResourceStore used by ServerLevel)
     compileOnly files('C:/Users/Chuck/.gradle/caches/modules-2/files-2.1/net.fabricmc.fabric-api/fabric-resource-loader-v1/2.0.9+d871b99e4c/adc76cbab1a71ba7802c59fc44c18f3351f14b34/fabric-resource-loader-v1-2.0.9+d871b99e4c.jar')
