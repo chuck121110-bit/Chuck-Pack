@@ -310,34 +310,10 @@ public final class AutoFly extends Module
 		.build()
 	);
 
-	private final Setting<AntiKickMode> antiKickMode = sgAutomation.add(new EnumSetting.Builder<AntiKickMode>()
-		.name("anti-kick-mode")
-		.description("Anti-kick method 1:1 of Flight: None, Normal, Packet, NoGround (never report onGround).")
-		.defaultValue(AntiKickMode.Packet)
-		.build()
-	);
-
-	private final Setting<Boolean> autoAntiKick = sgAutomation.add(new BoolSetting.Builder()
-		.name("auto-anti-kick")
-		.description("Every 20 ticks, move down 0.035 blocks to prevent anti-cheat kicks.")
+	private final Setting<Boolean> antiKick = sgAutomation.add(new BoolSetting.Builder()
+		.name("anti-kick")
+		.description("Meteor Flight packet anti-kick 1:1: periodically fly down a bit to reset floating ticks.")
 		.defaultValue(true)
-		.build()
-	);
-
-	private final Setting<Boolean> dipOneBlock = sgAutomation.add(new BoolSetting.Builder()
-		.name("dip-1-block")
-		.description("Every second, fly one full block down then back up one block (1s cycle).")
-		.defaultValue(false)
-		.build()
-	);
-
-	private final Setting<Integer> dipInterval = sgAutomation.add(new IntSetting.Builder()
-		.name("dip-interval")
-		.description("Ticks between 1-block dips (20 ticks = 1 second).")
-		.defaultValue(20)
-		.min(5)
-		.sliderMax(100)
-		.visible(dipOneBlock::get)
 		.build()
 	);
 
@@ -347,7 +323,7 @@ public final class AutoFly extends Module
 		.defaultValue(20)
 		.min(1)
 		.sliderMax(200)
-		.visible(() -> antiKickMode.get() != AntiKickMode.None)
+		.visible(antiKick::get)
 		.build()
 	);
 
@@ -357,7 +333,7 @@ public final class AutoFly extends Module
 		.defaultValue(1)
 		.min(1)
 		.sliderRange(1, 20)
-		.visible(() -> antiKickMode.get() != AntiKickMode.None)
+		.visible(antiKick::get)
 		.build()
 	);
 
@@ -408,9 +384,6 @@ public final class AutoFly extends Module
 	private boolean antiKickFlip;
 	private float antiKickLastYaw;
 	private double antiKickLastPacketY;
-	private int dipDelayLeft;
-	private int dipOffLeft;
-	private boolean dipDipped;
 
 	// Explore mode for base finding: spiral out, reroute when stuck
 	private boolean exploreMode;
@@ -477,9 +450,6 @@ public final class AutoFly extends Module
 		antiKickFlip = false;
 		antiKickLastYaw = 0;
 		antiKickLastPacketY = Double.MAX_VALUE;
-		dipDelayLeft = dipInterval.get();
-		dipOffLeft = 0;
-		dipDipped = false;
 		exploreMode = false;
 		exploreTarget = null;
 		exploreLastPos = null;
@@ -698,8 +668,7 @@ public final class AutoFly extends Module
 
 		adaptiveSpeedTick();
 
-		// Anti-kick 1:1 of Flight (base Meteor Flight onPostTick) + yaw spin from onPreTick
-		// Flight onPreTick: spin when falling still to avoid kick
+		// Meteor Flight packet anti-kick 1:1 (onPreTick yaw spin + onPostTick timing)
 		{
 			float currentYaw = mc.player.getYRot();
 			if(mc.player.fallDistance >= 3f && currentYaw == antiKickLastYaw && mc.player.getDeltaMovement().length() < 0.003d)
@@ -710,8 +679,7 @@ public final class AutoFly extends Module
 			antiKickLastYaw = currentYaw;
 		}
 
-		// Flight onPostTick exact: delay/off timing with positionReminder for Packet
-		if(antiKickMode.get() != AntiKickMode.None && pathFlightController.isActive() && mc.player != null)
+		if(antiKick.get() && pathFlightController.isActive() && mc.player != null)
 		{
 			if(antiKickDelayLeft > 0) antiKickDelayLeft--;
 
@@ -719,65 +687,21 @@ public final class AutoFly extends Module
 			{
 				antiKickDelayLeft = antiKickDelay.get();
 				antiKickOffLeft = antiKickOffTime.get();
-				if(antiKickMode.get() == AntiKickMode.Packet)
-				{
-					try {
-						((meteordevelopment.meteorclient.mixin.LocalPlayerAccessor) mc.player).meteor$setPositionReminder(20);
-					} catch(Throwable ignored) {}
-				}
+				try {
+					((meteordevelopment.meteorclient.mixin.LocalPlayerAccessor) mc.player).meteor$setPositionReminder(20);
+				} catch(Throwable ignored) {}
 			}
 			else if(antiKickDelayLeft <= 0)
 			{
-				boolean shouldReturn = false;
-				if(antiKickMode.get() == AntiKickMode.Normal)
-				{
-					// Flight Normal with Abilities disables abilities to drop; AutoFly has no abilities, timing only
-					shouldReturn = false;
-				}
-				else if(antiKickMode.get() == AntiKickMode.Packet && antiKickOffLeft == antiKickOffTime.get())
+				if(antiKickOffLeft == antiKickOffTime.get())
 				{
 					try {
 						((meteordevelopment.meteorclient.mixin.LocalPlayerAccessor) mc.player).meteor$setPositionReminder(20);
 					} catch(Throwable ignored) {}
 				}
-				// NoGround: timing only, onGround spoof handled in onSendPacket
 				antiKickOffLeft--;
-				if(shouldReturn) {
-					if(mc.player.getYRot() != antiKickLastYaw) mc.player.setYRot(antiKickLastYaw);
-					syncConfig();
-					return;
-				}
 			}
 			if(mc.player.getYRot() != antiKickLastYaw) mc.player.setYRot(antiKickLastYaw);
-		}
-
-		if (autoAntiKick.get() && pathFlightController.isActive() && mc.player != null && mc.player.tickCount % 20 == 0) {
-			mc.player.setPos(mc.player.getX(), mc.player.getY() - 0.035, mc.player.getZ());
-		}
-
-		// Dip 1 full block down every second then back up
-		if(dipOneBlock.get() && pathFlightController.isActive() && mc.player != null)
-		{
-			if(!dipDipped)
-			{
-				if(dipDelayLeft > 0) dipDelayLeft--;
-				if(dipDelayLeft <= 0)
-				{
-					mc.player.setPos(mc.player.getX(), mc.player.getY() - 1.0, mc.player.getZ());
-					dipDipped = true;
-					dipOffLeft = 2;
-				}
-			}
-			else
-			{
-				if(dipOffLeft > 0) dipOffLeft--;
-				if(dipOffLeft <= 0)
-				{
-					mc.player.setPos(mc.player.getX(), mc.player.getY() + 1.0, mc.player.getZ());
-					dipDipped = false;
-					dipDelayLeft = dipInterval.get();
-				}
-			}
 		}
 
 		syncConfig();
@@ -1090,20 +1014,8 @@ public final class AutoFly extends Module
 	private void onSendPacket(PacketEvent.Send event)
 	{
 		if(!isActive() || mc.player == null) return;
+		if(!antiKick.get()) return;
 		if(!(event.packet instanceof ServerboundMovePlayerPacket packet)) return;
-
-		// NoGround: never report onGround (1:1 NoFall NoGround) - works in any anti-kick mode when selected
-		if(antiKickMode.get() == AntiKickMode.NoGround)
-		{
-			try {
-				((meteordevelopment.meteorclient.mixin.ServerboundMovePlayerPacketAccessor) packet).meteor$setOnGround(false);
-			} catch(Throwable ignored) {
-				try { ((PlayerMoveC2SPacketAccessor) packet).chuckpack$setOnGround(false); } catch(Throwable ignored2) {}
-			}
-			return;
-		}
-
-		if(antiKickMode.get() != AntiKickMode.Packet) return;
 
 		// 1:1 Flight onSendPacket
 		double currentY = packet.getY(Double.MAX_VALUE);
@@ -1137,11 +1049,10 @@ public final class AutoFly extends Module
 
 	private void antiKickPacket(ServerboundMovePlayerPacket packet, double currentY)
 	{
-		// 1:1 Flight antiKickPacket: max 80 ticks floating, >= -0.03125D check uses 0.03130D
 		if(antiKickDelayLeft <= 0 && antiKickLastPacketY != Double.MAX_VALUE
 			&& shouldFlyDown(currentY, antiKickLastPacketY) && meteordevelopment.meteorclient.utils.entity.EntityUtils.isOnAir(mc.player))
 		{
-			((meteordevelopment.meteorclient.mixin.ServerboundMovePlayerPacketAccessor) packet).meteor$setY(antiKickLastPacketY - 0.03130D);
+			((meteordevelopment.meteorclient.mixin.ServerboundMovePlayerPacketAccessor) packet).meteor$setY(antiKickLastPacketY - 0.0313);
 		}
 		else
 		{
@@ -1152,7 +1063,7 @@ public final class AutoFly extends Module
 	private boolean shouldFlyDown(double currentY, double lastY)
 	{
 		if(currentY >= lastY) return true;
-		return lastY - currentY < 0.03130D;
+		return lastY - currentY < 0.0313;
 	}
 
 	@EventHandler
@@ -1772,10 +1683,4 @@ public final class AutoFly extends Module
 		}
 	}
 
-	public enum AntiKickMode {
-		Normal,
-		Packet,
-		NoGround,
-		None;
-	}
 }
