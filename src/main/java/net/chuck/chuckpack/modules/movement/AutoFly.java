@@ -312,7 +312,7 @@ public final class AutoFly extends Module
 
 	private final Setting<AntiKickMode> antiKickMode = sgAutomation.add(new EnumSetting.Builder<AntiKickMode>()
 		.name("anti-kick-mode")
-		.description("Anti-kick method: None (standard), Normal (minetick), Packet (packet edit).")
+		.description("Anti-kick method 1:1 of Flight: None, Normal, Packet, NoGround (never report onGround).")
 		.defaultValue(AntiKickMode.Packet)
 		.build()
 	);
@@ -321,6 +321,23 @@ public final class AutoFly extends Module
 		.name("auto-anti-kick")
 		.description("Every 20 ticks, move down 0.035 blocks to prevent anti-cheat kicks.")
 		.defaultValue(true)
+		.build()
+	);
+
+	private final Setting<Boolean> dipOneBlock = sgAutomation.add(new BoolSetting.Builder()
+		.name("dip-1-block")
+		.description("Every second, fly one full block down then back up one block (1s cycle).")
+		.defaultValue(false)
+		.build()
+	);
+
+	private final Setting<Integer> dipInterval = sgAutomation.add(new IntSetting.Builder()
+		.name("dip-interval")
+		.description("Ticks between 1-block dips (20 ticks = 1 second).")
+		.defaultValue(20)
+		.min(5)
+		.sliderMax(100)
+		.visible(dipOneBlock::get)
 		.build()
 	);
 
@@ -391,6 +408,20 @@ public final class AutoFly extends Module
 	private boolean antiKickFlip;
 	private float antiKickLastYaw;
 	private double antiKickLastPacketY;
+	private int dipDelayLeft;
+	private int dipOffLeft;
+	private boolean dipDipped;
+
+	// Explore mode for base finding: spiral out, reroute when stuck
+	private boolean exploreMode;
+	private int exploreRadius;
+	private int exploreHeight;
+	private double exploreAngle;
+	private int exploreLeg;
+	private BlockPos exploreTarget;
+	private Vec3 exploreLastPos;
+	private int exploreStuckTicks;
+	private int exploreStuckCooldown;
 
 	// Setback state machine
 	// Phase 0 = ramp up, counting setbacks
@@ -446,6 +477,14 @@ public final class AutoFly extends Module
 		antiKickFlip = false;
 		antiKickLastYaw = 0;
 		antiKickLastPacketY = Double.MAX_VALUE;
+		dipDelayLeft = dipInterval.get();
+		dipOffLeft = 0;
+		dipDipped = false;
+		exploreMode = false;
+		exploreTarget = null;
+		exploreLastPos = null;
+		exploreStuckTicks = 0;
+		exploreStuckCooldown = 0;
 		jumpWasPressed = false;
 		lastJumpPressMs = 0;
 
@@ -598,7 +637,14 @@ public final class AutoFly extends Module
 		}
 		wasPathing = isPathingNow;
 
-		if(arrived || !pathFlightController.isActive()) return;
+		if(exploreMode && !arrived) exploreTick();
+
+		if(arrived || !pathFlightController.isActive()) {
+			// In explore mode arrival just picks next leg instead of stopping (handled in exploreTick)
+			if(exploreMode && arrived) { arrived = false; exploreTick(); return; }
+			if(exploreMode && !pathFlightController.isActive() && !arrived) { exploreTick(); return; }
+			return;
+		}
 
 		if(autoLogOnDamage.get())
 		{
@@ -652,7 +698,19 @@ public final class AutoFly extends Module
 
 		adaptiveSpeedTick();
 
-		// Anti-kick post-tick (Meteor-style)
+		// Anti-kick 1:1 of Flight (base Meteor Flight onPostTick) + yaw spin from onPreTick
+		// Flight onPreTick: spin when falling still to avoid kick
+		{
+			float currentYaw = mc.player.getYRot();
+			if(mc.player.fallDistance >= 3f && currentYaw == antiKickLastYaw && mc.player.getDeltaMovement().length() < 0.003d)
+			{
+				mc.player.setYRot(currentYaw + (antiKickFlip ? 1 : -1));
+				antiKickFlip = !antiKickFlip;
+			}
+			antiKickLastYaw = currentYaw;
+		}
+
+		// Flight onPostTick exact: delay/off timing with positionReminder for Packet
 		if(antiKickMode.get() != AntiKickMode.None && pathFlightController.isActive() && mc.player != null)
 		{
 			if(antiKickDelayLeft > 0) antiKickDelayLeft--;
@@ -663,23 +721,63 @@ public final class AutoFly extends Module
 				antiKickOffLeft = antiKickOffTime.get();
 				if(antiKickMode.get() == AntiKickMode.Packet)
 				{
-					mc.player.connection.send(new net.minecraft.network.protocol.game.ServerboundMovePlayerPacket.Pos(
-						mc.player.getX(), mc.player.getY(), mc.player.getZ(), mc.player.onGround(), mc.player.horizontalCollision));
+					try {
+						((meteordevelopment.meteorclient.mixin.LocalPlayerAccessor) mc.player).meteor$setPositionReminder(20);
+					} catch(Throwable ignored) {}
 				}
 			}
 			else if(antiKickDelayLeft <= 0)
 			{
-				if(antiKickMode.get() == AntiKickMode.Packet && antiKickOffLeft == antiKickOffTime.get())
+				boolean shouldReturn = false;
+				if(antiKickMode.get() == AntiKickMode.Normal)
 				{
-					mc.player.connection.send(new net.minecraft.network.protocol.game.ServerboundMovePlayerPacket.Pos(
-						mc.player.getX(), mc.player.getY(), mc.player.getZ(), mc.player.onGround(), mc.player.horizontalCollision));
+					// Flight Normal with Abilities disables abilities to drop; AutoFly has no abilities, timing only
+					shouldReturn = false;
 				}
+				else if(antiKickMode.get() == AntiKickMode.Packet && antiKickOffLeft == antiKickOffTime.get())
+				{
+					try {
+						((meteordevelopment.meteorclient.mixin.LocalPlayerAccessor) mc.player).meteor$setPositionReminder(20);
+					} catch(Throwable ignored) {}
+				}
+				// NoGround: timing only, onGround spoof handled in onSendPacket
 				antiKickOffLeft--;
+				if(shouldReturn) {
+					if(mc.player.getYRot() != antiKickLastYaw) mc.player.setYRot(antiKickLastYaw);
+					syncConfig();
+					return;
+				}
 			}
+			if(mc.player.getYRot() != antiKickLastYaw) mc.player.setYRot(antiKickLastYaw);
 		}
 
 		if (autoAntiKick.get() && pathFlightController.isActive() && mc.player != null && mc.player.tickCount % 20 == 0) {
 			mc.player.setPos(mc.player.getX(), mc.player.getY() - 0.035, mc.player.getZ());
+		}
+
+		// Dip 1 full block down every second then back up
+		if(dipOneBlock.get() && pathFlightController.isActive() && mc.player != null)
+		{
+			if(!dipDipped)
+			{
+				if(dipDelayLeft > 0) dipDelayLeft--;
+				if(dipDelayLeft <= 0)
+				{
+					mc.player.setPos(mc.player.getX(), mc.player.getY() - 1.0, mc.player.getZ());
+					dipDipped = true;
+					dipOffLeft = 2;
+				}
+			}
+			else
+			{
+				if(dipOffLeft > 0) dipOffLeft--;
+				if(dipOffLeft <= 0)
+				{
+					mc.player.setPos(mc.player.getX(), mc.player.getY() + 1.0, mc.player.getZ());
+					dipDipped = false;
+					dipDelayLeft = dipInterval.get();
+				}
+			}
 		}
 
 		syncConfig();
@@ -991,49 +1089,59 @@ public final class AutoFly extends Module
 	@EventHandler
 	private void onSendPacket(PacketEvent.Send event)
 	{
-		if(antiKickMode.get() != AntiKickMode.Packet) return;
 		if(!isActive() || mc.player == null) return;
+		if(!(event.packet instanceof ServerboundMovePlayerPacket packet)) return;
 
-		if(event.packet instanceof ServerboundMovePlayerPacket packet)
+		// NoGround: never report onGround (1:1 NoFall NoGround) - works in any anti-kick mode when selected
+		if(antiKickMode.get() == AntiKickMode.NoGround)
 		{
-			double currentY;
-			if(packet instanceof ServerboundMovePlayerPacket.Pos posPacket)
-			{
-				currentY = posPacket.getY(0);
+			try {
+				((meteordevelopment.meteorclient.mixin.ServerboundMovePlayerPacketAccessor) packet).meteor$setOnGround(false);
+			} catch(Throwable ignored) {
+				try { ((PlayerMoveC2SPacketAccessor) packet).chuckpack$setOnGround(false); } catch(Throwable ignored2) {}
 			}
-			else if(packet instanceof ServerboundMovePlayerPacket.PosRot fullPacket2)
-			{
-				currentY = fullPacket2.getY(0);
-			}
-			else
-			{
-				currentY = Double.MAX_VALUE;
-			}
+			return;
+		}
 
-			if(currentY != Double.MAX_VALUE)
+		if(antiKickMode.get() != AntiKickMode.Packet) return;
+
+		// 1:1 Flight onSendPacket
+		double currentY = packet.getY(Double.MAX_VALUE);
+		if(currentY != Double.MAX_VALUE)
+		{
+			antiKickPacket(packet, currentY);
+		}
+		else
+		{
+			ServerboundMovePlayerPacket fullPacket;
+			if(packet.hasRotation())
 			{
-				antiKickPacket(packet, currentY);
-			}
-			else
-			{
-				ServerboundMovePlayerPacket.PosRot fullPacket = new ServerboundMovePlayerPacket.PosRot(
+				fullPacket = new ServerboundMovePlayerPacket.PosRot(
 					mc.player.getX(), mc.player.getY(), mc.player.getZ(),
 					packet.getYRot(0), packet.getXRot(0),
 					packet.isOnGround(), mc.player.horizontalCollision
 				);
-				event.cancel();
-				antiKickPacket(fullPacket, mc.player.getY());
-				mc.getConnection().getConnection().send(fullPacket);
 			}
+			else
+			{
+				fullPacket = new ServerboundMovePlayerPacket.Pos(
+					mc.player.getX(), mc.player.getY(), mc.player.getZ(),
+					packet.isOnGround(), mc.player.horizontalCollision
+				);
+			}
+			event.cancel();
+			antiKickPacket(fullPacket, mc.player.getY());
+			mc.getConnection().send(fullPacket);
 		}
 	}
 
 	private void antiKickPacket(ServerboundMovePlayerPacket packet, double currentY)
 	{
+		// 1:1 Flight antiKickPacket: max 80 ticks floating, >= -0.03125D check uses 0.03130D
 		if(antiKickDelayLeft <= 0 && antiKickLastPacketY != Double.MAX_VALUE
-			&& shouldFlyDown(currentY, antiKickLastPacketY) && !mc.player.onGround())
+			&& shouldFlyDown(currentY, antiKickLastPacketY) && meteordevelopment.meteorclient.utils.entity.EntityUtils.isOnAir(mc.player))
 		{
-			((PlayerMoveC2SPacketAccessor) packet).chuckpack$setY(antiKickLastPacketY - 0.0313);
+			((meteordevelopment.meteorclient.mixin.ServerboundMovePlayerPacketAccessor) packet).meteor$setY(antiKickLastPacketY - 0.03130D);
 		}
 		else
 		{
@@ -1044,7 +1152,7 @@ public final class AutoFly extends Module
 	private boolean shouldFlyDown(double currentY, double lastY)
 	{
 		if(currentY >= lastY) return true;
-		return lastY - currentY < 0.0313;
+		return lastY - currentY < 0.03130D;
 	}
 
 	@EventHandler
@@ -1105,13 +1213,106 @@ public final class AutoFly extends Module
 		}
 	}
 
+	public void startExplore(int radius, int height)
+	{
+		if(mc.player == null || mc.level == null) {
+			error("Join a Level before exploring.");
+			return;
+		}
+		if(!isActive()) toggle();
+		exploreMode = true;
+		exploreRadius = Math.max(256, radius);
+		exploreHeight = height;
+		exploreAngle = 0;
+		exploreLeg = 0;
+		exploreStuckTicks = 0;
+		exploreStuckCooldown = 0;
+		exploreLastPos = mc.player.position();
+		pickExploreTarget();
+		info("Explore started: radius " + exploreRadius + " height " + exploreHeight + ". Reroutes when stuck.");
+	}
+
+	public void stopExplore()
+	{
+		exploreMode = false;
+		exploreTarget = null;
+		if(isActive()) {
+			pathFlightController.stop();
+			toggle();
+		}
+		info("Explore stopped.");
+	}
+
+	public boolean isExploring() { return exploreMode && isActive(); }
+
+	private void pickExploreTarget()
+	{
+		if(mc.player == null) return;
+		BlockPos origin = mc.player.blockPosition();
+		// Spiral out: increase distance every 2 legs, rotate 90deg each leg for grid coverage (base finding loads chunks)
+		int step = 256;
+		int dist = step * (exploreLeg / 2 + 1);
+		if(dist > exploreRadius) {
+			// Reset spiral when radius covered
+			exploreLeg = 0;
+			dist = step;
+		}
+		double rad = Math.toRadians(exploreAngle);
+		int tx = origin.getX() + (int)(Math.cos(rad) * dist);
+		int tz = origin.getZ() + (int)(Math.sin(rad) * dist);
+		int ty = exploreHeight;
+		exploreAngle += 90;
+		if(exploreAngle >= 360) exploreAngle -= 360;
+		exploreLeg++;
+		exploreTarget = new BlockPos(tx, ty, tz);
+		exploreStuckTicks = 0;
+		setTargetFromMapInternal(tx, ty, tz);
+		if(pathDebug.get()) info("[Explore] New leg to " + tx + " " + ty + " " + tz);
+	}
+
+	private void exploreTick()
+	{
+		if(!exploreMode || mc.player == null) return;
+		if(exploreStuckCooldown > 0) { exploreStuckCooldown--; return; }
+		Vec3 cur = mc.player.position();
+		if(exploreLastPos != null) {
+			double moved = cur.distanceTo(exploreLastPos);
+			if(moved < 0.5) {
+				exploreStuckTicks++;
+			} else {
+				exploreStuckTicks = 0;
+			}
+			// Stuck for ~5s (100 ticks) or destination unreachable -> pick different way
+			boolean unreachable = false;
+			try { unreachable = pathFlightController.isDestinationUnreachable(); } catch(Throwable ignored) {}
+			if(exploreStuckTicks >= 100 || unreachable) {
+				if(pathDebug.get() || true) info("[Explore] Stuck, rerouting different way.");
+				// Turn 135deg different way instead of 90 to avoid same obstacle
+				exploreAngle += 135;
+				if(exploreAngle >= 360) exploreAngle -= 360;
+				exploreLeg++;
+				pickExploreTarget();
+				exploreStuckCooldown = 40;
+				unreachableTicks = 0;
+				return;
+			}
+		}
+		exploreLastPos = cur;
+		// If arrived at leg target (path inactive but explore on), pick next leg
+		if(!pathFlightController.isActive() && exploreMode) {
+			pickExploreTarget();
+		}
+	}
+
 	public void setTargetFromMap(int x, int y, int z)
 	{
+		exploreMode = false;
 		setTargetFromMap(x, y, z, false);
 	}
 
 	public void setTargetFromMap(int x, int y, int z, boolean yKnown, boolean skipWaypoint)
 	{
+		exploreMode = false;
 		mapClickYKnown = yKnown;
 		setTargetFromMapInternal(x, y, z);
 		if(!skipWaypoint) createAutoFlyWaypoint();
@@ -1574,6 +1775,7 @@ public final class AutoFly extends Module
 	public enum AntiKickMode {
 		Normal,
 		Packet,
+		NoGround,
 		None;
 	}
 }

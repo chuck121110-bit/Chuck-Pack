@@ -79,12 +79,27 @@ public class NoFallMixin {
     }
 
     @Inject(method = "onSendPacket", at = @At("HEAD"))
-    private void chuckpack$onSendPacketNoGround(PacketEvent.Send event, CallbackInfo ci) {
+    private void chuckpack$onSendPacketNoGroundHead(PacketEvent.Send event, CallbackInfo ci) {
+        chuckpack$applyNoGround(event);
+    }
+
+    @Inject(method = "onSendPacket", at = @At("TAIL"))
+    private void chuckpack$onSendPacketNoGroundTail(PacketEvent.Send event, CallbackInfo ci) {
+        // Re-apply after base NoFall Packet mode (which sets onGround=true) so NoGround wins
+        chuckpack$applyNoGround(event);
+    }
+
+    @Unique
+    private void chuckpack$applyNoGround(PacketEvent.Send event) {
         if (chuckpack$noGroundMode == null || chuckpack$noGroundMode.get() != NoGroundMode.NoGround) return;
         if (!(event.packet instanceof ServerboundMovePlayerPacket)) return;
         // Avoid handling our own deactivate packets (tag 1337) - same as Meteor Editions
         if (event.packet instanceof IServerboundMovePlayerPacket tagged && tagged.meteor$getTag() == 1337) return;
-        // Never report a landing - same as Meteor Editions PR: unconditional false
-        ((PlayerMoveC2SPacketAccessor) event.packet).chuckpack$setOnGround(false);
+        // Never report a landing - same as Meteor Editions PR: unconditional false (1:1, in list with Packet etc.)
+        try {
+            ((meteordevelopment.meteorclient.mixin.ServerboundMovePlayerPacketAccessor) event.packet).meteor$setOnGround(false);
+        } catch(Throwable ignored) {
+            try { ((PlayerMoveC2SPacketAccessor) event.packet).chuckpack$setOnGround(false); } catch(Throwable ignored2) {}
+        }
     }
 }

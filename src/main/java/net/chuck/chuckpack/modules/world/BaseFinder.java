@@ -141,17 +141,17 @@ public class BaseFinder extends Module {
     );
     private final Setting<Integer> minY = sgGeneral.add(new IntSetting.Builder()
             .name("Detection Y Minimum OffSet")
-            .description("Scans blocks above or at this this many blocks from minimum build limit.")
+            .description("Scans blocks at/above this many blocks from minimum build limit. Default 0 = scan from -64 (bottom of world).")
             .min(0)
             .sliderRange(0,319)
             .defaultValue(0)
             .build());
     private final Setting<Integer> maxY = sgGeneral.add(new IntSetting.Builder()
             .name("Detection Y Maximum OffSet")
-            .description("Scans blocks below or at this this many blocks from maximum build limit.")
+            .description("Scans blocks at/below max build limit minus this offset. Default 101 = scan up to 219 (320-101). Set 0 for full height to 320.")
             .min(0)
             .sliderRange(0,319)
-            .defaultValue(0)
+            .defaultValue(101)
             .build());
     private final Setting<Integer> minSpawnDistanceOverworld = sgGeneral.add(new IntSetting.Builder()
             .name("Min Spawn Distance Overworld (Chunks)")
@@ -188,11 +188,11 @@ public class BaseFinder extends Module {
             .defaultValue(true)
             .build());
     private final Setting<Integer> skybuildint = sgDetectors.add(new IntSetting.Builder()
-            .name("Sky Build Y Threshold")
-            .description("If Blocks higher than this Y value, flag LevelChunk as possible build.")
+            .name("Sky base height")
+            .description("Y level for sky bases. Any placed block above this level automatically flags the chunk as a sky base. Default 219.")
             .min(-64)
             .sliderRange(-64, 319)
-            .defaultValue(260)
+            .defaultValue(219)
             .visible(skybuildfind::get)
             .build());
     private final Setting<Boolean> bedrockfind = sgDetectors.add(new BoolSetting.Builder()
@@ -470,14 +470,14 @@ public class BaseFinder extends Module {
             .visible(list7Activar::get)
             .build());
     private final Setting<Boolean> exclusionEnabled = sglists.add(new BoolSetting.Builder()
-            .name("LevelChunk Exclusion")
-            .description("If a LevelChunk contains enough of these blocks, it will be excluded from detection. Useful for filtering out structures like woodland mansions or villages.")
+            .name("Chunk Exclusion")
+            .description("If a chunk contains enough of these blocks, it will be excluded from detection. Useful for filtering out structures like woodland mansions or villages.")
             .defaultValue(false)
             .build()
     );
     private final Setting<List<Block>> exclusionBlocks = sglists.add(new BlockListSetting.Builder()
             .name("Exclusion Blocks")
-            .description("Blocks that cause a LevelChunk to be excluded when the minimum count is reached. Add blocks like dark oak fences to filter woodland mansions.")
+            .description("Blocks that cause a chunk to be excluded when the minimum count is reached. Add blocks like dark oak fences to filter woodland mansions.")
             .defaultValue()
             .visible(exclusionEnabled::get)
             .filter(this::filterBlocks)
@@ -485,7 +485,7 @@ public class BaseFinder extends Module {
     );
     private final Setting<Integer> exclusionMinCount = sglists.add(new IntSetting.Builder()
             .name("Exclusion Min Count")
-            .description("Minimum number of exclusion blocks in a LevelChunk before it is excluded from detection.")
+            .description("Minimum number of exclusion blocks in a chunk before it is excluded from detection.")
             .min(1)
             .sliderRange(1, 100)
             .defaultValue(5)
@@ -1397,14 +1397,14 @@ public class BaseFinder extends Module {
                                 for (int y = 0; y < 16; y++) {
                                     for (int z = 0; z < 16; z++) {
                                         int currentY = Y + y;
-                                        if (currentY <= Ymin || currentY >= Ymax) continue;
+                                        if (currentY < Ymin || currentY > Ymax) continue;
                                         blockposi=new BlockPos(x, currentY, z);
                                         BlockState blerks = section.getBlockState(x,y,z);
                                         if (exclusionEnabled.get() && !exclusionBlocks.get().isEmpty() && exclusionBlocks.get().contains(blerks.getBlock())) {
                                             exclusionBlockCount++;
                                         }
                                         if (blerks.getBlock()!=Blocks.AIR && blerks.getBlock()!=Blocks.STONE){
-                                            if (!(blerks.getBlock()==Blocks.DEEPSLATE) && !(blerks.getBlock()==Blocks.DIRT) && !(blerks.getBlock()==Blocks.GRASS_BLOCK) && !(blerks.getBlock()==Blocks.WATER) && !(blerks.getBlock()==Blocks.SAND) && !(blerks.getBlock()==Blocks.GRAVEL)  && !(blerks.getBlock()==Blocks.BEDROCK)&& !(blerks.getBlock()==Blocks.NETHERRACK) && !(blerks.getBlock()==Blocks.LAVA)){
+                                            if (!(blerks.getBlock()==Blocks.DEEPSLATE) && !(blerks.getBlock()==Blocks.DIRT) && !(blerks.getBlock()==Blocks.GRASS_BLOCK) && !(blerks.getBlock()==Blocks.WATER) && !(blerks.getBlock()==Blocks.SAND) && !(blerks.getBlock()==Blocks.GRAVEL) && !(blerks.getBlock()==Blocks.NETHERRACK) && !(blerks.getBlock()==Blocks.LAVA)){
                                                 if (signFinder.get() && blerks.getBlock() instanceof SignBlock || blerks.getBlock() instanceof HangingSignBlock) {
                                                     for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
                                                         Boolean signtextfound = false;
