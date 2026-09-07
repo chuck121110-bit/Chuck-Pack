@@ -35,6 +35,8 @@ import net.chuck.chuckpack.modules.render.MobGearESP;
 import net.chuck.chuckpack.modules.world.AutoFarming;
 import net.chuck.chuckpack.modules.world.BaseFinder;
 import net.chuck.chuckpack.modules.world.OreSim;
+import net.chuck.chuckpack.modules.world.printer.Printer;
+import net.chuck.chuckpack.modules.world.printer.Shredder;
 import net.chuck.chuckpack.util.config.ChuckPackConfigModifier;
 import net.chuck.chuckpack.util.config.CategoryConfig;
 import net.minecraft.world.item.ItemStack;
@@ -83,6 +85,8 @@ public class ChuckPack extends MeteorAddon {
         addModule(new CoordinateLogout());
         addModule(new HoleTunnelStairsESP());
         addModule(new BaseFinder());
+        addModule(new Printer());
+        addModule(new Shredder());
         addModule(new MobGearESP());
         addModule(new PlayerTriangulate());
         addModule(new Untouchable());
