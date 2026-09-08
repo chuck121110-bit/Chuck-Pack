@@ -318,10 +318,10 @@ public class AutoLogin extends Module {
         }
 
         if (shouldContinueProcessing) {
-            if (loginStartTime == -1) loginStartTime = mc.level.getDefaultClockTime();
+            if (loginStartTime == -1) loginStartTime = mc.level.getGameTime();
             boolean hasRemainingAutoLogins = false;
             for (BaseAutoLogin autoLogin : List.copyOf(autoLogins)) {
-                if (mc.level.getDefaultClockTime() < loginStartTime + autoLogin.delay.get()) {
+                if (mc.level.getGameTime() < loginStartTime + autoLogin.delay.get()) {
                     hasRemainingAutoLogins = true;
                     continue;
                 }
