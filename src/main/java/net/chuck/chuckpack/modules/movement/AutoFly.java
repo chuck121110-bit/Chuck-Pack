@@ -679,7 +679,7 @@ public final class AutoFly extends Module
 			antiKickLastYaw = currentYaw;
 		}
 
-		if(antiKick.get() && pathFlightController.isActive() && mc.player != null)
+		if(antiKick.get() && mc.player != null)
 		{
 			if(antiKickDelayLeft > 0) antiKickDelayLeft--;
 
@@ -701,7 +701,7 @@ public final class AutoFly extends Module
 				}
 				antiKickOffLeft--;
 			}
-			if(mc.player.getYRot() != antiKickLastYaw) mc.player.setYRot(antiKickLastYaw);
+			if(pathFlightController.isActive() && mc.player.getYRot() != antiKickLastYaw) mc.player.setYRot(antiKickLastYaw);
 		}
 
 		syncConfig();
