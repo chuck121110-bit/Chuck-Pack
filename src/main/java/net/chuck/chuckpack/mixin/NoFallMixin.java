@@ -40,6 +40,39 @@ public class NoFallMixin {
         return chuckpack$mode != null && chuckpack$mode.get() == Mode.NoGround;
     }
 
+    // User's maxFallHeightNoWater before anything clobbers it. Meteor sets
+    // 159159 while NoFall is active and restores only its own default after,
+    // which wipes custom values (and a mid-stream switch to NoGround cancels
+    // the restore entirely, sticking at 159159).
+    @Unique
+    private static Integer chuckpack$fallSnapshot = null;
+
+    @Unique
+    private static int chuckpack$liveFallHeight() {
+        return baritone.api.BaritoneAPI.getSettings().maxFallHeightNoWater.value;
+    }
+
+    @Unique
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void chuckpack$setFallHeight(int target) {
+        try {
+            for (meteordevelopment.meteorclient.settings.SettingGroup group : meteordevelopment.meteorclient.pathing.PathManagers.get().getSettings().get().groups) {
+                boolean done = false;
+                for (meteordevelopment.meteorclient.settings.Setting<?> w : group) {
+                    if (w.name.equals("maxFallHeightNoWater") && w.get() instanceof Integer) {
+                        ((meteordevelopment.meteorclient.settings.Setting<Integer>) (Object) w).set(target);
+                        done = true;
+                        break;
+                    }
+                }
+                if (done) break;
+            }
+        } catch (Throwable ignored) {}
+        try {
+            ((baritone.api.Settings.Setting<Integer>) (Object) baritone.api.BaritoneAPI.getSettings().maxFallHeightNoWater).value = target;
+        } catch (Throwable ignored) {}
+    }
+
     // Push our selection into meteor's hidden mode so its sub-settings visibility
     // (placed-item, air-place-mode, anchor) keeps working. NoGround maps to Packet
     // but meteor's logic is fully suppressed while selected, so it never runs.
@@ -85,12 +118,61 @@ public class NoFallMixin {
     // own mode with no other logic attached.
     @Inject(method = "onActivate", at = @At("HEAD"), cancellable = true)
     private void chuckpack$suppressActivate(CallbackInfo ci) {
-        if (chuckpack$isNoGround()) ci.cancel();
+        if (chuckpack$isNoGround()) {
+            // Pure NoGround cycle: meteor must not touch anything. Heal a
+            // leaked 159159 first if we know the real value, then cancel.
+            try {
+                if (chuckpack$liveFallHeight() == 159159 && chuckpack$fallSnapshot != null) {
+                    chuckpack$setFallHeight(chuckpack$fallSnapshot);
+                }
+            } catch (Throwable ignored) {}
+            chuckpack$fallSnapshot = null;
+            ci.cancel();
+            return;
+        }
+        chuckpack$fallSnapshot = null;
+        try {
+            chuckpack$fallSnapshot = chuckpack$liveFallHeight();
+        } catch (Throwable ignored) {}
     }
 
     @Inject(method = "onDeactivate", at = @At("HEAD"), cancellable = true)
     private void chuckpack$suppressDeactivate(CallbackInfo ci) {
-        if (chuckpack$isNoGround()) ci.cancel();
+        if (!chuckpack$isNoGround()) return;
+        // NoGround: meteor's body would restore a stale pre value, and a
+        // mid-stream switch here leaves 159159 stuck. Fix it ourselves.
+        try {
+            if (chuckpack$liveFallHeight() == 159159) {
+                Integer snap = chuckpack$fallSnapshot;
+                if (snap != null) {
+                    chuckpack$setFallHeight(snap);
+                } else {
+                    try {
+                        chuckpack$setFallHeight(baritone.api.BaritoneAPI.getSettings().maxFallHeightNoWater.defaultValue);
+                    } catch (Throwable ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
+        chuckpack$fallSnapshot = null;
+        ci.cancel();
+    }
+
+    @Inject(method = "onDeactivate", at = @At("TAIL"))
+    private void chuckpack$restoreFallHeight() {
+        if (chuckpack$isNoGround()) return;
+        Integer snap = chuckpack$fallSnapshot;
+        chuckpack$fallSnapshot = null;
+        if (snap == null) return;
+        try {
+            baritone.api.Settings bs = baritone.api.BaritoneAPI.getSettings();
+            int cur = bs.maxFallHeightNoWater.value;
+            int def = bs.maxFallHeightNoWater.defaultValue;
+            // Still meteor's mark (or its default restore) -> give the
+            // pre-activate value back. User-edited mid-session -> keep it.
+            if (cur == 159159 || cur == def) {
+                chuckpack$setFallHeight(snap);
+            }
+        } catch (Throwable ignored) {}
     }
 
     @Inject(method = "onSendPacket", at = @At("HEAD"), cancellable = true)
