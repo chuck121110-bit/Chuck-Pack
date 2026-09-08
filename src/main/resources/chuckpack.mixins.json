@@ -39,6 +39,7 @@
     "ChatCoordinateMixin",
     "ChatScreenMixin",
     "TunnelChatMixin",
+    "SwarmConnectionMixin",
     "ClientShutdownMixin",
     "BaritoneSettingsFixMixin",
     "BaritoneWorldScannerMixin",

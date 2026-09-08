@@ -6,36 +6,34 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.DataInputStream;
+import java.net.Socket;
 
+// Host side: meteor's SwarmConnection only ever WRITES to workers, so the
+// worker->host direction is wide open. Read it here and route playertab
+// reports into the shared registry. One reader per socket; the writer thread
+// is untouched (separate stream direction, no interference).
 @Mixin(SwarmConnection.class)
-public abstract class SwarmConnectionMixin extends Thread {
-
-    @Inject(method = "run", at = @At("HEAD"), cancellable = true)
-    private void chuckpack$silentRun(CallbackInfo ci) {
-        ci.cancel();
-
-        SwarmConnection self = (SwarmConnection) (Object) this;
-        try {
-            DataOutputStream out = new DataOutputStream(self.socket.getOutputStream());
-
-            while (!self.isInterrupted()) {
-                if (self.messageToSend != null) {
-                    String msg = self.messageToSend;
-                    self.messageToSend = null;
-                    if (self.socket.isConnected() && !self.socket.isClosed()) {
-                        try {
-                            out.writeUTF(msg);
-                            out.flush();
-                        } catch (Exception ignored) {
-                        }
+public class SwarmConnectionMixin {
+    @Inject(method = "<init>(Ljava/net/Socket;)V", at = @At("TAIL"))
+    private void chuckpack$startReader(Socket socket, CallbackInfo ci) {
+        Thread reader = new Thread(() -> {
+            try {
+                DataInputStream in = new DataInputStream(socket.getInputStream());
+                while (!Thread.currentThread().isInterrupted()) {
+                    String msg;
+                    try {
+                        msg = in.readUTF();
+                    } catch (java.io.EOFException | java.net.SocketException e) {
+                        break;
+                    }
+                    if (msg != null && msg.startsWith("swarm ChuckPack-playertab ")) {
+                        net.chuck.chuckpack.util.SwarmPlayerList.handlePayload(msg);
                     }
                 }
-            }
-
-            out.close();
-        } catch (IOException ignored) {
-        }
+            } catch (Throwable ignored) {}
+        }, "ChuckPack-SwarmReader");
+        reader.setDaemon(true);
+        reader.start();
     }
 }
