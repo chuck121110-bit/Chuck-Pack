@@ -1444,6 +1444,26 @@ public class BaseFinder extends Module {
                                             exclusionBlockCount++;
                                         }
                                         if (blerks.getBlock()!=Blocks.AIR && blerks.getBlock()!=Blocks.STONE){
+                                            // Bedrock Finder runs before the natural-block discard below, otherwise
+                                            // bedrock never reaches its check (natural floor/roof still filtered by the Y rules inside).
+                                            if (bedrockfind.get() && blerks.getBlock()==Blocks.BEDROCK && ((currentY>mc.level.getMinY()+bedrockint.get() && mc.level.dimension() == Level.OVERWORLD) || (currentY>mc.level.getMinY()+bedrockint.get() && (currentY < 123 || currentY > 127) && mc.level.dimension() == Level.NETHER))) {
+                                                if (!baseChunks.contains(basepos) && !suppressedChunks.contains(basepos)){
+                                                    baseChunks.add(basepos);
+                                                    addTrigger(basepos, "Bedrock");
+                                                    if (save.get()) {
+                                                        saveBaseChunkData(basepos);
+                                                    }
+                                                    if (basefoundspamTicks==0){
+                                                        if (chatFeedback.get()) {
+                                                            if (displaycoords.get()) ChatUtils.sendMsg(Component.literal("Unnatural bedrock located near X" + basepos.getMiddleBlockX() + ", Z" + basepos.getMiddleBlockZ()));
+                                                            else ChatUtils.sendMsg(Component.literal("Unnatural bedrock located!"));
+                                                        }
+                                                        LastBaseFound= new ChunkPos(basepos.x(), basepos.z());
+                                                        basefound=true;
+                                                        newlyFound=true;
+                                                    }
+                                                }
+                                            }
                                             if (!(blerks.getBlock()==Blocks.DEEPSLATE) && !(blerks.getBlock()==Blocks.DIRT) && !(blerks.getBlock()==Blocks.GRASS_BLOCK) && !(blerks.getBlock()==Blocks.WATER) && !(blerks.getBlock()==Blocks.SAND) && !(blerks.getBlock()==Blocks.GRAVEL) && !(blerks.getBlock()==Blocks.BEDROCK) && !(blerks.getBlock()==Blocks.NETHERRACK) && !(blerks.getBlock()==Blocks.LAVA)){
                                                 if (signFinder.get() && blerks.getBlock() instanceof SignBlock || blerks.getBlock() instanceof HangingSignBlock) {
                                                     for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
@@ -1553,24 +1573,6 @@ public class BaseFinder extends Module {
                                                             if (chatFeedback.get()) {
                                                                 if (displaycoords.get()) ChatUtils.sendMsg(Component.literal("Open portal located near X" + basepos.getMiddleBlockX() + ", Z" + basepos.getMiddleBlockZ()));
                                                                 else ChatUtils.sendMsg(Component.literal("Open portal located!"));
-                                                            }
-                                                            LastBaseFound= new ChunkPos(basepos.x(), basepos.z());
-                                                            basefound=true;
-                                                            newlyFound=true;
-                                                        }
-                                                    }
-                                                }
-                                                if (bedrockfind.get() && blerks.getBlock()==Blocks.BEDROCK && ((currentY>mc.level.getMinY()+bedrockint.get() && mc.level.dimension() == Level.OVERWORLD) || (currentY>mc.level.getMinY()+bedrockint.get() && (currentY < 123 || currentY > 127) && mc.level.dimension() == Level.NETHER))) {
-                                                    if (!baseChunks.contains(basepos) && !suppressedChunks.contains(basepos)){
-                                                        baseChunks.add(basepos);
-                                                        addTrigger(basepos, "Bedrock");
-                                                        if (save.get()) {
-                                                            saveBaseChunkData(basepos);
-                                                        }
-                                                        if (basefoundspamTicks==0){
-                                                            if (chatFeedback.get()) {
-                                                                if (displaycoords.get()) ChatUtils.sendMsg(Component.literal("Unnatural bedrock located near X" + basepos.getMiddleBlockX() + ", Z" + basepos.getMiddleBlockZ()));
-                                                                else ChatUtils.sendMsg(Component.literal("Unnatural bedrock located!"));
                                                             }
                                                             LastBaseFound= new ChunkPos(basepos.x(), basepos.z());
                                                             basefound=true;
