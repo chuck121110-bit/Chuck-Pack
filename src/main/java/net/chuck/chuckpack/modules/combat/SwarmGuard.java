@@ -185,7 +185,11 @@ public class SwarmGuard extends Module {
         } catch (IOException ignored) {}
     }
 
-    private static final java.util.concurrent.ScheduledExecutorService chuckpack$executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+    private static final java.util.concurrent.ScheduledExecutorService chuckpack$executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "ChuckPack-SwarmGuard");
+        t.setDaemon(true);
+        return t;
+    });
 
     public void hostTick(Minecraft mc) {
         if (mc.player == null || mc.level == null) return;

@@ -60,7 +60,11 @@ public class DeepslateESP extends Module implements AeroShaderSource {
     private final Map<Long, Map<BlockPos, Boolean>> chunkToFlaggedPositions = new ConcurrentHashMap<>();
     private final List<BlockPos> toRender = Collections.synchronizedList(new ArrayList<>());
     private final BlockPos.MutableBlockPos scanPos = new BlockPos.MutableBlockPos();
-    private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "ChuckPack-DeepslateESP");
+        t.setDaemon(true);
+        return t;
+    });
     private volatile boolean renderListDirty = true;
 
     // ── Shader mesh ────────────────────────────────────────────────────

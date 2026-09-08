@@ -669,7 +669,11 @@ public class NewChunks extends Module {
 	@Override
 	public void onActivate() {
 		deactivating = false;
-		taskExecutor = Executors.newCachedThreadPool();
+		taskExecutor = Executors.newCachedThreadPool(r -> {
+			Thread t = new Thread(r, "ChuckPack-NewChunks");
+			t.setDaemon(true);
+			return t;
+		});
 		if (save.get())saveDataWasOn = true;
 		else if (!save.get())saveDataWasOn = false;
 		if (autoreload.get()) {

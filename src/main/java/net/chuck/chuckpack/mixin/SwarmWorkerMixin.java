@@ -532,7 +532,11 @@ public class SwarmWorkerMixin {
 
         mc.disconnectFromWorld(net.minecraft.network.chat.Component.literal("Impersonating target"));
 
-        java.util.concurrent.ScheduledExecutorService executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        java.util.concurrent.ScheduledExecutorService executor = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "ChuckPack-Impersonate");
+            t.setDaemon(true);
+            return t;
+        });
         executor.schedule(() -> {
             mc.execute(() -> {
                 try {

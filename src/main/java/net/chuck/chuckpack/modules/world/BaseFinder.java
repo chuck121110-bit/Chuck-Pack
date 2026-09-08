@@ -958,7 +958,11 @@ public class BaseFinder extends Module {
     public void onActivate() {
         deactivating = false;
         deduplicateBlockLists();
-        taskExecutor = Executors.newCachedThreadPool();
+        taskExecutor = Executors.newCachedThreadPool(r -> {
+            Thread t = new Thread(r, "ChuckPack-BaseFinder");
+            t.setDaemon(true);
+            return t;
+        });
         isBaseFinderModuleOn=1;
         if (save.get())saveDataWasOn = true;
         else if (!save.get())saveDataWasOn = false;
