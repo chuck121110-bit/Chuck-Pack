@@ -15,4 +15,8 @@ public interface SettingMutatorAccessor {
     @Mutable
     @Accessor("name")
     void chuckpack$setName(String name);
+
+    @Mutable
+    @Accessor("defaultValue")
+    void chuckpack$setDefaultValue(Object value);
 }

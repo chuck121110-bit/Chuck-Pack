@@ -111,7 +111,10 @@ public class BaritoneSettingsFixMixin {
                 String line = lines.get(i).trim();
                 if (line.isEmpty() || line.startsWith("#") || line.startsWith("//")) continue;
                 int sp = line.indexOf(' ');
-                if (sp > 0) indicesByName.computeIfAbsent(line.substring(0, sp).toLowerCase(), k -> new ArrayList<>()).add(i);
+                // Bare single-token lines (no value, e.g. from older writes) still
+                // belong to that setting — index them so they can be replaced/removed.
+                String key = (sp > 0 ? line.substring(0, sp) : line).toLowerCase();
+                indicesByName.computeIfAbsent(key, k -> new ArrayList<>()).add(i);
             }
             // Collect first, then apply: replacements use original indices, removals last.
             List<Settings.Setting<?>> targets = new ArrayList<>();
@@ -194,8 +197,17 @@ public class BaritoneSettingsFixMixin {
                 try {
                     if (w.get() instanceof SettingColor && b.value instanceof Color c) {
                         ((Setting<SettingColor>) (Object) w).set(new SettingColor(c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha()));
+                        // Point reset at baritone's true default, not the startup snapshot.
+                        Color def = (Color) b.defaultValue;
+                        if (def != null) {
+                            ((SettingMutatorAccessor) (Object) w).chuckpack$setDefaultValue(
+                                new SettingColor(def.getRed(), def.getGreen(), def.getBlue(), def.getAlpha()));
+                        }
                     } else if (w.get() instanceof List && b.value instanceof List<?> bl) {
                         ((Setting<List>) (Object) w).set(new ArrayList<>(bl));
+                        if (b.defaultValue instanceof List<?> dl) {
+                            ((SettingMutatorAccessor) (Object) w).chuckpack$setDefaultValue(new ArrayList<>(dl));
+                        }
                     }
                 } catch (Throwable ignored) {}
             }
