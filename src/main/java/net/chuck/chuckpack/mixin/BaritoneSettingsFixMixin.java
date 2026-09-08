@@ -75,6 +75,7 @@ public class BaritoneSettingsFixMixin {
     @Inject(method = "onClosed()V", at = @At("TAIL"))
     private void chuckpack$logAfterSave(CallbackInfo ci) {
         try {
+            chuckpack$forcePersistColorsAndLists();
             int colors = 0, lists = 0;
             for (Settings.Setting<?> s : chuckpack$baritoneSettings()) {
                 if (s.value instanceof Color) colors++;
@@ -88,6 +89,45 @@ public class BaritoneSettingsFixMixin {
             } catch (Throwable ignored) {}
             System.out.println("[ChuckPack] Baritone tab closed: live has " + colors + " colors, " + lists
                 + " lists; settings.txt=" + f + " (" + lines + " lines)");
+        } catch (Throwable ignored) {}
+    }
+
+    // Baritone only writes settings whose value != default, and shared-list
+    // aliasing can defeat that check. Force every color/list setting line into
+    // settings.txt (replace or append) using baritone's own serialization.
+    @Unique
+    private static void chuckpack$forcePersistColorsAndLists() {
+        try {
+            java.nio.file.Path f = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
+                .resolve("baritone").resolve("settings.txt");
+            List<String> lines = new ArrayList<>();
+            try {
+                lines.addAll(java.nio.file.Files.readAllLines(f));
+            } catch (Throwable ignored) {}
+            Map<String, Integer> indexByName = new HashMap<>();
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i).trim();
+                if (line.isEmpty() || line.startsWith("#") || line.startsWith("//")) continue;
+                int sp = line.indexOf(' ');
+                if (sp > 0) indexByName.putIfAbsent(line.substring(0, sp).toLowerCase(), i);
+            }
+            for (Settings.Setting<?> s : chuckpack$baritoneSettings()) {
+                if (!(s.value instanceof Color) && !(s.value instanceof List)) continue;
+                String serialized;
+                try {
+                    serialized = baritone.api.utils.SettingsUtil.settingToString(s);
+                } catch (Throwable ignored) {
+                    continue;
+                }
+                Integer idx = indexByName.get(s.getName().toLowerCase());
+                if (idx != null) lines.set(idx, serialized);
+                else {
+                    indexByName.put(s.getName().toLowerCase(), lines.size());
+                    lines.add(serialized);
+                }
+            }
+            java.nio.file.Files.createDirectories(f.getParent());
+            java.nio.file.Files.write(f, lines);
         } catch (Throwable ignored) {}
     }
 
