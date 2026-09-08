@@ -94,9 +94,11 @@ public class BaritoneSettingsFixMixin {
         } catch (Throwable ignored) {}
     }
 
-    // Baritone only writes settings whose value != default, and shared-list
-    // aliasing can defeat that check. Force every color/list setting line into
-    // settings.txt (replace or append) using baritone's own serialization.
+    // Baritone only writes settings whose value != default, but its check is
+    // reference equality, and a setting turned BACK to default keeps its stale
+    // file line forever (nothing ever removes it). Mirror the whole live state
+    // into settings.txt: non-default values get (re)written, at-default values
+    // get their lines removed, using baritone's own serialization.
     @Unique
     private static void chuckpack$forcePersistColorsAndLists() {
         try {
@@ -117,16 +119,30 @@ public class BaritoneSettingsFixMixin {
                 indicesByName.computeIfAbsent(key, k -> new ArrayList<>()).add(i);
             }
             // Collect first, then apply: replacements use original indices, removals last.
-            List<Settings.Setting<?>> targets = new ArrayList<>();
-            for (Settings.Setting<?> s : chuckpack$baritoneSettings()) {
-                if (s.value instanceof Color || s.value instanceof List) targets.add(s);
-            }
             java.util.Set<Integer> removeLines = new java.util.HashSet<>();
             Map<Integer, String> replaceLines = new HashMap<>();
-            for (Settings.Setting<?> s : targets) {
-                List<Integer> idxs = indicesByName.getOrDefault(s.getName().toLowerCase(), List.of());
+            for (Settings.Setting<?> s : chuckpack$baritoneSettings()) {
+                String key;
+                try {
+                    if (s.isJavaOnly()) continue;
+                    key = s.getName().toLowerCase();
+                } catch (Throwable ignored) {
+                    continue;
+                }
+                List<Integer> idxs = indicesByName.getOrDefault(key, List.of());
                 if (s.value instanceof List<?> l && l.isEmpty()) {
                     // An emptied list must vanish, not persist as an unparsable empty value.
+                    removeLines.addAll(idxs);
+                    continue;
+                }
+                boolean atDefault;
+                try {
+                    atDefault = java.util.Objects.equals(s.value, s.defaultValue);
+                } catch (Throwable ignored) {
+                    continue;
+                }
+                if (atDefault) {
+                    // Back to default: drop any stale line so it can't pin an old value.
                     removeLines.addAll(idxs);
                     continue;
                 }
@@ -141,6 +157,7 @@ public class BaritoneSettingsFixMixin {
                     removeLines.addAll(idxs.subList(1, idxs.size()));
                 } else {
                     lines.add(serialized);
+                    indicesByName.put(key, new ArrayList<>(List.of(lines.size() - 1)));
                 }
             }
             for (Map.Entry<Integer, String> e : replaceLines.entrySet()) lines.set(e.getKey(), e.getValue());
