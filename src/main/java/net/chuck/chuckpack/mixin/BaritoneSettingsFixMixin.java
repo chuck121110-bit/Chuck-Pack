@@ -72,6 +72,25 @@ public class BaritoneSettingsFixMixin {
         } catch (Throwable ignored) {}
     }
 
+    @Inject(method = "onClosed()V", at = @At("TAIL"))
+    private void chuckpack$logAfterSave(CallbackInfo ci) {
+        try {
+            int colors = 0, lists = 0;
+            for (Settings.Setting<?> s : chuckpack$baritoneSettings()) {
+                if (s.value instanceof Color) colors++;
+                else if (s.value instanceof List) lists++;
+            }
+            java.nio.file.Path f = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath()
+                .resolve("baritone").resolve("settings.txt");
+            long lines = 0;
+            try {
+                lines = java.nio.file.Files.lines(f).count();
+            } catch (Throwable ignored) {}
+            System.out.println("[ChuckPack] Baritone tab closed: live has " + colors + " colors, " + lists
+                + " lists; settings.txt=" + f + " (" + lines + " lines)");
+        } catch (Throwable ignored) {}
+    }
+
     @Unique
     private static List<Settings.Setting<?>> chuckpack$baritoneSettings() {
         List<Settings.Setting<?>> out = new ArrayList<>();
