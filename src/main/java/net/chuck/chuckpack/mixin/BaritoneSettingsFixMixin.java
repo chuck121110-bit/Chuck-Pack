@@ -41,26 +41,28 @@ public class BaritoneSettingsFixMixin {
     @Inject(method = "<init>(Lmeteordevelopment/meteorclient/gui/GuiTheme;Lmeteordevelopment/meteorclient/gui/tabs/Tab;)V", at = @At("HEAD"))
     private void chuckpack$snapshotLiveColors(CallbackInfo ci) {
         chuckpack$colorSnapshot.clear();
-        try {
-            for (Settings.Setting<?> s : chuckpack$baritoneSettings()) {
+        for (Settings.Setting<?> s : chuckpack$baritoneSettings()) {
+            try {
                 if (s.value instanceof Color c) {
                     chuckpack$colorSnapshot.put(s.getName(), new int[]{c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha()});
                 }
-            }
-        } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {}
+        }
     }
 
     @Inject(method = "<init>(Lmeteordevelopment/meteorclient/gui/GuiTheme;Lmeteordevelopment/meteorclient/gui/tabs/Tab;)V", at = @At("TAIL"))
     private void chuckpack$restoreAndResync(CallbackInfo ci) {
-        try {
-            // Restore live colors clobbered by meteor's stale onModuleActivated sync.
-            for (Settings.Setting<?> s : chuckpack$baritoneSettings()) {
+        // Restore live colors clobbered by meteor's stale onModuleActivated sync.
+        for (Settings.Setting<?> s : chuckpack$baritoneSettings()) {
+            try {
                 int[] rgba = chuckpack$colorSnapshot.get(s.getName());
                 if (rgba != null) {
                     ((Settings.Setting<Color>) (Object) s).value = new Color(rgba[0], rgba[1], rgba[2], rgba[3]);
                 }
-            }
-            // Re-sync meteor wrappers FROM live with fresh objects (also un-aliases shared lists).
+            } catch (Throwable ignored) {}
+        }
+        // Re-sync meteor wrappers FROM live with fresh objects (also un-aliases shared lists).
+        try {
             chuckpack$resyncWrappersFromLive();
         } catch (Throwable ignored) {}
     }
@@ -85,7 +87,7 @@ public class BaritoneSettingsFixMixin {
                 .resolve("baritone").resolve("settings.txt");
             long lines = 0;
             try {
-                lines = java.nio.file.Files.lines(f).count();
+                lines = java.nio.file.Files.readAllLines(f).size();
             } catch (Throwable ignored) {}
             System.out.println("[ChuckPack] Baritone tab closed: live has " + colors + " colors, " + lists
                 + " lists; settings.txt=" + f + " (" + lines + " lines)");
@@ -104,28 +106,46 @@ public class BaritoneSettingsFixMixin {
             try {
                 lines.addAll(java.nio.file.Files.readAllLines(f));
             } catch (Throwable ignored) {}
-            Map<String, Integer> indexByName = new HashMap<>();
+            Map<String, List<Integer>> indicesByName = new HashMap<>();
             for (int i = 0; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
                 if (line.isEmpty() || line.startsWith("#") || line.startsWith("//")) continue;
                 int sp = line.indexOf(' ');
-                if (sp > 0) indexByName.putIfAbsent(line.substring(0, sp).toLowerCase(), i);
+                if (sp > 0) indicesByName.computeIfAbsent(line.substring(0, sp).toLowerCase(), k -> new ArrayList<>()).add(i);
             }
+            // Collect first, then apply: replacements use original indices, removals last.
+            List<Settings.Setting<?>> targets = new ArrayList<>();
             for (Settings.Setting<?> s : chuckpack$baritoneSettings()) {
-                if (!(s.value instanceof Color) && !(s.value instanceof List)) continue;
+                if (s.value instanceof Color || s.value instanceof List) targets.add(s);
+            }
+            java.util.Set<Integer> removeLines = new java.util.HashSet<>();
+            Map<Integer, String> replaceLines = new HashMap<>();
+            for (Settings.Setting<?> s : targets) {
+                List<Integer> idxs = indicesByName.getOrDefault(s.getName().toLowerCase(), List.of());
+                if (s.value instanceof List<?> l && l.isEmpty()) {
+                    // An emptied list must vanish, not persist as an unparsable empty value.
+                    removeLines.addAll(idxs);
+                    continue;
+                }
                 String serialized;
                 try {
                     serialized = baritone.api.utils.SettingsUtil.settingToString(s);
                 } catch (Throwable ignored) {
                     continue;
                 }
-                Integer idx = indexByName.get(s.getName().toLowerCase());
-                if (idx != null) lines.set(idx, serialized);
-                else {
-                    indexByName.put(s.getName().toLowerCase(), lines.size());
+                if (!idxs.isEmpty()) {
+                    replaceLines.put(idxs.get(0), serialized);
+                    removeLines.addAll(idxs.subList(1, idxs.size()));
+                } else {
                     lines.add(serialized);
                 }
             }
+            for (Map.Entry<Integer, String> e : replaceLines.entrySet()) lines.set(e.getKey(), e.getValue());
+            List<String> kept = new ArrayList<>(lines.size());
+            for (int i = 0; i < lines.size(); i++) {
+                if (!removeLines.contains(i)) kept.add(lines.get(i));
+            }
+            lines = kept;
             java.nio.file.Files.createDirectories(f.getParent());
             java.nio.file.Files.write(f, lines);
         } catch (Throwable ignored) {}
@@ -134,13 +154,19 @@ public class BaritoneSettingsFixMixin {
     @Unique
     private static List<Settings.Setting<?>> chuckpack$baritoneSettings() {
         List<Settings.Setting<?>> out = new ArrayList<>();
+        Field[] fields;
         try {
-            for (Field field : BaritoneAPI.getSettings().getClass().getDeclaredFields()) {
+            fields = BaritoneAPI.getSettings().getClass().getDeclaredFields();
+        } catch (Throwable ignored) {
+            return out;
+        }
+        for (Field field : fields) {
+            try {
                 if (Modifier.isStatic(field.getModifiers())) continue;
                 Object obj = field.get(BaritoneAPI.getSettings());
                 if (obj instanceof Settings.Setting<?> s) out.add(s);
-            }
-        } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {}
+        }
         return out;
     }
 
