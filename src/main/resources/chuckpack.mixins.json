@@ -46,6 +46,7 @@
     "WWindowHeaderMixin",
     "FreecamMixin",
     "NoFallMixin",
+    "SettingMutatorAccessor",
     "TitleScreenMixin",
     "CommandsMixin"
   ],

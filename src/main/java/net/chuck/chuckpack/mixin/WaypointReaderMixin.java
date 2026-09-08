@@ -40,15 +40,15 @@ public abstract class WaypointReaderMixin {
                     AutoFly af = Modules.get().get(AutoFly.class);
                     if (af != null) {
                         String originalSymbol = "";
+                        Object realWp = null;
                         try {
-                            xaero.common.minimap.waypoints.Waypoint realWp =
-                                (xaero.common.minimap.waypoints.Waypoint) waypoint.getOriginal();
+                            realWp = waypoint.getOriginal();
                             Object sym = realWp.getClass().getMethod("getSymbol").invoke(realWp);
                             if (sym != null) originalSymbol = sym.toString();
                         } catch (Throwable ignored) {
                         }
                         if (!af.isActive()) af.toggle();
-                        af.setTargetFromExistingWaypoint(wx, wy, wz, originalSymbol);
+                        af.setTargetFromExistingWaypoint(wx, wy, wz, originalSymbol, realWp);
                     }
                 }
             });

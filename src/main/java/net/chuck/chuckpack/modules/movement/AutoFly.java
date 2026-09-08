@@ -1311,6 +1311,11 @@ public final class AutoFly extends Module
 
 	public void setTargetFromExistingWaypoint(int x, int y, int z, String originalSymbol)
 	{
+		setTargetFromExistingWaypoint(x, y, z, originalSymbol, null);
+	}
+
+	public void setTargetFromExistingWaypoint(int x, int y, int z, String originalSymbol, Object minimapWaypoint)
+	{
 		removeAutoFlyWaypoint();
 		restoreExistingWaypointSymbol();
 
@@ -1370,18 +1375,42 @@ public final class AutoFly extends Module
 			Object currentSet = currentWorld.getClass().getMethod("getCurrentWaypointSet").invoke(currentWorld);
 			if(currentSet == null) return;
 
-			Class<?> wpClass = Class.forName("xaero.common.minimap.waypoints.Waypoint");
-			Iterable<?> existingWaypoints = (Iterable<?>) currentSet.getClass().getMethod("getWaypoints").invoke(currentSet);
-			for(Object wp : existingWaypoints)
+		Class<?> wpClass = Class.forName("xaero.common.minimap.waypoints.Waypoint");
+		if(minimapWaypoint != null && wpClass.isInstance(minimapWaypoint))
+		{
+			existingWaypointOriginal = minimapWaypoint;
+			originalWaypointSymbol = originalSymbol;
+			wpClass.getMethod("setSymbol", String.class).invoke(minimapWaypoint, "AD");
+			try {
+				Object worldManagerIO = session.getClass().getMethod("getWorldManagerIO").invoke(session);
+				for(java.lang.reflect.Method m : worldManagerIO.getClass().getMethods()) {
+					if(m.getName().equals("saveWorld")) {
+						m.invoke(worldManagerIO, currentWorld);
+						break;
+					}
+				}
+			} catch(Throwable ignored) {}
+			try {
+				Object supportMods = Class.forName("xaero.map.mods.SupportMods").getField("xaeroMinimap").get(null);
+				if(supportMods != null) {
+					java.lang.reflect.Field f = supportMods.getClass().getDeclaredField("refreshWaypoints");
+					f.setAccessible(true);
+					f.setBoolean(supportMods, true);
+				}
+			} catch(Throwable ignored) {}
+			return;
+		}
+		Iterable<?> existingWaypoints = (Iterable<?>) currentSet.getClass().getMethod("getWaypoints").invoke(currentSet);
+		for(Object wp : existingWaypoints)
+		{
+			int exX = (int) wpClass.getMethod("getX").invoke(wp);
+			int exZ = (int) wpClass.getMethod("getZ").invoke(wp);
+			int exY = (int) wpClass.getMethod("getY").invoke(wp);
+			if(exX == x && exZ == z && exY == y)
 			{
-				int exX = (int) wpClass.getMethod("getX").invoke(wp);
-				int exZ = (int) wpClass.getMethod("getZ").invoke(wp);
-				int exY = (int) wpClass.getMethod("getY").invoke(wp);
-				if(exX == x && exZ == z && exY == y)
-				{
-					existingWaypointOriginal = wp;
-					originalWaypointSymbol = originalSymbol;
-					wpClass.getMethod("setSymbol", String.class).invoke(wp, "Ad");
+				existingWaypointOriginal = wp;
+				originalWaypointSymbol = originalSymbol;
+				wpClass.getMethod("setSymbol", String.class).invoke(wp, "AD");
 					try {
 						Object worldManagerIO = session.getClass().getMethod("getWorldManagerIO").invoke(session);
 						for(java.lang.reflect.Method m : worldManagerIO.getClass().getMethods()) {
