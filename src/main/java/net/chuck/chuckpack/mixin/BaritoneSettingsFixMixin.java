@@ -39,7 +39,7 @@ public class BaritoneSettingsFixMixin {
     private static final Map<String, int[]> chuckpack$colorSnapshot = new HashMap<>();
 
     @Inject(method = "<init>(Lmeteordevelopment/meteorclient/gui/GuiTheme;Lmeteordevelopment/meteorclient/gui/tabs/Tab;)V", at = @At("HEAD"))
-    private void chuckpack$snapshotLiveColors(CallbackInfo ci) {
+    private static void chuckpack$snapshotLiveColors(CallbackInfo ci) {
         chuckpack$colorSnapshot.clear();
         for (Settings.Setting<?> s : chuckpack$baritoneSettings()) {
             try {
