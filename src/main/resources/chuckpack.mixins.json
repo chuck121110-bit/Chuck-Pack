@@ -39,6 +39,7 @@
     "ChatCoordinateMixin",
     "ChatScreenMixin",
     "TunnelChatMixin",
+    "BaritoneSettingsFixMixin",
     "BaritoneWorldScannerMixin",
     "BaritoneFasterWorldScannerMixin",
     "BaritoneCachedWorldMixin",
