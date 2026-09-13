@@ -158,7 +158,7 @@ public class NoFallMixin {
     }
 
     @Inject(method = "onDeactivate", at = @At("TAIL"))
-    private void chuckpack$restoreFallHeight() {
+    private void chuckpack$restoreFallHeight(CallbackInfo ci) {
         if (chuckpack$isNoGround()) return;
         Integer snap = chuckpack$fallSnapshot;
         chuckpack$fallSnapshot = null;

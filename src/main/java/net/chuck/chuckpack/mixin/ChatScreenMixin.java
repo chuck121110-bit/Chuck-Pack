@@ -1,6 +1,7 @@
 package net.chuck.chuckpack.mixin;
 
 import net.chuck.chuckpack.modules.world.BaseFinder;
+import net.chuck.chuckpack.util.XaeroWaypointHelper;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.network.chat.ClickEvent;
@@ -21,6 +22,19 @@ public abstract class ChatScreenMixin {
             BaseFinder baseFinder = Modules.get().get(BaseFinder.class);
             if (baseFinder != null) {
                 baseFinder.openFlaggedChunksScreen();
+            }
+            cir.setReturnValue(true);
+        }
+
+        if (clickEvent instanceof ClickEvent.RunCommand cmd && cmd.command().startsWith(".chatwaypoint-gui ")) {
+            String[] parts = cmd.command().split(" ");
+            if (parts.length == 4) {
+                try {
+                    XaeroWaypointHelper.openChatWaypointGui(
+                        Integer.parseInt(parts[1]),
+                        Integer.parseInt(parts[2]),
+                        Integer.parseInt(parts[3]));
+                } catch (NumberFormatException ignored) {}
             }
             cir.setReturnValue(true);
         }

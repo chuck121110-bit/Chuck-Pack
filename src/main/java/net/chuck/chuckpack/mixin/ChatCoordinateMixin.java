@@ -17,8 +17,12 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-// Highlights coordinates in chat (cyan) — clicking creates a "chat waypoint"
-// (random color) via .chatwaypoint. Supports 3D and 2D (player Y) formats.
+// Highlights coordinates in chat (cyan) — clicking opens Xaero's waypoint
+// screen prefilled (name "chat waypoint", initial "C", Aqua) via the same
+// RunCommand + ChatScreenMixin interception pattern as BaseFinder's Open GUI
+// button. Hooks the private addMessage choke point so EVERY message type
+// (player, server system, client system) is covered. Supports 3D and 2D
+// (player Y) formats.
 @Mixin(ChatComponent.class)
 public class ChatCoordinateMixin {
 
@@ -72,7 +76,7 @@ public class ChatCoordinateMixin {
 
     private static final int MAX_HORIZONTAL = 30000000;
 
-    @ModifyVariable(method = "addMessage(Lnet/minecraft/network/chat/Component;)V", at = @At("HEAD"), argsOnly = true)
+    @ModifyVariable(method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageSource;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V", at = @At("HEAD"), argsOnly = true)
     private Component highlightCoords(Component message) {
         try {
             String text = message.getString();
@@ -95,11 +99,11 @@ public class ChatCoordinateMixin {
                 Style coordStyle = Style.EMPTY
                     .withColor(ChatFormatting.AQUA)
                     .withHoverEvent(new HoverEvent.ShowText(
-                        Component.literal("Click to create waypoint at " + match.x + ", " + match.y + ", " + match.z)
+                        Component.literal("Click to add waypoint at " + match.x + ", " + match.y + ", " + match.z)
                             .withStyle(ChatFormatting.YELLOW)
                     ))
                     .withClickEvent(new ClickEvent.RunCommand(
-                        ".chatwaypoint " + match.x + " " + match.y + " " + match.z
+                        ".chatwaypoint-gui " + match.x + " " + match.y + " " + match.z
                     ));
 
                 coordComponent.setStyle(coordStyle);
