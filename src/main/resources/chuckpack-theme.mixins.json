@@ -3,6 +3,8 @@
   "package": "net.chuck.chuckpack.theme.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "meteorclient.GuiRendererBlurMixin",
+    "meteorclient.InventoryHudMixin"
   ],
   "injectors": {
     "defaultRequire": 0

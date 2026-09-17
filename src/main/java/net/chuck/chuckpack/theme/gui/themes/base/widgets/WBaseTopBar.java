@@ -46,8 +46,8 @@ public class WBaseTopBar extends WTopBar implements BaseWidget {
             boolean isActiveTab = screen instanceof TabScreen && ((TabScreen) screen).tab == myTab;
             Color color = getButtonColor(pressed || isActiveTab, mouseOver);
 
-            if (WBaseTopBar.this.theme().widgetBlurStrength.get() > 0 && WorldFramebufferCapture.getInstance() != null) {
-                ((BlurRendererAccess) renderer).blurredQuad(x, y, width, height, WorldFramebufferCapture.getInstance().getBlurredTexture(), color);
+            if (WBaseTopBar.this.theme().widgetBlurStrength.get() > 0 && renderer instanceof BlurRendererAccess access && WorldFramebufferCapture.getInstance() != null) {
+                access.blurredQuad(x, y, width, height, WorldFramebufferCapture.getInstance().getBlurredTexture(), color);
             } else {
                 renderer.quad(x, y, width, height, color);
             }

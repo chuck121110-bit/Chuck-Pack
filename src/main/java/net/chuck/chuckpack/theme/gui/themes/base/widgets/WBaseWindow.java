@@ -30,8 +30,8 @@ public class WBaseWindow extends WWindow implements BaseWidget {
         if (scissor) renderer.scissorStart(x, y, width, (height - header.height) * animProgress + header.height);
 
         if (expanded || animProgress > 0) {
-            if (theme().widgetBlurStrength.get() > 0 && WorldFramebufferCapture.getInstance() != null) {
-                ((BlurRendererAccess) renderer).blurredQuad(
+            if (theme().widgetBlurStrength.get() > 0 && renderer instanceof BlurRendererAccess access && WorldFramebufferCapture.getInstance() != null) {
+                access.blurredQuad(
                     x,
                     y + header.height,
                     width,
@@ -75,8 +75,8 @@ public class WBaseWindow extends WWindow implements BaseWidget {
 
         @Override
         protected void onRender(GuiRenderer renderer, double mouseX, double mouseY, double delta) {
-            if (WBaseWindow.this.theme().widgetBlurStrength.get() > 0 && WorldFramebufferCapture.getInstance() != null) {
-                ((BlurRendererAccess) renderer).blurredQuad(
+            if (WBaseWindow.this.theme().widgetBlurStrength.get() > 0 && renderer instanceof BlurRendererAccess access && WorldFramebufferCapture.getInstance() != null) {
+                access.blurredQuad(
                     x,
                     y,
                     width,

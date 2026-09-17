@@ -20,11 +20,11 @@ public interface BaseWidget extends meteordevelopment.meteorclient.gui.utils.Bas
         double innerWidth = widget.width - s * 2;
         double innerHeight = widget.height - s * 2;
 
-        if (theme.widgetBlurStrength.get() > 0) {
+        if (theme.widgetBlurStrength.get() > 0 && renderer instanceof BlurRendererAccess access) {
             WorldFramebufferCapture capture = WorldFramebufferCapture.getInstance();
             GpuTextureView blurTexture = capture != null ? capture.getBlurredTexture() : null;
             if (blurTexture != null) {
-                ((BlurRendererAccess) renderer).blurredQuad(innerX, innerY, innerWidth, innerHeight, blurTexture, backgroundColor);
+                access.blurredQuad(innerX, innerY, innerWidth, innerHeight, blurTexture, backgroundColor);
             } else {
                 renderer.quad(innerX, innerY, innerWidth, innerHeight, backgroundColor);
             }
