@@ -1,5 +1,7 @@
 package net.chuck.chuckpack.theme.gui.themes.base.widgets;
 
+import net.chuck.chuckpack.theme.gui.renderer.BlurRendererAccess;
+import net.chuck.chuckpack.theme.gui.renderer.WorldFramebufferCapture;
 import net.chuck.chuckpack.theme.gui.themes.base.BaseWidget;
 import meteordevelopment.meteorclient.gui.renderer.GuiRenderer;
 import meteordevelopment.meteorclient.gui.widgets.WWidget;
@@ -28,7 +30,18 @@ public class WBaseWindow extends WWindow implements BaseWidget {
         if (scissor) renderer.scissorStart(x, y, width, (height - header.height) * animProgress + header.height);
 
         if (expanded || animProgress > 0) {
-            renderer.quad(x, y + header.height, width, height - header.height, theme().backgroundColor.get());
+            if (theme().widgetBlurStrength.get() > 0 && WorldFramebufferCapture.getInstance() != null) {
+                ((BlurRendererAccess) renderer).blurredQuad(
+                    x,
+                    y + header.height,
+                    width,
+                    height - header.height,
+                    WorldFramebufferCapture.getInstance().getBlurredTexture(),
+                    theme().backgroundColor.get()
+                );
+            } else {
+                renderer.quad(x, y + header.height, width, height - header.height, theme().backgroundColor.get());
+            }
         }
 
         super.render(renderer, mouseX, mouseY, delta);
@@ -62,7 +75,18 @@ public class WBaseWindow extends WWindow implements BaseWidget {
 
         @Override
         protected void onRender(GuiRenderer renderer, double mouseX, double mouseY, double delta) {
-            renderer.quad(this, theme().accentColor.get());
+            if (WBaseWindow.this.theme().widgetBlurStrength.get() > 0 && WorldFramebufferCapture.getInstance() != null) {
+                ((BlurRendererAccess) renderer).blurredQuad(
+                    x,
+                    y,
+                    width,
+                    height,
+                    WorldFramebufferCapture.getInstance().getBlurredTexture(),
+                    WBaseWindow.this.theme().accentColor.get()
+                );
+            } else {
+                renderer.quad(this, WBaseWindow.this.theme().accentColor.get());
+            }
         }
     }
 }

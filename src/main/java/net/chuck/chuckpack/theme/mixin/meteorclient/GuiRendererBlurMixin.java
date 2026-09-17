@@ -157,8 +157,8 @@ public abstract class GuiRendererBlurMixin implements BlurRendererAccess {
         }
         currentBlurTexture = blurredTexture;
 
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = mc.getWindow().getWidth();
+        int screenHeight = mc.getWindow().getHeight();
 
         float u1 = (float) (x / screenWidth);
         float v1 = 1.0f - (float) (y / screenHeight);

@@ -223,27 +223,14 @@ public class MobGearESP extends Module {
 
     private int count;
     private final Set<Entity> scannedEntities = Collections.synchronizedSet(new HashSet<>());
+    // Tick-cached match list: gear scanning (enchant unwrapping per entity) runs
+    // once per tick instead of once per render frame.
+    private final List<LivingEntity> cachedTargets = new ArrayList<>();
 
     @EventHandler
     private void onRender3D(Render3DEvent event) {
         count = 0;
-        for (Entity entity : mc.level.players()) {
-            if (!(entity instanceof LivingEntity livingEntity)) continue;
-            if (shouldSkip(livingEntity)) continue;
-            if (!scannedEntities.contains(entity)) {
-                StringBuilder message = new StringBuilder(entity.getType().getDescription().getString() + " found most likely wearing player gear");
-                if (coordsInChat.get()) message.append(" at ").append(entity.getBlockX()).append(", ").append(entity.getBlockY()).append(", ").append(entity.getBlockZ());
-                if (itemsInChat.get()) {
-                    ArrayList<Item> playerItems = getPlayerItems(livingEntity);
-                    message.append(" holding ");
-                    for (Item item : playerItems) {
-                        message.append(item.getDescriptionId().split("\\.")[2]).append(", ");
-                    }
-                    message.setLength(message.length() - 2);
-                }
-                ChatUtils.sendMsg(Component.literal(message.toString()));
-            }
-            scannedEntities.add(entity);
+        for (LivingEntity entity : cachedTargets) {
             drawBoundingBox(event, entity);
             if (tracers.get()) drawTracer(event, entity);
             count++;
@@ -253,10 +240,12 @@ public class MobGearESP extends Module {
     @Override
     public void onActivate() {
         scannedEntities.clear();
+        cachedTargets.clear();
     }
     @Override
     public void onDeactivate() {
         scannedEntities.clear();
+        cachedTargets.clear();
     }
 
     private void drawBoundingBox(Render3DEvent event, Entity entity) {
@@ -415,13 +404,33 @@ public class MobGearESP extends Module {
     }
     @EventHandler
     private void onPreTick(TickEvent.Pre event) {
-        if (mc.level != null){
-            Iterable<? extends net.minecraft.world.entity.Entity> entities = mc.level.players();
-            scannedEntities.removeIf(entity -> {
-                Set<Entity> entitySet = new HashSet<>();
-                entities.forEach(entity1 -> entitySet.add(entity1));
-                return !entitySet.contains(entity);
-            });
+        if (mc.level == null) return;
+
+        Set<Entity> present = new HashSet<>();
+        for (Entity entity : mc.level.players()) {
+            present.add(entity);
+        }
+        scannedEntities.retainAll(present);
+
+        cachedTargets.clear();
+        for (Entity entity : mc.level.players()) {
+            if (!(entity instanceof LivingEntity livingEntity)) continue;
+            if (shouldSkip(livingEntity)) continue;
+            if (!scannedEntities.contains(entity)) {
+                StringBuilder message = new StringBuilder(entity.getType().getDescription().getString() + " found most likely wearing player gear");
+                if (coordsInChat.get()) message.append(" at ").append(entity.getBlockX()).append(", ").append(entity.getBlockY()).append(", ").append(entity.getBlockZ());
+                if (itemsInChat.get()) {
+                    ArrayList<Item> playerItems = getPlayerItems(livingEntity);
+                    message.append(" holding ");
+                    for (Item item : playerItems) {
+                        message.append(item.getDescriptionId().split("\\.")[2]).append(", ");
+                    }
+                    message.setLength(message.length() - 2);
+                }
+                ChatUtils.sendMsg(Component.literal(message.toString()));
+            }
+            scannedEntities.add(entity);
+            cachedTargets.add(livingEntity);
         }
     }
 }

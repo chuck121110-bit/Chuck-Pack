@@ -1,5 +1,8 @@
 package net.chuck.chuckpack.theme.gui.themes.base;
 
+import com.mojang.blaze3d.textures.GpuTextureView;
+import net.chuck.chuckpack.theme.gui.renderer.BlurRendererAccess;
+import net.chuck.chuckpack.theme.gui.renderer.WorldFramebufferCapture;
 import meteordevelopment.meteorclient.gui.renderer.GuiRenderer;
 import meteordevelopment.meteorclient.gui.widgets.WWidget;
 import meteordevelopment.meteorclient.utils.render.color.Color;
@@ -12,8 +15,22 @@ public interface BaseWidget extends meteordevelopment.meteorclient.gui.utils.Bas
     default void renderBackground(GuiRenderer renderer, WWidget widget, Color outlineColor, Color backgroundColor) {
         BaseGuiTheme theme = theme();
         double s = theme.scale(2);
+        double innerX = widget.x + s;
+        double innerY = widget.y + s;
+        double innerWidth = widget.width - s * 2;
+        double innerHeight = widget.height - s * 2;
 
-        renderer.quad(widget.x + s, widget.y + s, widget.width - s * 2, widget.height - s * 2, backgroundColor);
+        if (theme.widgetBlurStrength.get() > 0) {
+            WorldFramebufferCapture capture = WorldFramebufferCapture.getInstance();
+            GpuTextureView blurTexture = capture != null ? capture.getBlurredTexture() : null;
+            if (blurTexture != null) {
+                ((BlurRendererAccess) renderer).blurredQuad(innerX, innerY, innerWidth, innerHeight, blurTexture, backgroundColor);
+            } else {
+                renderer.quad(innerX, innerY, innerWidth, innerHeight, backgroundColor);
+            }
+        } else {
+            renderer.quad(innerX, innerY, innerWidth, innerHeight, backgroundColor);
+        }
 
         if (outlineColor != null) {
             renderer.quad(widget.x, widget.y, widget.width, s, outlineColor);

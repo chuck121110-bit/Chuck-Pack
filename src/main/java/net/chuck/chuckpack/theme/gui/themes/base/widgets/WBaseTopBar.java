@@ -1,5 +1,7 @@
 package net.chuck.chuckpack.theme.gui.themes.base.widgets;
 
+import net.chuck.chuckpack.theme.gui.renderer.BlurRendererAccess;
+import net.chuck.chuckpack.theme.gui.renderer.WorldFramebufferCapture;
 import net.chuck.chuckpack.theme.gui.themes.base.BaseWidget;
 import meteordevelopment.meteorclient.gui.renderer.GuiRenderer;
 import meteordevelopment.meteorclient.gui.tabs.Tab;
@@ -44,7 +46,11 @@ public class WBaseTopBar extends WTopBar implements BaseWidget {
             boolean isActiveTab = screen instanceof TabScreen && ((TabScreen) screen).tab == myTab;
             Color color = getButtonColor(pressed || isActiveTab, mouseOver);
 
-            renderer.quad(x, y, width, height, color);
+            if (WBaseTopBar.this.theme().widgetBlurStrength.get() > 0 && WorldFramebufferCapture.getInstance() != null) {
+                ((BlurRendererAccess) renderer).blurredQuad(x, y, width, height, WorldFramebufferCapture.getInstance().getBlurredTexture(), color);
+            } else {
+                renderer.quad(x, y, width, height, color);
+            }
             renderer.text(myTab.name, x + pad, y + pad, getNameColor(), false);
         }
     }
