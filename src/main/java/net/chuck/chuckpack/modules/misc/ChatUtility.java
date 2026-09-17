@@ -20,15 +20,13 @@ import meteordevelopment.orbit.EventHandler;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import javax.imageio.ImageIO;
 
 public class ChatUtility extends Module {
     private final SettingGroup sgChatNotify = settings.createGroup("Chat Notify");
@@ -79,7 +77,6 @@ public class ChatUtility extends Module {
 
     public final List<Keyword> keywords = new ArrayList<>();
     private int timer;
-    private TrayIcon trayIcon;
 
     public ChatUtility() {
         super(Categories.Misc, "chat-utility", "Various chat-related utilities. Ported from Nora Tweaks by Noratweek.");
@@ -111,17 +108,8 @@ public class ChatUtility extends Module {
     @Override
     public void onActivate() {
         timer = 0;
-        setupTrayIcon();
         for (Keyword keyword : keywords) {
             keyword.compilePattern();
-        }
-    }
-
-    @Override
-    public void onDeactivate() {
-        if (trayIcon != null && SystemTray.isSupported()) {
-            SystemTray.getSystemTray().remove(trayIcon);
-            trayIcon = null;
         }
     }
 
@@ -155,28 +143,6 @@ public class ChatUtility extends Module {
         return this;
     }
 
-    private void setupTrayIcon() {
-        if (!SystemTray.isSupported()) {
-            return;
-        }
-
-        try (InputStream is = ChatUtility.class.getResourceAsStream("/assets/chuckpack/icon.png")) {
-            if (is == null) return;
-            BufferedImage image = ImageIO.read(is);
-            if (image == null) return;
-            Image scaledImage = image.getScaledInstance(16, 16, Image.SCALE_SMOOTH);
-            trayIcon = new TrayIcon(scaledImage, "Chuck Pack");
-            trayIcon.setImageAutoSize(true);
-            try {
-                SystemTray.getSystemTray().add(trayIcon);
-            } catch (AWTException e) {
-                // ignore
-            }
-        } catch (Exception e) {
-            // ignore
-        }
-    }
-
     @EventHandler
     private void onReceiveMessage(ReceiveMessageEvent event) {
         if (!chatNotifyEnabled.get()) return;
@@ -206,9 +172,12 @@ public class ChatUtility extends Module {
     }
 
     private void sendToastNotification(String title, String message) {
-        if (trayIcon != null) {
-            trayIcon.displayMessage(title, message, TrayIcon.MessageType.INFO);
-        }
+        try {
+            if (mc.gui.toastManager() == null) return;
+            Runnable show = () -> SystemToast.add(mc.gui.toastManager(), SystemToast.SystemToastId.PERIODIC_NOTIFICATION, Component.literal(title), Component.literal(message));
+            if (mc.isSameThread()) show.run();
+            else mc.execute(show);
+        } catch (Throwable ignored) {}
     }
 
     @EventHandler

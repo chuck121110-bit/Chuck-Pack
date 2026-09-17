@@ -12,6 +12,7 @@ import net.chuck.chuckpack.modules.misc.AiChat;
 import net.chuck.chuckpack.modules.misc.AiChatConverse;
 import net.chuck.chuckpack.modules.misc.AntiSocial;
 import net.chuck.chuckpack.modules.misc.AutoInteract;
+import net.chuck.chuckpack.modules.misc.BaritoneNotifier;
 import net.chuck.chuckpack.modules.misc.AutoLogin;
 import net.chuck.chuckpack.modules.misc.ChatUtility;
 import net.chuck.chuckpack.modules.misc.DoubleDoorsInteract;
@@ -80,6 +81,7 @@ public class ChuckPack extends MeteorAddon {
         addModule(new Tunnel());
         addModule(new AutoFarming());
         addModule(new ChatUtility());
+        addModule(new BaritoneNotifier());
         addModule(new PearlChecker());
         addModule(new DeepslateESP());
         addModule(new CoordinateLogout());
