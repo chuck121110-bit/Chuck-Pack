@@ -15,7 +15,6 @@ import net.chuck.chuckpack.modules.misc.AutoInteract;
 import net.chuck.chuckpack.modules.misc.BaritoneNotifier;
 import net.chuck.chuckpack.modules.misc.AutoLogin;
 import net.chuck.chuckpack.modules.misc.ChatUtility;
-import net.chuck.chuckpack.modules.misc.ChatWaypoints;
 import net.chuck.chuckpack.modules.misc.DoubleDoorsInteract;
 import net.chuck.chuckpack.modules.misc.NbtFilter;
 import net.chuck.chuckpack.modules.misc.MapIntegration;
@@ -84,7 +83,6 @@ public class ChuckPack extends MeteorAddon {
         addModule(new Tunnel());
         addModule(new AutoFarming());
         addModule(new ChatUtility());
-        addModule(new ChatWaypoints());
         addModule(new BaritoneNotifier());
         addModule(new PearlChecker());
         addModule(new DeepslateESP());
