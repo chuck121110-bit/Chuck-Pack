@@ -1,5 +1,6 @@
 package net.chuck.chuckpack.mixin;
 
+import net.chuck.chuckpack.modules.misc.MapIntegration;
 import net.chuck.chuckpack.modules.world.BaseFinder;
 import net.chuck.chuckpack.util.XaeroWaypointHelper;
 import meteordevelopment.meteorclient.systems.modules.Modules;
@@ -10,6 +11,8 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 @Mixin(ChatScreen.class)
 public abstract class ChatScreenMixin {
@@ -27,13 +30,23 @@ public abstract class ChatScreenMixin {
         }
 
         if (clickEvent instanceof ClickEvent.RunCommand cmd && cmd.command().startsWith(".chatwaypoint-gui ")) {
+            if (!MapIntegration.chatCoordsEnabled()) return;
             String[] parts = cmd.command().split(" ");
             if (parts.length == 4) {
                 try {
-                    XaeroWaypointHelper.openChatWaypointGui(
-                        Integer.parseInt(parts[1]),
-                        Integer.parseInt(parts[2]),
-                        Integer.parseInt(parts[3]));
+                    int x = Integer.parseInt(parts[1]);
+                    int z = Integer.parseInt(parts[3]);
+                    int y;
+                    if (parts[2].equals("~")) {
+                        if (mc.player == null) {
+                            cir.setReturnValue(true);
+                            return;
+                        }
+                        y = mc.player.blockPosition().getY();
+                    } else {
+                        y = Integer.parseInt(parts[2]);
+                    }
+                    XaeroWaypointHelper.openChatWaypointGui(x, y, z);
                 } catch (NumberFormatException ignored) {}
             }
             cir.setReturnValue(true);

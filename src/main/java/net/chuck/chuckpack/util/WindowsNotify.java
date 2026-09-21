@@ -85,6 +85,16 @@ public final class WindowsNotify {
                         } catch (InterruptedException e) {
                             return;
                         }
+                        // No tray icon squatting: drop it when idle, it is
+                        // re-added on the next notification.
+                        synchronized (LOCK) {
+                            if (QUEUE.isEmpty() && trayIcon != null) {
+                                try {
+                                    SystemTray.getSystemTray().remove(trayIcon);
+                                } catch (Throwable ignored) {}
+                                trayIcon = null;
+                            }
+                        }
                     }
                 } catch (Throwable ignored) {}
             }, "ChuckPack-Notify");
