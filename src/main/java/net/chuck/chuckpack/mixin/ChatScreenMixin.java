@@ -1,6 +1,6 @@
 package net.chuck.chuckpack.mixin;
 
-import net.chuck.chuckpack.modules.misc.MapIntegration;
+import net.chuck.chuckpack.modules.misc.ChatWaypoints;
 import net.chuck.chuckpack.modules.world.BaseFinder;
 import net.chuck.chuckpack.util.XaeroWaypointHelper;
 import meteordevelopment.meteorclient.systems.modules.Modules;
@@ -30,7 +30,7 @@ public abstract class ChatScreenMixin {
         }
 
         if (clickEvent instanceof ClickEvent.RunCommand cmd && cmd.command().startsWith(".chatwaypoint-gui ")) {
-            if (!MapIntegration.chatCoordsEnabled()) return;
+            if (!ChatWaypoints.chatCoordsEnabled()) return;
             String[] parts = cmd.command().split(" ");
             if (parts.length == 4) {
                 try {
