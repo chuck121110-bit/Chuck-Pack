@@ -23,6 +23,7 @@ import net.chuck.chuckpack.modules.misc.PlayerTriangulate;
 import net.chuck.chuckpack.modules.misc.villagerroller.VillagerRoller;
 import net.chuck.chuckpack.modules.misc.StaffMonitor;
 import net.chuck.chuckpack.modules.movement.AutoFly;
+import net.chuck.chuckpack.modules.movement.BaritoneSwim;
 import net.chuck.chuckpack.modules.movement.BedrockEscape;
 import net.chuck.chuckpack.modules.movement.Tunnel;
 import net.chuck.chuckpack.modules.movement.FlightScrollHandler;
@@ -77,6 +78,7 @@ public class ChuckPack extends MeteorAddon {
         addModule(new AutoInteract());
         addModule(new AntiSocial());
         addModule(new AutoFly());
+        addModule(new BaritoneSwim());
         addModule(new BedrockEscape());
         addModule(new Tunnel());
         addModule(new AutoFarming());

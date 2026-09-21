@@ -57,6 +57,11 @@ public class BaritoneNotifier extends Module {
     private IGameEventListener listener;
     private boolean fullNotified;
     private int tickCounter;
+    private long lastGoalNotify;
+    private long lastFailNotify;
+
+    private static final long GOAL_COOLDOWN_MS = 30000;
+    private static final long FAIL_COOLDOWN_MS = 15000;
 
     public BaritoneNotifier() {
         super(Categories.Misc, "baritone-notifier", "Windows notifications for Baritone background events (goal reached, path failed, inventory full).");
@@ -87,10 +92,17 @@ public class BaritoneNotifier extends Module {
 
                 @Override
                 public void onPathEvent(PathEvent event) {
+                    long now = System.currentTimeMillis();
                     if (event == PathEvent.AT_GOAL && goalReached.get()) {
-                        WindowsNotify.send("Baritone", "Goal reached.");
+                        if (now - lastGoalNotify >= GOAL_COOLDOWN_MS) {
+                            lastGoalNotify = now;
+                            WindowsNotify.send("Baritone", "Goal reached.");
+                        }
                     } else if ((event == PathEvent.CALC_FAILED || event == PathEvent.NEXT_CALC_FAILED) && pathFailed.get()) {
-                        WindowsNotify.send("Baritone", "Path calculation failed.");
+                        if (now - lastFailNotify >= FAIL_COOLDOWN_MS) {
+                            lastFailNotify = now;
+                            WindowsNotify.send("Baritone", "Path calculation failed.");
+                        }
                     }
                 }
             };
