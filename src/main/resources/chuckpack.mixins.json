@@ -37,7 +37,6 @@
     "KillAuraMixin",
     "WaypointReaderMixin",
     "PacketByteBufNbtLimitMixin",
-    "ChatCoordinateMixin",
     "ChatScreenMixin",
     "TunnelChatMixin",
     "SwarmConnectionMixin",
