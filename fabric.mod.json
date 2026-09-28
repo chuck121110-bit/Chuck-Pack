@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "chuckpack",
-  "version": "1.0.12",
+  "version": "${version}",
   "name": "Chuck Pack",
   "description": "Chuck Pack — feature-rich Meteor Client addon for 26.1.2 with 30+ modules, swarm support, AutoFly pathfinding, NoFall NoGround spoof, Tunnel & more. Updates check on startup via Config. By Chuck.",
   "authors": ["Chuck"],
