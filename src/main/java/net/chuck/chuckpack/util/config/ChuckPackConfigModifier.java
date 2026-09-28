@@ -34,13 +34,6 @@ public class ChuckPackConfigModifier {
         .build()
     );
 
-    public final Setting<String> githubToken = sgChuckPack.add(new StringSetting.Builder()
-        .name("github-token")
-        .description("Fine-grained GitHub personal access token (read-only) for the private Chuck-Pack repo. Required for the auto-updater to see releases.")
-        .defaultValue("")
-        .build()
-    );
-
     public final Setting<Boolean> debugLogging = sgChuckPack.add(new BoolSetting.Builder()
         .name("debug-logging")
         .description("Master switch for debug logging (auto-connect, auto-updater, swarm) — shows detailed logs to help find issues.")
