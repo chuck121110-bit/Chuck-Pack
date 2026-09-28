@@ -1,0 +1,38 @@
+name: Publish release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Build workflow run id to take the jar artifact from"
+        required: true
+      version:
+        description: "Version (matches gradle.properties mod_version)"
+        required: true
+        default: "1.0.78"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p dist
+          gh run download "${{ inputs.run_id }}" -n "chuckpack-${{ inputs.version }}" -D dist
+          ls -la dist
+
+      - name: Create or update GitHub release and upload jar
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ inputs.version }}"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --notes "Chuck Pack $TAG"
+          fi
+          gh release upload "$TAG" dist/*.jar --clobber
