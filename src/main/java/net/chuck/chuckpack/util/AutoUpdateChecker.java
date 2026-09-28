@@ -21,7 +21,6 @@ import java.util.concurrent.CompletableFuture;
 public class AutoUpdateChecker {
     private static String latestVersion = "";
     private static String downloadUrl = "";
-    private static String apiAssetUrl = "";
     private static String latestFileName = "";
     private static boolean updateAvailable = false;
     public static String splashStatus = "";
@@ -39,18 +38,17 @@ public class AutoUpdateChecker {
         CompletableFuture.runAsync(() -> {
             try {
                 String currentVersion = getVersion();
-                String token = ChuckPackConfigModifier.get().githubToken.get().trim();
+                // The repo is public: anonymous release checks work for everyone, no token needed.
                 HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(10))
                     .build();
 
-                HttpRequest.Builder rb = HttpRequest.newBuilder()
+                HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("https://api.github.com/repos/chuck121110-bit/Chuck-Pack/releases/latest"))
                     .header("Accept", "application/vnd.github.v3+json")
                     .header("User-Agent", "ChuckPack-AutoUpdater")
-                    .GET();
-                if (!token.isEmpty()) rb.header("Authorization", "Bearer " + token);
-                HttpRequest request = rb.build();
+                    .GET()
+                    .build();
 
                 HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
@@ -73,7 +71,6 @@ public class AutoUpdateChecker {
                                 String lower = name.toLowerCase();
                                 if (name.endsWith(".jar") && lower.contains("chuck") && lower.contains("pack")) {
                                     downloadUrl = assetObj.get("browser_download_url").getAsString();
-                                    if (assetObj.has("url")) apiAssetUrl = assetObj.get("url").getAsString();
                                     latestFileName = name;
                                     ChuckPack.LOG.info("Download: {} (file: {})", downloadUrl, latestFileName);
                                     break;
@@ -91,15 +88,6 @@ public class AutoUpdateChecker {
                         updateAvailable = false;
                         splashStatus = "Chuck Pack up to date: " + currentClean;
                         ChuckPack.LOG.info("Chuck Pack is up to date: {}", currentClean);
-                    }
-                } else if (response.statusCode() == 404 || response.statusCode() == 401 || response.statusCode() == 403) {
-                    // Private repo: GitHub returns 404/401/403 without a valid token — never silently call this "up to date".
-                    if (token.isEmpty()) {
-                        splashStatus = "Chuck Pack update check needs a GitHub token (repo is private)";
-                        ChuckPack.LOG.warn("AutoUpdate: repo is private and no GitHub token is set — paste a read-only token in Config > Chuck Pack > github-token.");
-                    } else {
-                        splashStatus = "Chuck Pack update check failed: " + response.statusCode();
-                        ChuckPack.LOG.warn("AutoUpdate GitHub API returned status {} even with a token — check the token's repo permissions.", response.statusCode());
                     }
                 } else {
                     splashStatus = "Chuck Pack update check failed: " + response.statusCode();
@@ -134,19 +122,13 @@ public class AutoUpdateChecker {
                     .followRedirects(HttpClient.Redirect.NORMAL)
                     .build();
 
-                // Private repo assets: use the API asset URL with octet-stream + token.
-                // Public/fallback: browser_download_url as before.
-                String token = ChuckPackConfigModifier.get().githubToken.get().trim();
-                String dlUrl = (!token.isEmpty() && !apiAssetUrl.isEmpty()) ? apiAssetUrl : downloadUrl;
-                HttpRequest.Builder drb = HttpRequest.newBuilder()
+                // Public repo: browser_download_url works anonymously for everyone.
+                String dlUrl = downloadUrl;
+                HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(dlUrl))
                     .header("User-Agent", "ChuckPack-AutoUpdater")
-                    .GET();
-                if (!token.isEmpty()) {
-                    drb.header("Authorization", "Bearer " + token);
-                    if (dlUrl.equals(apiAssetUrl)) drb.header("Accept", "application/octet-stream");
-                }
-                HttpRequest request = drb.build();
+                    .GET()
+                    .build();
 
                 HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
