@@ -53,22 +53,11 @@ dependencies {
     compileOnly "net.fabricmc.fabric-api:fabric-resource-loader-v1:2.0.9+d871b99e4c"
 
     // Cubiomes native bindings (HawtJNI, natives auto-loaded from META-INF/native)
-    extraLibs("dev.duti.acheong:cubiomes:1.22.5") {
-        exclude group: "net.minecraft"
-        exclude group: "com.mojang"
-    }
-    extraLibs("dev.duti.acheong:cubiomes:1.22.5:windows64") {
-        exclude group: "net.minecraft"
-        exclude group: "com.mojang"
-    }
-    extraLibs("dev.duti.acheong:cubiomes:1.22.5:linux64") {
-        exclude group: "net.minecraft"
-        exclude group: "com.mojang"
-    }
-    extraLibs("dev.duti.acheong:cubiomes:1.22.5:osx") {
-        exclude group: "net.minecraft"
-        exclude group: "com.mojang"
-    }
+    // Vendored in libs/ — upstream maven (maven.duti.dev) is unreliable
+    extraLibs files('libs/cubiomes-1.22.5.jar')
+    extraLibs files('libs/cubiomes-1.22.5-windows64.jar')
+    extraLibs files('libs/cubiomes-1.22.5-linux64.jar')
+    extraLibs files('libs/cubiomes-1.22.5-osx.jar')
 }
 
 jar {
