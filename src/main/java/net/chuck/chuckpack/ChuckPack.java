@@ -5,6 +5,7 @@ import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
+import net.chuck.chuckpack.modules.combat.KnockbackDisplacer;
 import net.chuck.chuckpack.modules.combat.MaceDamage;
 import net.chuck.chuckpack.modules.combat.SpearKill;
 import net.chuck.chuckpack.modules.combat.Untouchable;
@@ -70,6 +71,7 @@ public class ChuckPack extends MeteorAddon {
 
         addModule(new NewChunks());
         addModule(new MaceDamage());
+        addModule(new KnockbackDisplacer());
         addModule(new SpearKill());
         addModule(new AiChat());
         addModule(new AiChatConverse());
