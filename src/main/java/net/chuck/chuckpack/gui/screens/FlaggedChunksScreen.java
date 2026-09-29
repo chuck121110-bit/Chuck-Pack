@@ -43,8 +43,24 @@ public class FlaggedChunksScreen extends WindowScreen {
         Map.entry("Bubble Column", new ItemStack(Items.HEART_OF_THE_SEA)),
         Map.entry("Spawner", new ItemStack(Items.SPAWNER)),
         Map.entry("Loaded from File", new ItemStack(Items.BOOK)),
-        Map.entry("Manual Add", new ItemStack(Items.EMERALD))
+        Map.entry("Manual Add", new ItemStack(Items.EMERALD)),
+        Map.entry("List 1", new ItemStack(Items.PAPER)),
+        Map.entry("List 2", new ItemStack(Items.PAPER)),
+        Map.entry("List 3", new ItemStack(Items.PAPER)),
+        Map.entry("List 4", new ItemStack(Items.PAPER)),
+        Map.entry("List 5", new ItemStack(Items.PAPER)),
+        Map.entry("List 6", new ItemStack(Items.PAPER)),
+        Map.entry("List 7", new ItemStack(Items.PAPER))
     );
+
+    private static ItemStack triggerIcon(String reason) {
+        ItemStack icon = TRIGGER_ICONS.get(reason);
+        if (icon != null) return icon;
+        icon = ENTITY_ICONS.get(reason);
+        if (icon != null) return icon;
+        if (reason.startsWith("Storage")) return new ItemStack(Items.CHEST);
+        return new ItemStack(Items.REDSTONE_TORCH);
+    }
 
     private static final Map<String, ItemStack> ENTITY_ICONS = Map.of(
         "Item Frame", new ItemStack(Items.ITEM_FRAME),
@@ -171,6 +187,7 @@ public class FlaggedChunksScreen extends WindowScreen {
         for (Map.Entry<String, Integer> e : reasons.entrySet()) {
             String reason = e.getKey();
             if (reason.startsWith("List ")) continue;
+            if (reason.startsWith("Storage")) continue;
             if (ENTITY_ICONS.containsKey(reason)) continue;
             filtered.put(reason, e.getValue());
         }
@@ -187,7 +204,7 @@ public class FlaggedChunksScreen extends WindowScreen {
         for (Map.Entry<String, Integer> entry : sorted) {
             String reason = entry.getKey();
             int count = entry.getValue();
-            ItemStack icon = TRIGGER_ICONS.getOrDefault(reason, new ItemStack(Items.REDSTONE_TORCH));
+            ItemStack icon = triggerIcon(reason);
             triggerTable.add(theme.item(icon));
             String label = reason + (count > 1 ? " x" + count : "");
             triggerTable.add(theme.label(label)).expandX();

@@ -73,7 +73,7 @@ public class FlightMixin {
     @Inject(method = "onPreTick", at = @At("HEAD"))
     private void chuckpack$noSprint(TickEvent.Pre event, CallbackInfo ci) {
         Flight self = (Flight)(Object)this;
-        if (!self.isActive() || chuckpack$mc.player == null) return;
+        if ((!self.isActive() && !chuckpack$isAutoFlyActive()) || chuckpack$mc.player == null) return;
         try {
             var s = self.settings.get("no-sprint");
             if (s instanceof BoolSetting bs && bs.get()) {

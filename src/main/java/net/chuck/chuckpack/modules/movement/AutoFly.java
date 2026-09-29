@@ -337,6 +337,15 @@ public final class AutoFly extends Module
 		.build()
 	);
 
+	private final Setting<Integer> cruiseClimb = sgAutomation.add(new IntSetting.Builder()
+		.name("cruise-climb")
+		.description("How far above your current height AutoFly climbs when the target height is unknown. 0 = stay level and let terrain avoidance handle hills.")
+		.defaultValue(25)
+		.min(0)
+		.sliderMax(200)
+		.build()
+	);
+
 	private final Setting<Boolean> showPath = sgRender.add(new BoolSetting.Builder()
 		.name("show-path")
 		.description("Render FlyTo's calculated route in the world.")
@@ -375,6 +384,8 @@ public final class AutoFly extends Module
 	private Object autoFlyWaypoint;
 	private Object existingWaypointOriginal;
 	private String originalWaypointSymbol;
+	private String originalWaypointName;
+	private Integer originalWaypointColor;
 
 	private long lastDangerAvoidMs = 0;
 	private int unreachableTicks = 0;
@@ -1321,6 +1332,8 @@ public final class AutoFly extends Module
 
 		existingWaypointOriginal = null;
 		originalWaypointSymbol = null;
+		originalWaypointName = null;
+		originalWaypointColor = null;
 
 		arrived = false;
 		currentSpeed = startSpeed.get();
@@ -1378,9 +1391,23 @@ public final class AutoFly extends Module
 		Class<?> wpClass = Class.forName("xaero.common.minimap.waypoints.Waypoint");
 		if(minimapWaypoint != null && wpClass.isInstance(minimapWaypoint))
 		{
-			existingWaypointOriginal = minimapWaypoint;
-			originalWaypointSymbol = originalSymbol;
+			try {
+				existingWaypointOriginal = minimapWaypoint;
+				try { originalWaypointSymbol = (String) wpClass.getMethod("getSymbol").invoke(minimapWaypoint); } catch(Throwable ignored) { originalWaypointSymbol = originalSymbol; }
+				try { originalWaypointName = (String) wpClass.getMethod("getName").invoke(minimapWaypoint); } catch(Throwable ignored) {}
+				try { originalWaypointColor = (Integer) wpClass.getMethod("getColor").invoke(minimapWaypoint); } catch(Throwable ignored) {}
+			} catch(Throwable ignored) {
+				existingWaypointOriginal = minimapWaypoint;
+				originalWaypointSymbol = originalSymbol;
+			}
 			wpClass.getMethod("setSymbol", String.class).invoke(minimapWaypoint, "AD");
+			try { wpClass.getMethod("setName", String.class).invoke(minimapWaypoint, "AD"); } catch(Throwable ignored) {}
+			try {
+				Class<?> colorClass = Class.forName("xaero.hud.minimap.waypoint.WaypointColor");
+				Object aqua = colorClass.getField("AQUA").get(null);
+				int aquaHex = (int) colorClass.getMethod("getHex").invoke(aqua);
+				wpClass.getMethod("setColor", int.class).invoke(minimapWaypoint, aquaHex);
+			} catch(Throwable ignored) {}
 			try {
 				Object worldManagerIO = session.getClass().getMethod("getWorldManagerIO").invoke(session);
 				for(java.lang.reflect.Method m : worldManagerIO.getClass().getMethods()) {
@@ -1390,14 +1417,7 @@ public final class AutoFly extends Module
 					}
 				}
 			} catch(Throwable ignored) {}
-			try {
-				Object supportMods = Class.forName("xaero.map.mods.SupportMods").getField("xaeroMinimap").get(null);
-				if(supportMods != null) {
-					java.lang.reflect.Field f = supportMods.getClass().getDeclaredField("refreshWaypoints");
-					f.setAccessible(true);
-					f.setBoolean(supportMods, true);
-				}
-			} catch(Throwable ignored) {}
+			refreshXaeroWaypoints();
 			return;
 		}
 		Iterable<?> existingWaypoints = (Iterable<?>) currentSet.getClass().getMethod("getWaypoints").invoke(currentSet);
@@ -1408,9 +1428,23 @@ public final class AutoFly extends Module
 			int exY = (int) wpClass.getMethod("getY").invoke(wp);
 			if(exX == x && exZ == z && exY == y)
 			{
-				existingWaypointOriginal = wp;
-				originalWaypointSymbol = originalSymbol;
+				try {
+					existingWaypointOriginal = wp;
+					try { originalWaypointSymbol = (String) wpClass.getMethod("getSymbol").invoke(wp); } catch(Throwable ignored) { originalWaypointSymbol = originalSymbol; }
+					try { originalWaypointName = (String) wpClass.getMethod("getName").invoke(wp); } catch(Throwable ignored) {}
+					try { originalWaypointColor = (Integer) wpClass.getMethod("getColor").invoke(wp); } catch(Throwable ignored) {}
+				} catch(Throwable ignored) {
+					existingWaypointOriginal = wp;
+					originalWaypointSymbol = originalSymbol;
+				}
 				wpClass.getMethod("setSymbol", String.class).invoke(wp, "AD");
+				try { wpClass.getMethod("setName", String.class).invoke(wp, "AD"); } catch(Throwable ignored) {}
+				try {
+					Class<?> colorClass = Class.forName("xaero.hud.minimap.waypoint.WaypointColor");
+					Object aqua = colorClass.getField("AQUA").get(null);
+					int aquaHex = (int) colorClass.getMethod("getHex").invoke(aqua);
+					wpClass.getMethod("setColor", int.class).invoke(wp, aquaHex);
+				} catch(Throwable ignored) {}
 					try {
 						Object worldManagerIO = session.getClass().getMethod("getWorldManagerIO").invoke(session);
 						for(java.lang.reflect.Method m : worldManagerIO.getClass().getMethods()) {
@@ -1420,14 +1454,7 @@ public final class AutoFly extends Module
 							}
 						}
 					} catch(Throwable ignored) {}
-					try {
-						Object supportMods = Class.forName("xaero.map.mods.SupportMods").getField("xaeroMinimap").get(null);
-						if(supportMods != null) {
-							java.lang.reflect.Field f = supportMods.getClass().getDeclaredField("refreshWaypoints");
-							f.setAccessible(true);
-							f.setBoolean(supportMods, true);
-						}
-					} catch(Throwable ignored) {}
+					refreshXaeroWaypoints();
 					break;
 				}
 			}
@@ -1436,11 +1463,13 @@ public final class AutoFly extends Module
 
 	private void restoreExistingWaypointSymbol()
 	{
-		if(existingWaypointOriginal == null || originalWaypointSymbol == null) return;
+		if(existingWaypointOriginal == null) return;
 		try
 		{
 			Class<?> wpClass = Class.forName("xaero.common.minimap.waypoints.Waypoint");
-			wpClass.getMethod("setSymbol", String.class).invoke(existingWaypointOriginal, originalWaypointSymbol);
+			if(originalWaypointSymbol != null) wpClass.getMethod("setSymbol", String.class).invoke(existingWaypointOriginal, originalWaypointSymbol);
+			if(originalWaypointName != null) try { wpClass.getMethod("setName", String.class).invoke(existingWaypointOriginal, originalWaypointName); } catch(Throwable ignored) {}
+			if(originalWaypointColor != null) try { wpClass.getMethod("setColor", int.class).invoke(existingWaypointOriginal, originalWaypointColor.intValue()); } catch(Throwable ignored) {}
 
 			Object builtInMinimap = Class.forName("xaero.hud.minimap.BuiltInHudModules")
 				.getField("MINIMAP").get(null);
@@ -1460,19 +1489,33 @@ public final class AutoFly extends Module
 							}
 						}
 					} catch(Throwable ignored) {}
-					try {
-						Object supportMods = Class.forName("xaero.map.mods.SupportMods").getField("xaeroMinimap").get(null);
-						if(supportMods != null) {
-							java.lang.reflect.Field f = supportMods.getClass().getDeclaredField("refreshWaypoints");
-							f.setAccessible(true);
-							f.setBoolean(supportMods, true);
-						}
-					} catch(Throwable ignored) {}
+					refreshXaeroWaypoints();
 				}
 			}
 		}catch(Throwable ignored) {}
 		existingWaypointOriginal = null;
 		originalWaypointSymbol = null;
+		originalWaypointName = null;
+		originalWaypointColor = null;
+	}
+
+	private void refreshXaeroWaypoints() {
+		try {
+			Object supportMods = Class.forName("xaero.map.mods.SupportMods").getField("xaeroMinimap").get(null);
+			if(supportMods != null) {
+				java.lang.reflect.Field f = supportMods.getClass().getDeclaredField("refreshWaypoints");
+				f.setAccessible(true);
+				f.setBoolean(supportMods, true);
+			}
+		} catch(Throwable ignored) {}
+		try {
+			Object supportModsWm = Class.forName("xaero.map.mods.SupportMods").getField("xaeroWorldMap").get(null);
+			if(supportModsWm != null) {
+				for(java.lang.reflect.Field ff : supportModsWm.getClass().getDeclaredFields()) {
+					if(ff.getName().toLowerCase().contains("refresh")) { try { ff.setAccessible(true); ff.setBoolean(supportModsWm, true); } catch(Throwable ignored) {} }
+				}
+			}
+		} catch(Throwable ignored) {}
 	}
 
 	private void syncConfig()
@@ -1487,7 +1530,14 @@ public final class AutoFly extends Module
 		pathFlightConfig.flightRenderPath = false;
 		pathFlightConfig.flightDebug = pathDebug.get();
 		pathFlightConfig.flightVerbose = verboseDebug.get();
-		pathFlightConfig.flightCruiseHeight = 120;
+		int cruise = 120;
+		try {
+			if (mc.player != null && mc.level != null) {
+				cruise = mc.player.getBlockY() + Math.max(0, cruiseClimb.get());
+				cruise = Math.max(mc.level.getMinY() + 2, Math.min(mc.level.getMaxY() - 2, cruise));
+			}
+		} catch (Throwable ignored) {}
+		pathFlightConfig.flightCruiseHeight = cruise;
 
 		if(mc.level != null && mc.level.dimension() != null)
 		{
@@ -1591,14 +1641,7 @@ public final class AutoFly extends Module
 				}
 			} catch(Throwable ignored) {}
 
-			try {
-				Object supportMods = Class.forName("xaero.map.mods.SupportMods").getField("xaeroMinimap").get(null);
-				if(supportMods != null) {
-					java.lang.reflect.Field f = supportMods.getClass().getDeclaredField("refreshWaypoints");
-					f.setAccessible(true);
-					f.setBoolean(supportMods, true);
-				}
-			} catch(Throwable ignored) {}
+			refreshXaeroWaypoints();
 
 			autoFlyWaypoint = waypoint;
 			mapClickTarget = null;
@@ -1611,6 +1654,8 @@ public final class AutoFly extends Module
 	private void removeAutoFlyWaypoint()
 	{
 		if(autoFlyWaypoint == null) return;
+		Object removed = autoFlyWaypoint;
+		autoFlyWaypoint = null;
 		try
 		{
 			Object builtInMinimap = Class.forName("xaero.hud.minimap.BuiltInHudModules")
@@ -1626,12 +1671,18 @@ public final class AutoFly extends Module
 					if(currentSet != null)
 					{
 						Class<?> wpClass = Class.forName("xaero.common.minimap.waypoints.Waypoint");
-						currentSet.getClass().getMethod("remove", wpClass).invoke(currentSet, autoFlyWaypoint);
+						currentSet.getClass().getMethod("remove", wpClass).invoke(currentSet, removed);
+						try {
+							Object worldManagerIO = session.getClass().getMethod("getWorldManagerIO").invoke(session);
+							for(java.lang.reflect.Method m : worldManagerIO.getClass().getMethods()) {
+								if(m.getName().equals("saveWorld")) { m.invoke(worldManagerIO, currentWorld); break; }
+							}
+						} catch(Throwable ignored) {}
+						refreshXaeroWaypoints();
 					}
 				}
 			}
 		}catch(Throwable ignored) {}
-		autoFlyWaypoint = null;
 	}
 
 	private void cleanStaleAutoFlyWaypoints()
@@ -1680,14 +1731,7 @@ public final class AutoFly extends Module
 					}
 				} catch(Throwable ignored) {}
 
-				try {
-					Object supportMods = Class.forName("xaero.map.mods.SupportMods").getField("xaeroMinimap").get(null);
-					if(supportMods != null) {
-						java.lang.reflect.Field f = supportMods.getClass().getDeclaredField("refreshWaypoints");
-						f.setAccessible(true);
-						f.setBoolean(supportMods, true);
-					}
-				} catch(Throwable ignored) {}
+				refreshXaeroWaypoints();
 			}
 		}catch(Throwable ignored) {}
 	}

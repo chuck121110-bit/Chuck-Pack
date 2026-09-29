@@ -100,7 +100,7 @@ public class BedrockEscape extends Module {
 
     private final Setting<Boolean> shiftClickActivation = sgTeleport.add(new BoolSetting.Builder()
         .name("shift-click-activation")
-        .description("Require holding shift to teleport when going down through bedrock.")
+            .description("Require holding the physical Shift key plus right-click to teleport through bedrock, up or down.")
         .defaultValue(false)
         .build()
     );
@@ -211,7 +211,6 @@ public class BedrockEscape extends Module {
     private static int colorToInt(Color c) {
         return (255 << 24) | (c.r << 16) | (c.g << 8) | c.b;
     }
-    private static final double VERTICAL_LOOK_THRESHOLD = 0.99995;
     private static final int NETHER_FLOOR_RENDER_Y = -2;
     private static final int BOAT_PLACE_RETRY_TICKS = 12;
     private static final int BOAT_ENTER_RETRY_TICKS = 12;
@@ -291,8 +290,8 @@ public class BedrockEscape extends Module {
         if (!isValidTarget) return;
         if (!showSafeTick && !ignoreSafeTick.get()) return;
 
-        boolean shiftOk = !targetBelow || !shiftClickActivation.get() || mc.options.keyShift.isDown();
-        boolean wantsTeleport = mc.options.keyAttack.isDown() && shiftOk;
+        boolean shiftOk = !shiftClickActivation.get() || isPhysicalShiftDown();
+        boolean wantsTeleport = mc.options.keyUse.isDown() && shiftOk;
         if (wantsTeleport) {
             if (!teleportedThisPress) {
                 performTeleport(teleportTarget);
@@ -303,7 +302,7 @@ public class BedrockEscape extends Module {
 
         teleportedThisPress = false;
 
-        boolean breakingBelowBedrock = isValidTarget && mc.options.keyShift.isDown();
+        boolean breakingBelowBedrock = isValidTarget && isPhysicalShiftDown();
         if (breakingBelowBedrock) {
             if (shiftBreakCooldown <= 0) {
                 breakBlocksBelowBedrock();
@@ -315,6 +314,14 @@ public class BedrockEscape extends Module {
         }
 
         shiftBreakCooldown = 0;
+    }
+
+    private static boolean isPhysicalShiftDown() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.getWindow() == null) return false;
+        long handle = mc.getWindow().handle();
+        return org.lwjgl.glfw.GLFW.glfwGetKey(handle, org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_SHIFT) == org.lwjgl.glfw.GLFW.GLFW_PRESS
+            || org.lwjgl.glfw.GLFW.glfwGetKey(handle, org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_SHIFT) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
     }
 
     private boolean isActiveBedrockEscapeContext() {
@@ -417,9 +424,6 @@ public class BedrockEscape extends Module {
         isValidTarget = inBedrock;
         float playerHearts = getPlayerHearts();
         double dropDistance = mc.player.getY() - teleportTarget.y;
-        boolean facingDown = direction.y <= -VERTICAL_LOOK_THRESHOLD;
-        boolean facingUp = direction.y >= VERTICAL_LOOK_THRESHOLD;
-        boolean isVertical = facingDown || facingUp;
 
         if (dropDistance > 0) {
             damageHearts = estimateFallDamageHearts(dropDistance);
@@ -430,8 +434,7 @@ public class BedrockEscape extends Module {
         }
 
         boolean safeFromDamage = dropDistance <= 0 || playerHearts >= damageHearts;
-        boolean correctOrientation = dropDistance > 0 ? facingDown : facingUp;
-        showSafeTick = isValidTarget && safeFromDamage && isVertical && correctOrientation;
+        showSafeTick = isValidTarget && safeFromDamage;
         targetBelow = dropDistance > 0;
 
         targetBox = new AABB(

@@ -1284,6 +1284,40 @@ public class NbtFilter extends Module {
     private void sendRed(String message) {
     }
 
+    private static volatile Integer cachedPlayChunkPacketId;
+
+    // 26.2 removed CompressionDecoder's protocol field, so the mixin can no
+    // longer pass it in. PLAY phase ~= player present; chunk id resolved once
+    // from the PLAY codec and cached.
+    public static boolean shouldDropRawClientboundPacket(ByteBuf buf) {
+        NbtFilter hack = getActiveInstance();
+        if (hack == null || buf == null)
+            return false;
+
+        try {
+            if (net.minecraft.client.Minecraft.getInstance().player == null)
+                return false;
+        } catch (Throwable t) {
+            return false;
+        }
+
+        RawPacketId rawId = readRawPacketId(buf);
+        if (rawId == null)
+            return false;
+
+        int payloadBytes = buf.readableBytes() - rawId.bytesRead();
+        if (payloadBytes <= hack.maxSuspiciousPacketBytes())
+            return false;
+
+        Integer chunkPacketId = cachedPlayChunkPacketId;
+        if (chunkPacketId == null) {
+            chunkPacketId = resolveChunkPacketId(ConnectionProtocol.PLAY);
+            if (chunkPacketId != null)
+                cachedPlayChunkPacketId = chunkPacketId;
+        }
+        return chunkPacketId != null && rawId.id() == chunkPacketId;
+    }
+
     public static boolean shouldDropRawClientboundPacket(
         ConnectionProtocol state, ByteBuf buf) {
         NbtFilter hack = getActiveInstance();
