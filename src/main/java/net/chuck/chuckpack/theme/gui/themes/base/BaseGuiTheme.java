@@ -55,6 +55,64 @@ public class BaseGuiTheme extends GuiTheme {
     private final SettingGroup sgModuleColor = settings.createGroup("Module Colors");
     private final SettingGroup sgStarscript = settings.createGroup("Starscript");
 
+    /** Default color palette. Subclass themes override {@link #palette()} to return their own static palette. */
+    protected static class Palette {
+        SettingColor accent, checkbox, plus, minus, favorite;
+        SettingColor text, textSecondary, textHighlight, titleText, loggedIn, placeholder;
+        SettingColor bgNormal, bgHovered, bgPressed;
+        SettingColor outlineNormal, outlineHovered, outlinePressed, windowOutline;
+        double windowOutlineThickness;
+        SettingColor separatorText, separatorCenter, separatorEdges;
+        SettingColor scrollbarNormal, scrollbarHovered, scrollbarPressed;
+        SettingColor sliderHandleNormal, sliderHandleHovered, sliderHandlePressed, sliderLeft, sliderRight;
+        SettingColor moduleHovered, moduleInactive, moduleActive, moduleInactiveGradient, moduleActiveGradient;
+    }
+
+    protected static final Palette EXETER = new Palette();
+
+    static {
+        EXETER.accent = new SettingColor(145, 61, 226);
+        EXETER.checkbox = new SettingColor(145, 61, 226);
+        EXETER.plus = new SettingColor(50, 255, 50);
+        EXETER.minus = new SettingColor(255, 50, 50);
+        EXETER.favorite = new SettingColor(250, 215, 0);
+        EXETER.text = new SettingColor(255, 255, 255);
+        EXETER.textSecondary = new SettingColor(150, 150, 150);
+        EXETER.textHighlight = new SettingColor(45, 125, 245, 100);
+        EXETER.titleText = new SettingColor(255, 255, 255);
+        EXETER.loggedIn = new SettingColor(45, 225, 45);
+        EXETER.placeholder = new SettingColor(255, 255, 255, 20);
+        EXETER.bgNormal = new SettingColor(20, 20, 20, 200);
+        EXETER.bgHovered = new SettingColor(30, 30, 30, 200);
+        EXETER.bgPressed = new SettingColor(40, 40, 40, 200);
+        EXETER.outlineNormal = new SettingColor(0, 0, 0);
+        EXETER.outlineHovered = new SettingColor(10, 10, 10);
+        EXETER.outlinePressed = new SettingColor(20, 20, 20);
+        EXETER.windowOutline = new SettingColor(145, 61, 226);
+        EXETER.windowOutlineThickness = 0;
+        EXETER.separatorText = new SettingColor(255, 255, 255);
+        EXETER.separatorCenter = new SettingColor(255, 255, 255);
+        EXETER.separatorEdges = new SettingColor(225, 225, 225, 150);
+        EXETER.scrollbarNormal = new SettingColor(30, 30, 30, 200);
+        EXETER.scrollbarHovered = new SettingColor(40, 40, 40, 200);
+        EXETER.scrollbarPressed = new SettingColor(50, 50, 50, 200);
+        EXETER.sliderHandleNormal = new SettingColor(130, 0, 255);
+        EXETER.sliderHandleHovered = new SettingColor(140, 30, 255);
+        EXETER.sliderHandlePressed = new SettingColor(150, 60, 255);
+        EXETER.sliderLeft = new SettingColor(100, 35, 170);
+        EXETER.sliderRight = new SettingColor(50, 50, 50);
+        EXETER.moduleHovered = new SettingColor(60, 60, 60);
+        EXETER.moduleInactive = new SettingColor(40, 40, 40, 0);
+        EXETER.moduleActive = new SettingColor(70, 70, 70);
+        EXETER.moduleInactiveGradient = new SettingColor(40, 40, 40, 0);
+        EXETER.moduleActiveGradient = new SettingColor(40, 40, 40, 0);
+    }
+
+    /** Called from field initializers via dynamic dispatch — must only return a static palette, never touch subclass instance state. */
+    protected Palette palette() {
+        return EXETER;
+    }
+
     // General
 
     public final Setting<Double> scale = sgGeneral.add(new DoubleSetting.Builder()
@@ -210,30 +268,30 @@ public class BaseGuiTheme extends GuiTheme {
 
     // Module colors
 
-    public final Setting<SettingColor> moduleHoveredColor = color(sgModuleColor, "module-hovered", "Color of module when hovered.", new SettingColor(60, 60, 60));
-    public final Setting<SettingColor> moduleInactiveColor = color(sgModuleColor, "module-inactive", "Color of module when inactive.", new SettingColor(40, 40, 40, 0));
-    public final Setting<SettingColor> moduleActiveColor = color(sgModuleColor, "module-active", "Color of module when active.", new SettingColor(70, 70, 70));
-    public final Setting<SettingColor> moduleInactiveGradientColor = color(sgModuleColor, "module-inactive-gradient", "Gradient color for inactive modules. 'None' uses inactive color.", new SettingColor(40, 40, 40, 0));
-    public final Setting<SettingColor> moduleActiveGradientColor = color(sgModuleColor, "module-active-gradient", "Gradient color for active modules. 'None' uses inactive color.", new SettingColor(40, 40, 40, 0));
+    public final Setting<SettingColor> moduleHoveredColor = color(sgModuleColor, "module-hovered", "Color of module when hovered.", palette().moduleHovered);
+    public final Setting<SettingColor> moduleInactiveColor = color(sgModuleColor, "module-inactive", "Color of module when inactive.", palette().moduleInactive);
+    public final Setting<SettingColor> moduleActiveColor = color(sgModuleColor, "module-active", "Color of module when active.", palette().moduleActive);
+    public final Setting<SettingColor> moduleInactiveGradientColor = color(sgModuleColor, "module-inactive-gradient", "Gradient color for inactive modules. 'None' uses inactive color.", palette().moduleInactiveGradient);
+    public final Setting<SettingColor> moduleActiveGradientColor = color(sgModuleColor, "module-active-gradient", "Gradient color for active modules. 'None' uses inactive color.", palette().moduleActiveGradient);
 
 
 
     // Colors
 
-    public final Setting<SettingColor> accentColor = color("accent", "Main color of the GUI.", new SettingColor(145, 61, 226));
-    public final Setting<SettingColor> checkboxColor = color("checkbox", "Color of checkbox.", new SettingColor(145, 61, 226));
-    public final Setting<SettingColor> plusColor = color("plus", "Color of plus button.", new SettingColor(50, 255, 50));
-    public final Setting<SettingColor> minusColor = color("minus", "Color of minus button.", new SettingColor(255, 50, 50));
-    public final Setting<SettingColor> favoriteColor = color("favorite", "Color of checked favorite button.", new SettingColor(250, 215, 0));
+    public final Setting<SettingColor> accentColor = color("accent", "Main color of the GUI.", palette().accent);
+    public final Setting<SettingColor> checkboxColor = color("checkbox", "Color of checkbox.", palette().checkbox);
+    public final Setting<SettingColor> plusColor = color("plus", "Color of plus button.", palette().plus);
+    public final Setting<SettingColor> minusColor = color("minus", "Color of minus button.", palette().minus);
+    public final Setting<SettingColor> favoriteColor = color("favorite", "Color of checked favorite button.", palette().favorite);
 
     // Text
 
-    public final Setting<SettingColor> textColor = color(sgTextColors, "text", "Color of text.", new SettingColor(255, 255, 255));
-    public final Setting<SettingColor> textSecondaryColor = color(sgTextColors, "text-secondary-text", "Color of secondary text.", new SettingColor(150, 150, 150));
-    public final Setting<SettingColor> textHighlightColor = color(sgTextColors, "text-highlight", "Color of text highlighting.", new SettingColor(45, 125, 245, 100));
-    public final Setting<SettingColor> titleTextColor = color(sgTextColors, "title-text", "Color of title text.", new SettingColor(255, 255, 255));
-    public final Setting<SettingColor> loggedInColor = color(sgTextColors, "logged-in-text", "Color of logged in account name.", new SettingColor(45, 225, 45));
-    public final Setting<SettingColor> placeholderColor = color(sgTextColors, "placeholder", "Color of placeholder text.", new SettingColor(255, 255, 255, 20));
+    public final Setting<SettingColor> textColor = color(sgTextColors, "text", "Color of text.", palette().text);
+    public final Setting<SettingColor> textSecondaryColor = color(sgTextColors, "text-secondary-text", "Color of secondary text.", palette().textSecondary);
+    public final Setting<SettingColor> textHighlightColor = color(sgTextColors, "text-highlight", "Color of text highlighting.", palette().textHighlight);
+    public final Setting<SettingColor> titleTextColor = color(sgTextColors, "title-text", "Color of title text.", palette().titleText);
+    public final Setting<SettingColor> loggedInColor = color(sgTextColors, "logged-in-text", "Color of logged in account name.", palette().loggedIn);
+    public final Setting<SettingColor> placeholderColor = color(sgTextColors, "placeholder", "Color of placeholder text.", palette().placeholder);
 
 
     // Background
@@ -241,9 +299,9 @@ public class BaseGuiTheme extends GuiTheme {
     public final ThreeStateColorSetting backgroundColor = new ThreeStateColorSetting(
             sgBackgroundColors,
             "background",
-            new SettingColor(20, 20, 20, 200),
-            new SettingColor(30, 30, 30, 200),
-            new SettingColor(40, 40, 40, 200)
+            palette().bgNormal,
+            palette().bgHovered,
+            palette().bgPressed
     );
 
     // Outline
@@ -251,17 +309,17 @@ public class BaseGuiTheme extends GuiTheme {
     public final ThreeStateColorSetting outlineColor = new ThreeStateColorSetting(
             sgOutline,
             "outline",
-            new SettingColor(0, 0, 0),
-            new SettingColor(10, 10, 10),
-            new SettingColor(20, 20, 20)
+            palette().outlineNormal,
+            palette().outlineHovered,
+            palette().outlinePressed
     );
 
-    public final Setting<SettingColor> windowOutlineColor = color(sgOutline, "window-outline", "Color of window outlines.", new SettingColor(145, 61, 226));
+    public final Setting<SettingColor> windowOutlineColor = color(sgOutline, "window-outline", "Color of window outlines.", palette().windowOutline);
 
     public final Setting<Double> windowOutlineThickness = sgOutline.add(new DoubleSetting.Builder()
             .name("window-outline-thickness")
-            .description("Thickness of window outlines.")
-            .defaultValue(0)
+        .description("Thickness of window outlines.")
+        .defaultValue(palette().windowOutlineThickness)
             .min(0)
             .max(5)
             .sliderRange(0, 5)
@@ -270,18 +328,18 @@ public class BaseGuiTheme extends GuiTheme {
 
     // Separator
 
-    public final Setting<SettingColor> separatorText = color(sgSeparator, "separator-text", "Color of separator text", new SettingColor(255, 255, 255));
-    public final Setting<SettingColor> separatorCenter = color(sgSeparator, "separator-center", "Center color of separators.", new SettingColor(255, 255, 255));
-    public final Setting<SettingColor> separatorEdges = color(sgSeparator, "separator-edges", "Color of separator edges.", new SettingColor(225, 225, 225, 150));
+    public final Setting<SettingColor> separatorText = color(sgSeparator, "separator-text", "Color of separator text", palette().separatorText);
+    public final Setting<SettingColor> separatorCenter = color(sgSeparator, "separator-center", "Center color of separators.", palette().separatorCenter);
+    public final Setting<SettingColor> separatorEdges = color(sgSeparator, "separator-edges", "Color of separator edges.", palette().separatorEdges);
 
     // Scrollbar
 
     public final ThreeStateColorSetting scrollbarColor = new ThreeStateColorSetting(
             sgScrollbar,
             "Scrollbar",
-            new SettingColor(30, 30, 30, 200),
-            new SettingColor(40, 40, 40, 200),
-            new SettingColor(50, 50, 50, 200)
+            palette().scrollbarNormal,
+            palette().scrollbarHovered,
+            palette().scrollbarPressed
     );
 
     // Slider
@@ -289,13 +347,13 @@ public class BaseGuiTheme extends GuiTheme {
     public final ThreeStateColorSetting sliderHandle = new ThreeStateColorSetting(
             sgSlider,
             "slider-handle",
-            new SettingColor(130, 0, 255),
-            new SettingColor(140, 30, 255),
-            new SettingColor(150, 60, 255)
+            palette().sliderHandleNormal,
+            palette().sliderHandleHovered,
+            palette().sliderHandlePressed
     );
 
-    public final Setting<SettingColor> sliderLeft = color(sgSlider, "slider-left", "Color of slider left part.", new SettingColor(100,35,170));
-    public final Setting<SettingColor> sliderRight = color(sgSlider, "slider-right", "Color of slider right part.", new SettingColor(50, 50, 50));
+    public final Setting<SettingColor> sliderLeft = color(sgSlider, "slider-left", "Color of slider left part.", palette().sliderLeft);
+    public final Setting<SettingColor> sliderRight = color(sgSlider, "slider-right", "Color of slider right part.", palette().sliderRight);
 
     // Starscript
 
@@ -311,7 +369,11 @@ public class BaseGuiTheme extends GuiTheme {
     private final Setting<SettingColor> starscriptAccessedObjects = color(sgStarscript, "starscript-accessed-objects", "Color of accessed objects (before a dot) in Starscript code.", new SettingColor(152, 118, 170));
 
     public BaseGuiTheme() {
-        super("Exeter");
+        this("Exeter");
+    }
+
+    protected BaseGuiTheme(String name) {
+        super(name);
 
         settingsFactory = new DefaultSettingsWidgetFactory(this);
     }
