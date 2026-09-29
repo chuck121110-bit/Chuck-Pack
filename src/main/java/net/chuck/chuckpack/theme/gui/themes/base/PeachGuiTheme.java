@@ -7,7 +7,7 @@ import meteordevelopment.meteorclient.utils.render.color.SettingColor;
  * Dark plum backgrounds (14,10,25), peach accent (255,150,118), pill controls.
  */
 public class PeachGuiTheme extends BaseGuiTheme {
-    private static final Palette PEACH = new Palette();
+    static final Palette PEACH = new Palette();
 
     static {
         PEACH.accent = new SettingColor(255, 150, 118);
@@ -48,7 +48,11 @@ public class PeachGuiTheme extends BaseGuiTheme {
     }
 
     public PeachGuiTheme() {
-        super("Peach");
+        super("Peach V1");
+    }
+
+    protected PeachGuiTheme(String name) {
+        super(name);
     }
 
     @Override

@@ -154,6 +154,9 @@ public class ChuckPack extends MeteorAddon {
         meteordevelopment.meteorclient.gui.GuiThemes.add(
             new net.chuck.chuckpack.theme.gui.themes.base.GlassGuiTheme()
         );
+        meteordevelopment.meteorclient.gui.GuiThemes.add(
+            new net.chuck.chuckpack.theme.gui.themes.base.PeachV2GuiTheme()
+        );
 
         LOG.info("Chuck Pack ready.");
     }
